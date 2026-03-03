@@ -182,12 +182,12 @@ export default function WelcomeScreen({ onEnter }) {
             Que la plata no sea<br />motivo de pelea
           </h1>
           <p style={{ fontSize:15, color:"#ffffff66", lineHeight:1.6, margin:0 }}>
-            Gastos compartidos de manera simple y ordenada. Justa y automática.
+            Gastos compartidos de manera simple y ordenada,{"\n"}justa y automática.
           </p>
         </div>
 
         {/* ── FEATURE CARD con animación slide ── */}
-        <div style={{ opacity: visible ? 1 : 0, animation: visible ? "fadeUp 0.7s ease 0.15s forwards" : "none", marginBottom: 28 }}>
+        <div style={{ opacity: visible ? 1 : 0, animation: visible ? "fadeUp 0.7s ease 0.15s forwards" : "none", marginBottom: 16 }}>
           <div style={{ position:"relative", minHeight:100, overflow:"hidden" }}>
             <div
               key={displayedFeature}
@@ -251,7 +251,7 @@ export default function WelcomeScreen({ onEnter }) {
             className="btn-press"
             onClick={handleShare}
             style={{ width:"100%", padding:"14px 20px", borderRadius:18, background:"transparent", border:"1px solid #ffffff18", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontFamily:SF, fontWeight:600, fontSize:15, color:"#ffffffbb", marginBottom:20, transition:"all 0.2s" }}>
-            📤 Compartir X-penses
+            Compartir X-penses
           </button>
 
           {error && <p style={{ color:"#ff6b6b", fontSize:13, textAlign:"center", margin:"-12px 0 14px" }}>{error}</p>}
