@@ -7,6 +7,7 @@ import AuthScreen from "./AuthScreen";
 import ConfigScreen from "./ConfigScreen";
 import SettingsScreen from "./SettingsScreen";
 import AccountSelectorScreen from "./AccountSelectorScreen";
+import WelcomeScreen from "./WelcomeScreen";
 import EditExpenseModal from "./EditExpenseModal";
 import { NotifProvider, useNotif, NotifCenter, NOTIF_TYPES } from "./notifications";
 import { useTheme, formatAmount, CURRENCIES } from "./theme.jsx";
@@ -417,27 +418,27 @@ function AppInner() {
   const [showNotifs, setShowNotifs] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [userAccounts, setUserAccounts] = useState([]);
+  const [showWelcome, setShowWelcome] = useState(true);
   const currentMonth = getCurrentMonth();
 
   useEffect(() => { return onAuthStateChanged(auth, user => setAuthUser(user || null)); }, []);
   useEffect(() => { if (!authUser) return; return onSnapshot(doc(db, "users", authUser.uid), snap => { setUserProfile(snap.exists() ? snap.data() : null); }); }, [authUser]);
   useEffect(() => {
-  if (!authUser) return;
-  return onSnapshot(doc(db, "users", authUser.uid), snap => {
-    const data = snap.data();
-    const ids = data?.accountIds || [authUser.uid];
-    const unsubs = ids.map(id => onSnapshot(doc(db, "accounts", id), aSnap => {
-      if (aSnap.exists()) setUserAccounts(prev => { const filtered = prev.filter(a => a.id !== id); return [...filtered, { id: aSnap.id, ...aSnap.data() }]; });
-    }));
-    return () => unsubs.forEach(u => u());
-  });
-}, [authUser]);
-
-useEffect(() => {
-  if (!selectedAccountId || userAccounts.length === 0) return;
-  const acc = userAccounts.find(a => a.id === selectedAccountId);
-  if (acc) setAccount(acc);
-}, [selectedAccountId, userAccounts]);
+    if (!authUser) return;
+    return onSnapshot(doc(db, "users", authUser.uid), snap => {
+      const data = snap.data();
+      const ids = data?.accountIds || [authUser.uid];
+      const unsubs = ids.map(id => onSnapshot(doc(db, "accounts", id), aSnap => {
+        if (aSnap.exists()) setUserAccounts(prev => { const filtered = prev.filter(a => a.id !== id); return [...filtered, { id: aSnap.id, ...aSnap.data() }]; });
+      }));
+      return () => unsubs.forEach(u => u());
+    });
+  }, [authUser]);
+  useEffect(() => {
+    if (!selectedAccountId || userAccounts.length === 0) return;
+    const acc = userAccounts.find(a => a.id === selectedAccountId);
+    if (acc) setAccount(acc);
+  }, [selectedAccountId, userAccounts]);
   useEffect(() => {
     if (!account?.memberIds) return;
     const ids = [...account.memberIds];
@@ -459,12 +460,13 @@ useEffect(() => {
   };
 
   const deleteExpense = async (id) => { await deleteDoc(doc(db, "expenses", id)); };
-  const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); };
+  const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); setShowWelcome(true); };
 
   if (authUser === undefined) return <Spinner text="Iniciando X-penses..." />;
+  if (showWelcome) return <WelcomeScreen onEnter={() => setShowWelcome(false)} />;
   if (!authUser) return <AuthScreen />;
   if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
-if (!selectedAccountId) return <AccountSelectorScreen user={authUser} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} />;
+  if (!selectedAccountId) return <AccountSelectorScreen user={authUser} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} />;
 
   return (
     <div style={{ maxWidth: 430, margin: "0 auto", background: colors.bg, minHeight: "100vh", position: "relative", fontFamily: SF }}>
