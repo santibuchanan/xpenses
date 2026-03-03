@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { collection, addDoc, doc, setDoc } from "firebase/firestore";
+import { collection, addDoc, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
 const SF = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
@@ -17,6 +17,7 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
   const [accountType, setAccountType] = useState("shared");
   const [divisionSystem, setDivisionSystem] = useState("proportional");
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const handleCreate = async () => {
     if (!accountName.trim()) return;
@@ -71,10 +72,38 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
                   <p style={{ margin: 0, fontSize: 12, color: "#aaa" }}>
                     {acc.type === "shared" ? "Compartida" : "Personal"} · {acc.memberIds?.length || 1} miembro{(acc.memberIds?.length || 1) !== 1 ? "s" : ""}
                   </p>
+                  {confirmDelete && (
+  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+    <div style={{ background: "#fff", borderRadius: 24, padding: 24, width: "100%", maxWidth: 340, fontFamily: SF }}>
+      <p style={{ fontSize: 18, fontWeight: 700, color: "#1a1a2e", margin: "0 0 8px" }}>¿Eliminar cuenta?</p>
+      <p style={{ fontSize: 14, color: "#888", margin: "0 0 24px" }}>Se van a borrar todos los gastos y datos de esta cuenta. Esta acción no se puede deshacer.</p>
+      <button
+        onClick={async () => {
+          await deleteDoc(doc(db, "accounts", confirmDelete));
+          await setDoc(doc(db, "users", user.uid), {
+            accountIds: accounts.filter(a => a.id !== confirmDelete).map(a => a.id)
+          }, { merge: true });
+          setConfirmDelete(null);
+        }}
+        style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: SF, marginBottom: 8 }}>
+        Sí, eliminar
+      </button>
+      <button onClick={() => setConfirmDelete(null)}
+        style={{ width: "100%", padding: 14, borderRadius: 14, background: "#f0f0f0", color: "#555", border: "none", fontSize: 15, cursor: "pointer", fontFamily: SF }}>
+        Cancelar
+      </button>
+    </div>
+  </div>
+)}
                 </div>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 18l6-6-6-6"/>
-                </svg>
+  <path d="M9 18l6-6-6-6"/>
+</svg>
+<button
+  onClick={(e) => { e.stopPropagation(); setConfirmDelete(acc.id); }}
+  style={{ marginLeft: 8, background: "#fee", border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 13, color: "#e74c3c", cursor: "pointer", flexShrink: 0 }}>
+  🗑️
+</button>
               </button>
             ))}
 
