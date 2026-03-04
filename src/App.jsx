@@ -133,7 +133,7 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
     await onAdd({ ...form, ...extra, amount, month: form.date.slice(0, 7) });
     setLoading(false); onClose();
   };
-  const types = [["hogar","🏠 Hogar"],["personal","🎁 Para otro"],["extraordinary","⭐ Extra"],["mio","👤 Mío"]];
+  const types = [["hogar","🏠 Hogar"],["personal","🎁 Para otro"],["extraordinary","✈️ Extraordinario"],["mio","👤 Para mí"]];
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
       <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", maxHeight: "88vh", overflowY: "auto", fontFamily: SF }}>
@@ -162,7 +162,8 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
           ))}
         </div>
         <p style={labelStyle}>Fecha</p>
-        <input type="date" value={form.date} onChange={e => set("date", e.target.value)} style={inputStyle} />
+        <input type="date" value={form.date} onChange={e => set("date", e.target.value)} style={inputStyle} 
+  pattern="\d{2}-\d{2}-\d{4}" />
         {form.type !== "mio" && members && (<><p style={labelStyle}>Pagó</p><div style={{ display: "flex", gap: 8, marginBottom: 14 }}>{members.map(m => (<button key={m.uid} onClick={() => set("paidBy", m.uid)} style={{ flex: 1, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: SF, borderColor: form.paidBy === m.uid ? (m.color||"#4F7FFA") : colors.inputBorder, background: form.paidBy === m.uid ? (m.color||"#4F7FFA") + "18" : colors.input, color: form.paidBy === m.uid ? (m.color||"#4F7FFA") : colors.textMuted }}>{m.name}</button>))}</div></>)}
         {form.type === "mio" && members && (<><p style={labelStyle}>¿De quién?</p><div style={{ display: "flex", gap: 8, marginBottom: 14 }}>{members.map(m => (<button key={m.uid} onClick={() => set("owner", m.uid)} style={{ flex: 1, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: SF, borderColor: form.owner === m.uid ? (m.color||"#4F7FFA") : colors.inputBorder, background: form.owner === m.uid ? (m.color||"#4F7FFA") + "18" : colors.input, color: form.owner === m.uid ? (m.color||"#4F7FFA") : colors.textMuted }}>{m.name}</button>))}</div></>)}
         {form.type === "personal" && members && (<><p style={labelStyle}>Para...</p><div style={{ display: "flex", gap: 8, marginBottom: 14 }}>{members.map(m => (<button key={m.uid} onClick={() => set("forWhom", m.uid)} style={{ flex: 1, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: SF, borderColor: form.forWhom === m.uid ? (m.color||"#4F7FFA") : colors.inputBorder, background: form.forWhom === m.uid ? (m.color||"#4F7FFA") + "18" : colors.input, color: form.forWhom === m.uid ? (m.color||"#4F7FFA") : colors.textMuted }}>{m.name}</button>))}</div></>)}
@@ -182,10 +183,10 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
   const meColor = me?.color || "#4F7FFA";
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const monthExp = expenses.filter(e => e.month === currentMonth);
-  const sharedExp = monthExp.filter(e => e.type !== "mio");
+  const sharedExp = monthExp.filter(e => e.type !== "Para mí");
   const saldos = calcSaldos(sharedExp, members, account?.divisionSystem);
   const myBalance = saldos[currentUser.uid]?.balance || 0;
-  const myPersonalTotal = monthExp.filter(e => e.type === "mio" && e.owner === currentUser.uid).reduce((s, e) => s + e.amount, 0);
+  const myPersonalTotal = monthExp.filter(e => e.type === "Para mí" && e.owner === currentUser.uid).reduce((s, e) => s + e.amount, 0);
   const recent = [...monthExp].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
   const catTotals = allCategories.map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total).slice(0, 4);
   const monthLabel = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
@@ -261,14 +262,14 @@ function GastosScreen({ expenses, members, currentMonth, onEdit, onDelete, accou
     <div style={{ padding: "0 20px", fontFamily: SF }}>
       <SectionTitle>Todos los gastos</SectionTitle>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-        {[["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","⭐"],["mio","👤"]].map(([val, lbl]) => (
+        {[["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","✈️"],["Para mí","👤"]].map(([val, lbl]) => (
           <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: SF, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
         ))}
       </div>
       {sorted.length === 0 && <Card style={{ textAlign: "center", color: colors.textMuted, padding: 32 }}><p style={{ fontSize: 32, margin: "0 0 8px" }}>📭</p><p style={{ margin: 0 }}>Sin gastos</p></Card>}
       {sorted.map(e => {
         const cat = allCategories.find(c => c.id === e.category);
-        const who = e.type === "mio" ? members?.find(m=>m.uid===e.owner) : members?.find(m=>m.uid===e.paidBy);
+        const who = e.type === "Para mí" ? members?.find(m=>m.uid===e.owner) : members?.find(m=>m.uid===e.paidBy);
         return (
           <Card key={e.id} style={{ padding: "14px 16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -298,7 +299,7 @@ function MisGastosScreen({ expenses, currentUser, members, currentMonth, account
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const me = members?.find(m => m.uid === currentUser.uid);
   const meColor = me?.color || "#FA4F7F";
-  const myExp = expenses.filter(e => e.type === "mio" && e.owner === currentUser.uid && e.month === currentMonth);
+  const myExp = expenses.filter(e => e.type === "Para mí" && e.owner === currentUser.uid && e.month === currentMonth);
   const total = myExp.reduce((s, e) => s + e.amount, 0);
   const catTotals = allCategories.map((c, i) => ({ ...c, total: myExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0), color: CAT_COLORS[i % CAT_COLORS.length] })).filter(c => c.total > 0);
   return (
@@ -323,7 +324,7 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
-  const monthExp = expenses.filter(e => e.month === currentMonth && e.type !== "mio");
+  const monthExp = expenses.filter(e => e.month === currentMonth && e.type !== "Para mí");
   const saldos = calcSaldos(monthExp, members, account?.divisionSystem);
   const [settled, setSettled] = useState(false);
   const handleSettle = async () => {

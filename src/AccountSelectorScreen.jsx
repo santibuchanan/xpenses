@@ -6,11 +6,9 @@ import { useTheme } from "./theme.jsx";
 const SF = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
 
 const DIVISION_SYSTEMS = [
-  { id: "proportional", label: "Proporcional al salario", icon: "📊" },
-  { id: "50_50", label: "50/50", icon: "⚖️" },
-  { id: "fixed", label: "Monto fijo", icon: "🔒" },
-  { id: "by_category", label: "Por categoría", icon: "🗂️" },
-  { id: "informativo", label: "Solo informativo", icon: "📋" },
+  { id: "proportional", label: "Proporcional al ingreso", icon: "📊", desc: "Ideal para parejas que conviven. Cada uno aporta según su sueldo." },
+  { id: "50_50", label: "Partes iguales", icon: "⚖️", desc: "Cada uno paga exactamente la mitad." },
+  { id: "informativo", label: "Gastos en común", icon: "🤝", desc: "Registrá y gestioná gastos sin calcular quién le debe a quién." },
 ];
 
 // Componente de fila con swipe para eliminar estilo iOS
@@ -151,7 +149,7 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
 
       <div style={{ background: colors.headerBg, padding: "52px 20px 32px" }}>
         <p style={{ color: "#ffffff44", fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", margin: "0 0 8px" }}>X-penses</p>
-        <p style={{ fontSize: 26, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>Tus cuentas</p>
+        <p style={{ fontSize: 26, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>Mis X-penses</p>
         <p style={{ color: "#ffffff66", fontSize: 14, margin: 0 }}>Deslizá a la izquierda para eliminar</p>
       </div>
 
@@ -215,9 +213,7 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
                     <span style={{ fontSize: 20 }}>{s.icon}</span>
                     <div style={{ flex: 1 }}>
                       <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: divisionSystem === s.id ? "#4F7FFA" : colors.text }}>{s.label}</p>
-                      {s.id === "informativo" && (
-                        <p style={{ margin: "2px 0 0", fontSize: 11, color: colors.textMuted }}>Registrá gastos sin calcular quién le debe a quién</p>
-                      )}
+                      <p style={{ margin: "2px 0 0", fontSize: 11, color: colors.textMuted }}>{s.desc}</p>
                     </div>
                     {divisionSystem === s.id && <span style={{ color: "#4F7FFA", fontSize: 18 }}>✓</span>}
                   </button>
