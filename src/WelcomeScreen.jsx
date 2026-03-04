@@ -163,7 +163,7 @@ export default function WelcomeScreen({ onEnter }) {
       {/* Grid sutil */}
       <div style={{ position:"absolute", inset:0, pointerEvents:"none", backgroundImage:`linear-gradient(rgba(79,127,250,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(79,127,250,0.04) 1px,transparent 1px)`, backgroundSize:"40px 40px" }} />
 
-      <div style={{ flex:1, display:"flex", flexDirection:"column", padding:"0 24px", maxWidth:430, margin:"0 auto", width:"100%", boxSizing:"border-box", overflowX:"hidden" }}>
+      <div style={{ flex:1, display:"flex", flexDirection:"column", padding:"0 24px", width:"100%", boxSizing:"border-box", overflowX:"hidden" }}>
 
         {/* ── LOGO ── */}
         <div style={{ paddingTop: 40, opacity: visible ? 1 : 0, animation: visible ? "fadeUp 0.6s ease forwards" : "none", display:"flex", alignItems:"center", gap:14, marginBottom: 36 }}>

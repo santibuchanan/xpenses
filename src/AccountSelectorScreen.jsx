@@ -144,7 +144,7 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
   };
 
   return (
-    <div style={{ minHeight: "100dvh", background: colors.bg, fontFamily: SF, paddingBottom: "env(safe-area-inset-bottom)" }}>
+    <div style={{ minHeight: "100dvh", background: colors.bg, fontFamily: SF, paddingBottom: "env(safe-area-inset-bottom)", paddingTop: "env(safe-area-inset-top)", boxSizing: "border-box", width: "100%" }}>
       <style>{`* { box-sizing: border-box; }`}</style>
 
       <div style={{ background: colors.headerBg, padding: "52px 20px 32px" }}>
