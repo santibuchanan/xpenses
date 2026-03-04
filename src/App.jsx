@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, where, getDoc, updateDoc, setDoc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -18,19 +18,19 @@ const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sa
 const NAV_HEIGHT = 72;
 
 const DEFAULT_CATEGORIES = [
-  { id: "super", label: "Supermercado", icon: "🛒" },
-  { id: "salidas", label: "Salidas", icon: "🍕" },
-  { id: "servicios", label: "Impuestos y Servicios", icon: "💡" },
-  { id: "transporte", label: "Transporte", icon: "🚗" },
-  { id: "salud", label: "Salud", icon: "💊" },
-  { id: "ropa", label: "Ropa y Calzado", icon: "👗" },
-  { id: "hogar", label: "Hogar", icon: "🏠" },
-  { id: "otros", label: "Otros", icon: "📦" },
+  { id: "super",     label: "Supermercado",          icon: "🛒" },
+  { id: "salidas",   label: "Salidas",                icon: "🍕" },
+  { id: "servicios", label: "Impuestos y Servicios",  icon: "💡" },
+  { id: "transporte",label: "Transporte",             icon: "🚗" },
+  { id: "salud",     label: "Salud",                  icon: "💊" },
+  { id: "ropa",      label: "Ropa y Calzado",         icon: "👗" },
+  { id: "hogar",     label: "Hogar",                  icon: "🏠" },
+  { id: "otros",     label: "Otros",                  icon: "📦" },
 ];
 const CAT_COLORS = ["#4F7FFA","#FA4F7F","#f39c12","#2ecc71","#9b59b6","#1abc9c","#e74c3c","#95a5a6"];
 const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
-// Formato fecha yyyy-mm-dd → dd-mm-yyyy
+// yyyy-mm-dd → dd-mm-yyyy
 const fmtDate = (iso) => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
@@ -38,7 +38,11 @@ const fmtDate = (iso) => {
   return `${d}-${m}-${y}`;
 };
 
-const FONT_SIZE_MAP = { small: { base: 12, sub: 10, title: 18 }, medium: { base: 14, sub: 12, title: 20 }, large: { base: 17, sub: 14, title: 22 } };
+const FONT_SIZE_MAP = {
+  small:  { base: 12, sub: 10, title: 18 },
+  medium: { base: 14, sub: 12, title: 20 },
+  large:  { base: 17, sub: 14, title: 22 },
+};
 
 function useExpenseFontSize() {
   const [size, setSize] = useState(() => localStorage.getItem("expenseFontSize") || "medium");
@@ -55,7 +59,7 @@ function MenuIcon({ color = "#ffffffcc" }) {
     <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
       <rect x="1.5" y="1.5" width="25" height="25" rx="7" stroke={color} strokeWidth="2"/>
       <line x1="7" y1="9.5" x2="21" y2="9.5" stroke={color} strokeWidth="2" strokeLinecap="round"/>
-      <line x1="7" y1="14" x2="21" y2="14" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="7" y1="14"  x2="21" y2="14"  stroke={color} strokeWidth="2" strokeLinecap="round"/>
       <line x1="7" y1="18.5" x2="21" y2="18.5" stroke={color} strokeWidth="2" strokeLinecap="round"/>
     </svg>
   );
@@ -64,8 +68,8 @@ function MenuIcon({ color = "#ffffffcc" }) {
 function NavIcon({ id, active, color }) {
   const s = active ? 2 : 1.5;
   const c = active ? color : "#aaa";
-  if (id === "home") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>;
-  if (id === "saldos") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg>;
+  if (id === "home")    return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>;
+  if (id === "saldos")  return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg>;
   if (id === "graficos") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V14M9 20V8M14 20v-5M19 20V4"/></svg>;
   if (id === "ajustes") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
   return null;
@@ -88,7 +92,8 @@ function calcSaldos(expenses, members, divisionSystem) {
     }
     if (e.type === "personal") {
       if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
-      if (e.forWhom && result[e.forWhom] !== undefined) result[e.forWhom].owes += e.amount;
+      const targets = Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []);
+      targets.forEach(uid => { if (result[uid] !== undefined) result[uid].owes += e.amount / (targets.length || 1); });
     }
     if (e.type === "extraordinary") {
       members.forEach(m => {
@@ -114,7 +119,12 @@ function SectionTitle({ children, style = {} }) {
 }
 function StatPill({ label, value, color }) {
   const { colors } = useTheme();
-  return <div style={{ background: color + "14", borderRadius: 14, padding: "12px 14px", flex: 1 }}><p style={{ margin: "0 0 3px", fontSize: 10, color, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: FONT }}>{label}</p><p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT }}>{value}</p></div>;
+  return (
+    <div style={{ background: color + "14", borderRadius: 14, padding: "12px 14px", flex: 1 }}>
+      <p style={{ margin: "0 0 3px", fontSize: 10, color, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: FONT }}>{label}</p>
+      <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT }}>{value}</p>
+    </div>
+  );
 }
 function Spinner({ text = "Cargando..." }) {
   const { colors } = useTheme();
@@ -188,7 +198,9 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
         style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 500, margin: "0 auto", padding: "20px 20px calc(32px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: dragging.current ? "none" : "transform 0.3s ease" }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", background: colors.pill, borderRadius: 18, marginBottom: 16 }}>
-          {currentUser?.photoURL ? <img src={currentUser.photoURL} style={{ width: 48, height: 48, borderRadius: 24, border: `2px solid ${meColor}` }} alt="" /> : <div style={{ width: 48, height: 48, borderRadius: 24, background: meColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
+          {currentUser?.photoURL
+            ? <img src={currentUser.photoURL} style={{ width: 48, height: 48, borderRadius: 24, border: `2px solid ${meColor}` }} alt="" />
+            : <div style={{ width: 48, height: 48, borderRadius: 24, background: meColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
           <div>
             <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{userProfile?.name || currentUser?.displayName}</p>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{currentUser?.email}</p>
@@ -217,17 +229,38 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
 }
 
 // ── ADD EXPENSE MODAL ──
-function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, customCategories }) {
+function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, customCategories, isPersonal }) {
   const { colors } = useTheme();
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
+  const defaultType = isPersonal ? "mio" : "hogar";
+  const memberList = allMembers || [];
+
   const [form, setForm] = useState({
-    type: "hogar", concept: "", amount: "", category: "super",
+    type: defaultType,
+    concept: "", amount: "", category: "super",
     date: new Date().toISOString().slice(0, 10),
-    paidBy: currentUser.uid, forWhom: [], owner: currentUser.uid,
+    paidBy: currentUser.uid,
+    forWhom: memberList.map(m => m.uid), // todos seleccionados por default
+    owner: currentUser.uid,
   });
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const currSymbol = CURRENCIES[currency]?.symbol || "$";
+
+  // Al cambiar tipo, resetear forWhom
+  const setType = (t) => {
+    setForm(f => ({
+      ...f, type: t,
+      forWhom: (t === "hogar" || t === "extraordinary") ? memberList.map(m => m.uid) : [],
+    }));
+  };
+
+  const toggleForWhom = (uid) => {
+    setForm(f => {
+      const cur = f.forWhom || [];
+      return { ...f, forWhom: cur.includes(uid) ? cur.filter(u => u !== uid) : [...cur, uid] };
+    });
+  };
 
   // Swipe to close
   const sheetRef = useRef(null);
@@ -253,30 +286,23 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
   const labelStyle = { fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT };
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
 
-  // Toggle forWhom (múltiple selección)
-  const toggleForWhom = (uid) => {
-    setForm(f => {
-      const cur = f.forWhom || [];
-      return { ...f, forWhom: cur.includes(uid) ? cur.filter(u => u !== uid) : [...cur, uid] };
-    });
-  };
-
   const handleAdd = async () => {
     if (!form.concept || !form.amount) return;
     setLoading(true);
     const amount = parseFloat(form.amount);
     const extra = {};
-    if (form.type === "extraordinary" && members) {
-      members.forEach(m => { extra[`paid_${m.uid}`] = m.uid === form.paidBy ? amount : 0; });
+    if (form.type === "extraordinary" && memberList.length > 0) {
+      memberList.forEach(m => { extra[`paid_${m.uid}`] = m.uid === form.paidBy ? amount : 0; });
     }
     await onAdd({ ...form, ...extra, amount, month: form.date.slice(0, 7) });
-    setLoading(false); onClose();
+    setLoading(false);
+    onClose();
   };
 
   const types = [["hogar","🏠 Hogar"],["personal","🎁 Para otro"],["extraordinary","✈️ Extraordinario"],["mio","👤 Para mí"]];
-
-  // Todos los miembros disponibles incluyendo memberLabels no vinculados
-  const allMembers = members || [];
+  const showPaidBy  = !isPersonal && form.type !== "mio" && memberList.length > 0;
+  const showForWhom = !isPersonal && (form.type === "personal" || form.type === "extraordinary" || form.type === "hogar") && memberList.length > 0;
+  const showOwner   = !isPersonal && form.type === "mio" && memberList.length > 0;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
@@ -290,12 +316,17 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
           <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
         </div>
 
-        <p style={labelStyle}>Tipo</p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-          {types.map(([val, lbl]) => (
-            <button key={val} onClick={() => set("type", val)} style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.type === val ? "#4F7FFA" : colors.inputBorder, background: form.type === val ? "#4F7FFA11" : colors.input, color: form.type === val ? "#4F7FFA" : colors.textMuted }}>{lbl}</button>
-          ))}
-        </div>
+        {/* Tipo: solo en cuentas compartidas */}
+        {!isPersonal && (
+          <>
+            <p style={labelStyle}>Tipo</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+              {types.map(([val, lbl]) => (
+                <button key={val} onClick={() => setType(val)} style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.type === val ? "#4F7FFA" : colors.inputBorder, background: form.type === val ? "#4F7FFA11" : colors.input, color: form.type === val ? "#4F7FFA" : colors.textMuted }}>{lbl}</button>
+              ))}
+            </div>
+          </>
+        )}
 
         <p style={labelStyle}>Concepto</p>
         <input value={form.concept} onChange={e => set("concept", e.target.value)} placeholder="Ej: Supermercado" style={inputStyle} />
@@ -316,12 +347,12 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
         <p style={labelStyle}>Fecha</p>
         <DateInput value={form.date} onChange={v => set("date", v)} />
 
-        {/* Pagó — siempre visible si hay miembros */}
-        {allMembers.length > 0 && form.type !== "mio" && (
+        {/* Pagó */}
+        {showPaidBy && (
           <>
             <p style={labelStyle}>Pagó</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {allMembers.map(m => (
+              {memberList.map(m => (
                 <button key={m.uid} onClick={() => set("paidBy", m.uid)}
                   style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
                     borderColor: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder,
@@ -334,22 +365,19 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
           </>
         )}
 
-        {/* Para quién — selección múltiple */}
-        {allMembers.length > 0 && (form.type === "personal" || form.type === "extraordinary" || form.type === "hogar") && (
+        {/* Para quién/es */}
+        {showForWhom && (
           <>
-            <p style={labelStyle}>{form.type === "personal" ? "Para..." : "Aplica a"}</p>
+            <p style={labelStyle}>Para quién/es</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {allMembers.map(m => {
-                const selected = form.type === "personal"
-                  ? form.forWhom?.includes(m.uid)
-                  : true; // hogar/extraordinary siempre aplica a todos (visual)
-                if (form.type === "hogar" || form.type === "extraordinary") return null;
+              {memberList.map(m => {
+                const sel = form.forWhom?.includes(m.uid);
                 return (
                   <button key={m.uid} onClick={() => toggleForWhom(m.uid)}
                     style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                      borderColor: selected ? (m.color || "#4F7FFA") : colors.inputBorder,
-                      background: selected ? (m.color || "#4F7FFA") + "18" : colors.input,
-                      color: selected ? (m.color || "#4F7FFA") : colors.textMuted }}>
+                      borderColor: sel ? (m.color || "#4F7FFA") : colors.inputBorder,
+                      background: sel ? (m.color || "#4F7FFA") + "18" : colors.input,
+                      color: sel ? (m.color || "#4F7FFA") : colors.textMuted }}>
                     {m.name}
                   </button>
                 );
@@ -358,12 +386,12 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
           </>
         )}
 
-        {/* De quién — gastos personales */}
-        {allMembers.length > 0 && form.type === "mio" && (
+        {/* ¿De quién? — para mí en cuentas compartidas */}
+        {showOwner && (
           <>
             <p style={labelStyle}>¿De quién?</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {allMembers.map(m => (
+              {memberList.map(m => (
                 <button key={m.uid} onClick={() => set("owner", m.uid)}
                   style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
                     borderColor: form.owner === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder,
@@ -402,7 +430,7 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
         <div style={{ marginBottom: 20 }}>
           {memberLabels.map(label => (
             <button key={label.id} onClick={() => setSelected(label.id)}
-              style={{ width: "100%", padding: "14px 16px", borderRadius: 16, border: "2px solid", marginBottom: 8, cursor: "pointer", fontFamily: FONT, textAlign: "left", display: "flex", alignItems: "center", gap: 14, borderColor: selected === label.id ? label.color || "#4F7FFA" : colors.inputBorder, background: selected === label.id ? (label.color || "#4F7FFA") + "14" : colors.input, transition: "all 0.15s" }}>
+              style={{ width: "100%", padding: "14px 16px", borderRadius: 16, border: "2px solid", marginBottom: 8, cursor: "pointer", fontFamily: FONT, textAlign: "left", display: "flex", alignItems: "center", gap: 14, borderColor: selected === label.id ? label.color || "#4F7FFA" : colors.inputBorder, background: selected === label.id ? (label.color || "#4F7FFA") + "14" : colors.input }}>
               <div style={{ width: 44, height: 44, borderRadius: 22, flexShrink: 0, background: (label.color || "#4F7FFA") + "33", border: `2px solid ${label.color || "#4F7FFA"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={{ fontSize: 18, fontWeight: 700, color: label.color || "#4F7FFA", fontFamily: FONT }}>{label.name[0].toUpperCase()}</span>
               </div>
@@ -427,8 +455,7 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
 }
 
 // ── SWIPEABLE EXPENSE ROW ──
-// Deslizá izquierda para revelar Editar y Eliminar (estilo iOS)
-function SwipeableExpenseRow({ e, allCategories, members, fmt, fs, colors, onEdit, onDelete }) {
+function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, onEdit, onDelete, isPersonal }) {
   const [offsetX, setOffsetX] = useState(0);
   const startX = useRef(null);
   const EDIT_W = 64, DEL_W = 64, TOTAL = EDIT_W + DEL_W + 8;
@@ -445,13 +472,14 @@ function SwipeableExpenseRow({ e, allCategories, members, fmt, fs, colors, onEdi
   };
 
   const cat = allCategories.find(c => c.id === e.category);
-  const who = e.type === "mio" ? members?.find(m => m.uid === e.owner) : members?.find(m => m.uid === e.paidBy);
+  const who = e.type === "mio"
+    ? allMembers?.find(m => m.uid === e.owner)
+    : allMembers?.find(m => m.uid === e.paidBy);
   const typeColor = e.type === "hogar" ? "#4F7FFA" : e.type === "personal" ? "#FA4F7F" : e.type === "extraordinary" ? "#f39c12" : "#2ecc71";
   const typeLabel = e.type === "hogar" ? "Hogar" : e.type === "personal" ? "Para otro" : e.type === "extraordinary" ? "Extraordinario" : "Para mí";
 
   return (
     <div style={{ position: "relative", marginBottom: 10, borderRadius: 20, overflow: "hidden" }}>
-      {/* Acciones ocultas */}
       <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, display: "flex", gap: 8, padding: "0 4px", alignItems: "center" }}>
         <button onClick={() => { setOffsetX(0); onEdit(e); }}
           style={{ width: EDIT_W, height: "calc(100% - 8px)", borderRadius: 16, background: "#4F7FFA", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3 }}>
@@ -464,25 +492,16 @@ function SwipeableExpenseRow({ e, allCategories, members, fmt, fs, colors, onEdi
           <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
         </button>
       </div>
-
-      {/* Tarjeta deslizable */}
-      <div
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+      <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
         onClick={() => offsetX > 0 && setOffsetX(0)}
-        style={{
-          background: colors.card, borderRadius: 20, padding: "14px 16px",
-          border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow,
-          transform: `translateX(-${offsetX}px)`,
-          transition: startX.current === null ? "transform 0.25s ease" : "none",
-          position: "relative", zIndex: 1,
-        }}>
+        style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, transform: `translateX(-${offsetX}px)`, transition: startX.current === null ? "transform 0.25s ease" : "none", position: "relative", zIndex: 1 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
             <span style={{ fontSize: 22, flexShrink: 0 }}>{cat?.icon || "📦"}</span>
             <div>
               <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{e.concept}</p>
-              <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(e.date)} · {who?.name || "—"}</p>
-              <Tag color={typeColor}>{typeLabel}</Tag>
+              <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(e.date)}{who ? ` · ${who.name}` : ""}</p>
+              {!isPersonal && <Tag color={typeColor}>{typeLabel}</Tag>}
             </div>
           </div>
           <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT, flexShrink: 0, marginLeft: 8 }}>{fmt(e.amount)}</p>
@@ -493,49 +512,77 @@ function SwipeableExpenseRow({ e, allCategories, members, fmt, fs, colors, onEdi
 }
 
 // ── HOME SCREEN ──
-function HomeScreen({ expenses, currentUser, members, account, currentMonth, customCategories, fixedExpenses, onEdit, onDelete }) {
+function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, customCategories, fixedExpenses, onEdit, onDelete }) {
   const { colors } = useTheme();
   const fs = useExpenseFontSize();
+  const isPersonal = account?.type === "personal";
   const currency = account?.currency || "ARS";
   const fmt = (n) => formatAmount(n, currency);
-  const me = members?.find(m => m.uid === currentUser.uid);
+  // Para la foto/nombre del usuario logueado usamos allMembers
+  const me = allMembers?.find(m => m.uid === currentUser.uid);
   const meColor = me?.color || "#4F7FFA";
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const monthExp = expenses.filter(e => e.month === currentMonth);
   const sharedExp = monthExp.filter(e => e.type !== "mio");
-  const saldos = calcSaldos(sharedExp, members, account?.divisionSystem);
+  // Saldos solo para cuentas compartidas — usamos solo miembros reales (con uid de Firebase)
+  const realMembers = allMembers?.filter(m => !m._isLabel) || [];
+  const saldos = calcSaldos(sharedExp, realMembers, account?.divisionSystem);
   const myBalance = saldos[currentUser.uid]?.balance || 0;
+  const totalMonthExp = monthExp.reduce((s, e) => s + e.amount, 0);
   const myPersonalTotal = monthExp.filter(e => e.type === "mio" && e.owner === currentUser.uid).reduce((s, e) => s + e.amount, 0);
   const catTotals = allCategories.map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total).slice(0, 4);
   const monthLabel = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
+
+  // Filtros: personal → por categoría; compartida → por tipo
   const [filterType, setFilterType] = useState("todos");
-  const filtered = filterType === "todos" ? monthExp : monthExp.filter(e => e.type === filterType);
+  const filtered = isPersonal
+    ? (filterType === "todos" ? monthExp : monthExp.filter(e => e.category === filterType))
+    : (filterType === "todos" ? monthExp : monthExp.filter(e => e.type === filterType));
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
   const [fixedExpanded, setFixedExpanded] = useState(false);
   const today = new Date().getDate();
 
   return (
     <div style={{ fontFamily: FONT }}>
+      {/* Hero */}
       <div style={{ background: colors.headerBg, borderRadius: "0 0 32px 32px", padding: "calc(env(safe-area-inset-top) + 76px) 20px 28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-          {me?.photo ? <img src={me.photo} style={{ width: 44, height: 44, borderRadius: 22, border: "2px solid #ffffff44" }} alt="" /> : <div style={{ width: 44, height: 44, borderRadius: 22, background: meColor + "44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
+          {me?.photo
+            ? <img src={me.photo} style={{ width: 44, height: 44, borderRadius: 22, border: "2px solid #ffffff44" }} alt="" />
+            : <div style={{ width: 44, height: 44, borderRadius: 22, background: meColor + "44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
           <div>
             <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>Hola,</p>
             <p style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, fontFamily: FONT }}>{me?.name || currentUser.displayName}</p>
           </div>
         </div>
+
         <div style={{ background: meColor, borderRadius: 22, padding: 20 }}>
-          <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Saldo — {monthLabel}</p>
-          <p style={{ color: "#fff", fontSize: 36, fontWeight: 700, margin: "0 0 4px", letterSpacing: -1, fontFamily: FONT }}>{myBalance >= 0 ? "+" : ""}{fmt(myBalance)}</p>
-          <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>{myBalance >= 0 ? "✅ Te deben a vos" : "⚠️ Debés este monto"}</p>
+          <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>
+            Gastos — {monthLabel}
+          </p>
+          <p style={{ color: "#fff", fontSize: 36, fontWeight: 700, margin: "0 0 4px", letterSpacing: -1, fontFamily: FONT }}>
+            {fmt(totalMonthExp)}
+          </p>
+          {/* En cuentas compartidas mostramos el saldo personal */}
+          {!isPersonal && (
+            <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>
+              {myBalance >= 0 ? `✅ Saldo a favor: ${fmt(myBalance)}` : `⚠️ Debés: ${fmt(Math.abs(myBalance))}`}
+            </p>
+          )}
         </div>
       </div>
 
       <div style={{ padding: "0 20px" }}>
         <SectionTitle>Resumen del mes</SectionTitle>
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-          <StatPill label="Compartido" value={fmt(sharedExp.reduce((s, e) => s + e.amount, 0))} color="#4F7FFA" />
-          <StatPill label="Mis gastos" value={fmt(myPersonalTotal)} color={meColor} />
+          {isPersonal ? (
+            <StatPill label="Total gastos" value={fmt(totalMonthExp)} color={meColor} />
+          ) : (
+            <>
+              <StatPill label="Compartido" value={fmt(sharedExp.reduce((s, e) => s + e.amount, 0))} color="#4F7FFA" />
+              <StatPill label="Mis gastos" value={fmt(myPersonalTotal)} color={meColor} />
+            </>
+          )}
         </div>
 
         {catTotals.length > 0 && (
@@ -588,9 +635,15 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
 
         <SectionTitle>Movimientos</SectionTitle>
         <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-          {[["todos", "Todos"], ["hogar", "🏠"], ["personal", "🎁"], ["extraordinary", "✈️"], ["mio", "👤"]].map(([val, lbl]) => (
-            <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
-          ))}
+          {isPersonal ? (
+            [["todos", "Todos"], ...allCategories.filter(c => monthExp.some(e => e.category === c.id)).map(c => [c.id, c.icon])].map(([val, lbl]) => (
+              <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
+            ))
+          ) : (
+            [["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","✈️"],["mio","👤"]].map(([val, lbl]) => (
+              <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
+            ))
+          )}
         </div>
 
         {sorted.length === 0 && (
@@ -599,9 +652,8 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
             <p style={{ margin: 0, fontFamily: FONT }}>Sin gastos este mes</p>
           </Card>
         )}
-
         {sorted.map(e => (
-          <SwipeableExpenseRow key={e.id} e={e} allCategories={allCategories} members={members} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} />
+          <SwipeableExpenseRow key={e.id} e={e} allCategories={allCategories} allMembers={allMembers} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} isPersonal={isPersonal} />
         ))}
         <div style={{ height: 120 }} />
       </div>
@@ -613,7 +665,6 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
 function SaldosScreen({ expenses, members, account, currentMonth }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
-  const fs = useExpenseFontSize();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const monthExp = expenses.filter(e => e.month === currentMonth && e.type !== "mio");
   const saldos = calcSaldos(monthExp, members, account?.divisionSystem);
@@ -621,13 +672,21 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
   const handleSettle = async () => {
     setSettled(true);
     const otherMembers = members?.filter(m => m.uid !== members[0]?.uid) || [];
-    await sendNotification({ type: NOTIF_TYPES.ACCOUNT_SETTLED, title: "¡Cuentas saldadas! 🎉", body: `Las cuentas de ${new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long" })} fueron saldadas.`, fromName: members[0]?.name || "Un miembro", toUids: otherMembers.map(m => m.uid), accountId: account?.id });
+    await sendNotification({
+      type: NOTIF_TYPES.ACCOUNT_SETTLED,
+      title: "¡Cuentas saldadas! 🎉",
+      body: `Las cuentas de ${new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long" })} fueron saldadas.`,
+      fromName: members[0]?.name || "Un miembro",
+      toUids: otherMembers.map(m => m.uid),
+      accountId: account?.id,
+      accountName: account?.name,
+    });
   };
   const debtSummary = () => {
     if (!members || members.length < 2) return "Configurá los miembros para ver saldos";
     const balances = members.map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
     const creditor = balances.find(m => m.balance > 0);
-    const debtor = balances.find(m => m.balance < 0);
+    const debtor   = balances.find(m => m.balance < 0);
     if (!creditor || !debtor) return "¡Están al día! 🎉";
     return `${debtor.name} le debe ${fmt(Math.abs(debtor.balance))} a ${creditor.name}`;
   };
@@ -637,7 +696,6 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
       {members?.map(m => {
         const s = saldos[m.uid] || { paid: 0, owes: 0, balance: 0 };
         const totalSalary = members.reduce((acc, mb) => acc + (mb.salary || 0), 0);
-        // Solo mostrar % en cuentas proporcionales
         const showPct = account?.divisionSystem === "proportional" && totalSalary > 0;
         const pct = showPct ? ((m.salary || 0) / totalSalary * 100).toFixed(0) : null;
         return (
@@ -646,9 +704,7 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
               {m.photo ? <img src={m.photo} style={{ width: 44, height: 44, borderRadius: 22 }} alt="" /> : <div style={{ width: 44, height: 44, borderRadius: 22, background: (m.color || "#4F7FFA") + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>👤</div>}
               <div>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{m.name}</p>
-                <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
-                  {showPct ? `${fmt(m.salary)} · ${pct}% de la cuenta` : "Miembro"}
-                </p>
+                <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{showPct ? `${fmt(m.salary)} · ${pct}% de la cuenta` : "Miembro"}</p>
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
@@ -665,11 +721,9 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
       <Card style={{ background: colors.headerBg, border: "none" }}>
         <p style={{ fontSize: 11, fontWeight: 700, color: "#ffffff55", textTransform: "uppercase", marginBottom: 8, fontFamily: FONT }}>Conclusión</p>
         <p style={{ color: "#fff", fontSize: 15, fontWeight: 600, margin: 0, fontFamily: FONT }}>{debtSummary()}</p>
-        {!settled ? (
-          <button onClick={handleSettle} style={{ marginTop: 16, width: "100%", padding: 14, borderRadius: 14, background: "#4F7FFA", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>✅ Saldar cuentas</button>
-        ) : (
-          <div style={{ marginTop: 14, background: "#2ecc7122", borderRadius: 12, padding: 14, textAlign: "center" }}><p style={{ color: "#2ecc71", fontWeight: 700, margin: 0, fontFamily: FONT }}>¡Cuentas saldadas! 🎉</p></div>
-        )}
+        {!settled
+          ? <button onClick={handleSettle} style={{ marginTop: 16, width: "100%", padding: 14, borderRadius: 14, background: "#4F7FFA", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>✅ Saldar cuentas</button>
+          : <div style={{ marginTop: 14, background: "#2ecc7122", borderRadius: 12, padding: 14, textAlign: "center" }}><p style={{ color: "#2ecc71", fontWeight: 700, margin: 0, fontFamily: FONT }}>¡Cuentas saldadas! 🎉</p></div>}
       </Card>
       <div style={{ height: 120 }} />
     </div>
@@ -677,15 +731,25 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
 }
 
 // ── GRAFICOS SCREEN ──
-function GraficosScreen({ expenses, account }) {
+function GraficosScreen({ expenses, account, customCategories }) {
   const { colors } = useTheme();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
+  const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const allMonths = [...new Set(expenses.map(e => e.month))].sort();
   const last3 = allMonths.slice(-3);
   const monthLabel = (m) => new Date(m + "-02").toLocaleString("es-AR", { month: "short" });
-  const barData = last3.map(m => ({ mes: monthLabel(m), Hogar: expenses.filter(e => e.month === m && e.type === "hogar").reduce((s, e) => s + e.amount, 0), Personal: expenses.filter(e => e.month === m && e.type === "mio").reduce((s, e) => s + e.amount, 0), Extra: expenses.filter(e => e.month === m && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0) }));
+  const barData = last3.map(m => ({
+    mes: monthLabel(m),
+    Hogar:    expenses.filter(e => e.month === m && e.type === "hogar").reduce((s, e) => s + e.amount, 0),
+    Personal: expenses.filter(e => e.month === m && e.type === "mio").reduce((s, e) => s + e.amount, 0),
+    Extra:    expenses.filter(e => e.month === m && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0),
+  }));
   const lastMonth = last3[last3.length - 1];
-  const pieData = DEFAULT_CATEGORIES.map((c, i) => ({ name: c.label, value: expenses.filter(e => e.month === lastMonth && e.category === c.id).reduce((s, e) => s + e.amount, 0), color: CAT_COLORS[i] })).filter(c => c.value > 0);
+  const pieData = allCategories.map((c, i) => ({
+    name: c.label,
+    value: expenses.filter(e => e.month === lastMonth && e.category === c.id).reduce((s, e) => s + e.amount, 0),
+    color: CAT_COLORS[i % CAT_COLORS.length],
+  })).filter(c => c.value > 0);
   const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     if (percent < 0.07) return null;
     const RADIAN = Math.PI / 180;
@@ -704,14 +768,13 @@ function GraficosScreen({ expenses, account }) {
               <XAxis dataKey="mes" tick={{ fontSize: 12, fill: colors.textMuted, fontFamily: FONT }} />
               <YAxis tick={{ fontSize: 10, fill: colors.textMuted, fontFamily: FONT }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
-              <Bar dataKey="Hogar" fill="#4F7FFA" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="Personal" fill="#2ecc71" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="Extra" fill="#f39c12" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Hogar"    fill="#4F7FFA" radius={[6,6,0,0]} />
+              <Bar dataKey="Personal" fill="#2ecc71" radius={[6,6,0,0]} />
+              <Bar dataKey="Extra"    fill="#f39c12" radius={[6,6,0,0]} />
             </BarChart>
-          </ResponsiveContainer>
-        }
+          </ResponsiveContainer>}
         <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>
-          {[["#4F7FFA", "Hogar"], ["#2ecc71", "Personal"], ["#f39c12", "Extra"]].map(([col, lbl]) => <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: col }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span></div>)}
+          {[["#4F7FFA","Hogar"],["#2ecc71","Personal"],["#f39c12","Extra"]].map(([col, lbl]) => <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: col }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span></div>)}
         </div>
       </Card>
       <SectionTitle>Por categoría — último mes</SectionTitle>
@@ -724,8 +787,7 @@ function GraficosScreen({ expenses, account }) {
               </Pie>
               <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
             </PieChart>
-          </ResponsiveContainer>
-        }
+          </ResponsiveContainer>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6, justifyContent: "center" }}>
           {pieData.map(p => <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{p.name}</span></div>)}
         </div>
@@ -739,23 +801,23 @@ function GraficosScreen({ expenses, account }) {
 function AppInner() {
   const { colors, toggleTheme, isDark } = useTheme();
   const { unreadCount } = useNotif();
-  const [authUser, setAuthUser] = useState(undefined);
+  const [authUser, setAuthUser]       = useState(undefined);
   const [userProfile, setUserProfile] = useState(null);
-  const [account, setAccount] = useState(null);
-  const [members, setMembers] = useState([]);
-  const [expenses, setExpenses] = useState([]);
+  const [account, setAccount]         = useState(null);
+  const [members, setMembers]         = useState([]);   // usuarios reales con uid de Firebase
+  const [expenses, setExpenses]       = useState([]);   // TODOS los gastos (filtramos en JS)
   const [customCategories, setCustomCategories] = useState([]);
-  const [fixedExpenses, setFixedExpenses] = useState([]);
-  const [tab, setTab] = useState("home");
-  const [showAdd, setShowAdd] = useState(false);
+  const [fixedExpenses, setFixedExpenses]       = useState([]);
+  const [tab, setTab]                 = useState("home");
+  const [showAdd, setShowAdd]         = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
-  const [showNotifs, setShowNotifs] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
+  const [showNotifs, setShowNotifs]   = useState(false);
+  const [showMenu, setShowMenu]       = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [userAccounts, setUserAccounts] = useState([]);
   const [showWelcome, setShowWelcome] = useState(true);
   const [pendingInviteId, setPendingInviteId] = useState(null);
-  const [claimData, setClaimData] = useState(null);
+  const [claimData, setClaimData]     = useState(null);
   const currentMonth = getCurrentMonth();
 
   useEffect(() => {
@@ -811,6 +873,8 @@ function AppInner() {
 
   useEffect(() => { return onAuthStateChanged(auth, user => setAuthUser(user || null)); }, []);
   useEffect(() => { if (!authUser) return; return onSnapshot(doc(db, "users", authUser.uid), snap => { setUserProfile(snap.exists() ? snap.data() : null); }); }, [authUser]);
+
+  // Cargar lista de cuentas del usuario
   useEffect(() => {
     if (!authUser) return;
     return onSnapshot(doc(db, "users", authUser.uid), snap => {
@@ -822,33 +886,68 @@ function AppInner() {
       return () => unsubs.forEach(u => u());
     });
   }, [authUser]);
+
+  // Cuando cambia la cuenta seleccionada
   useEffect(() => {
     if (!selectedAccountId || userAccounts.length === 0) return;
     const acc = userAccounts.find(a => a.id === selectedAccountId);
-    if (acc) setAccount(acc);
+    if (acc) { setAccount(acc); setMembers([]); }
   }, [selectedAccountId, userAccounts]);
+
+  // Miembros reales (uid de Firebase)
   useEffect(() => {
     if (!account?.memberIds) return;
+    setMembers([]);
     const ids = [...account.memberIds];
-    const unsubs = ids.map(uid => onSnapshot(doc(db, "users", uid), snap => { if (snap.exists()) setMembers(prev => [...prev.filter(m => m.uid !== uid), { uid, ...snap.data() }]); }));
+    const unsubs = ids.map(uid => onSnapshot(doc(db, "users", uid), snap => {
+      if (snap.exists()) setMembers(prev => [...prev.filter(m => m.uid !== uid), { uid, ...snap.data() }]);
+    }));
     return () => unsubs.forEach(u => u());
   }, [account?.memberIds?.join(",")]);
-  // Expenses filtradas por cuenta
+
+  // Gastos: query global, filtramos en JS para soportar gastos viejos sin accountId
   useEffect(() => {
-    if (!account?.id) return;
-    const q = query(collection(db, "expenses"), where("accountId", "==", account.id), orderBy("date", "desc"));
+    if (!authUser) return;
+    const q = query(collection(db, "expenses"), orderBy("date", "desc"));
     return onSnapshot(q, snap => { setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-  }, [account?.id]);
+  }, [authUser]);
+
   useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "categories"), snap => { setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
   useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "fixedExpenses"), snap => { setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
 
   const { sendNotification } = useNotif();
 
+  // Gastos filtrados para la cuenta actual
+  // Incluye gastos con accountId coincidente Y gastos viejos sin accountId creados por algún miembro
+  const accountExpenses = expenses.filter(e =>
+    e.accountId === account?.id ||
+    (!e.accountId && account?.memberIds?.includes(e.createdBy))
+  );
+
+  // allMembers: usuarios reales + memberLabels sin uid vinculado (marcados con _isLabel)
+  const memberLabels = account?.memberLabels || [];
+  const allMembers = [
+    ...members,
+    ...memberLabels
+      .filter(l => !l.linkedUid && !members.some(m => m.uid === l.linkedUid))
+      .map(l => ({ uid: l.id, name: l.name, color: l.color, _isLabel: true })),
+  ];
+
   const addExpense = async (e) => {
     await addDoc(collection(db, "expenses"), { ...e, createdBy: authUser.uid, accountId: account?.id });
     const otherMembers = members?.filter(m => m.uid !== authUser.uid) || [];
     const myName = members?.find(m => m.uid === authUser.uid)?.name || "Alguien";
-    if (otherMembers.length > 0) await sendNotification({ type: NOTIF_TYPES.EXPENSE_ADDED, title: `Nuevo gasto: ${e.concept}`, body: `${myName} agregó ${formatAmount(e.amount, account?.currency || "ARS")}`, fromName: myName, toUids: otherMembers.map(m => m.uid), accountId: account?.id });
+    if (otherMembers.length > 0) {
+      await sendNotification({
+        type: NOTIF_TYPES.EXPENSE_ADDED,
+        title: `Nuevo gasto: ${e.concept}`,
+        body: `${myName} agregó ${formatAmount(e.amount, account?.currency || "ARS")} en ${account?.name}`,
+        fromName: myName,
+        toUids: otherMembers.map(m => m.uid),
+        accountId: account?.id,
+        accountName: account?.name,
+      });
+    }
   };
   const deleteExpense = async (id) => { await deleteDoc(doc(db, "expenses", id)); };
   const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); setShowWelcome(true); };
@@ -862,8 +961,6 @@ function AppInner() {
   const isPersonal = account?.type === "personal";
   if (isPersonal && tab === "saldos") setTab("home");
 
-  // Nav: personal = 4 ítems sin hueco raro (home, graficos, ajustes + espacio FAB)
-  // shared = home, saldos | graficos, ajustes
   const NAV_LEFT = isPersonal
     ? [{ id: "home", label: "Inicio" }, { id: "graficos", label: "Gráficos" }]
     : [{ id: "home", label: "Inicio" }, { id: "saldos", label: "Saldos" }];
@@ -885,15 +982,14 @@ function AppInner() {
       <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
-        {tab === "home" && <HomeScreen expenses={expenses} currentUser={authUser} members={members} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} />}
-        {tab === "saldos" && <SaldosScreen expenses={expenses} members={members} account={account} currentMonth={currentMonth} />}
-        {tab === "graficos" && <GraficosScreen expenses={expenses} account={account} />}
-        {tab === "ajustes" && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
+        {tab === "home"     && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} />}
+        {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} members={members} account={account} currentMonth={currentMonth} />}
+        {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} />}
+        {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
       </div>
 
       {/* NAV BAR */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, width: "100%", maxWidth: 500, margin: "0 auto", zIndex: 40 }}>
-        {/* FAB */}
         <div style={{ position: "absolute", top: -28, left: "50%", transform: "translateX(-50%)", zIndex: 41 }}>
           <button onClick={() => setShowAdd(true)} style={{ width: 64, height: 64, borderRadius: 32, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", border: "4px solid " + colors.navBg, color: "#fff", fontSize: 30, cursor: "pointer", boxShadow: "0 6px 24px #4F7FFA88", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
         </div>
@@ -914,8 +1010,8 @@ function AppInner() {
         </div>
       </div>
 
-      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} members={members} currency={account?.currency || "ARS"} customCategories={customCategories} />}
-      {editingExpense && <EditExpenseModal expense={editingExpense} members={members} onClose={() => setEditingExpense(null)} />}
+      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={customCategories} isPersonal={isPersonal} />}
+      {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} onClose={() => setEditingExpense(null)} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
       {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
       {claimData && (

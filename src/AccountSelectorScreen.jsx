@@ -7,11 +7,11 @@ const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sa
 
 const DIVISION_SYSTEMS = [
   { id: "proportional", label: "Proporcional al ingreso", icon: "📊", desc: "Ideal para parejas que conviven. Cada uno aporta según su sueldo." },
-  { id: "50_50", label: "Partes iguales", icon: "⚖️", desc: "Cada uno paga exactamente la mitad." },
-  { id: "informativo", label: "Gastos en común", icon: "🤝", desc: "Registrá y gestioná gastos sin calcular quién le debe a quién." },
+  { id: "50_50",        label: "Partes iguales",          icon: "⚖️", desc: "Cada uno paga exactamente la mitad." },
+  { id: "informativo",  label: "Gastos en común",         icon: "🤝", desc: "Registrá y gestioná gastos sin calcular quién le debe a quién." },
 ];
 
-const MEMBER_COLORS = ["#4F7FFA", "#FA4F7F", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c"];
+const MEMBER_COLORS = ["#4F7FFA","#FA4F7F","#2ecc71","#f39c12","#9b59b6","#1abc9c"];
 
 function MenuIcon({ color = "#ffffffcc" }) {
   return (
@@ -24,50 +24,65 @@ function MenuIcon({ color = "#ffffffcc" }) {
   );
 }
 
-function SwipeableAccountRow({ acc, onSelect, onDelete, colors }) {
-  const [swipeX, setSwipeX] = useState(0);
-  const [swiped, setSwiped] = useState(false);
-  const startX = useRef(null);
-  const DELETE_THRESHOLD = 80;
+function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
+  const [swipeX, setSwipeX]  = useState(0);
+  const [swiped, setSwiped]  = useState(false);
+  const startX               = useRef(null);
+  const isDragging           = useRef(false);
+  const DELETE_THRESHOLD     = 80;
 
-  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; };
+  const onTouchStart = (e) => {
+    startX.current     = e.touches[0].clientX;
+    isDragging.current = true;
+  };
   const onTouchMove = (e) => {
-    if (startX.current === null) return;
+    if (!isDragging.current || startX.current === null) return;
     const diff = startX.current - e.touches[0].clientX;
     if (diff > 0) setSwipeX(Math.min(diff, DELETE_THRESHOLD + 20));
+    else if (diff < -10) { setSwipeX(0); setSwiped(false); }
   };
   const onTouchEnd = () => {
+    isDragging.current = false;
     if (swipeX > DELETE_THRESHOLD / 2) { setSwipeX(DELETE_THRESHOLD); setSwiped(true); }
     else { setSwipeX(0); setSwiped(false); }
     startX.current = null;
   };
-  const handleClose = () => { setSwipeX(0); setSwiped(false); };
 
   return (
     <div style={{ position: "relative", marginBottom: 12, borderRadius: 20, overflow: "hidden" }}>
+      {/* Botón eliminar detrás */}
       <div style={{
         position: "absolute", right: 0, top: 0, bottom: 0, width: DELETE_THRESHOLD,
         background: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center",
         borderRadius: "0 20px 20px 0",
       }}>
-        <button onClick={(e) => { e.stopPropagation(); onDelete(acc.id); }}
-          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDeleteRequest(acc.id); }}
+          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 0 }}>
           <span style={{ fontSize: 20 }}>🗑️</span>
           <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
         </button>
       </div>
+
+      {/* Fila deslizable */}
       <div
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onClick={() => { if (swiped) { setSwipeX(0); setSwiped(false); } else { onSelect(acc.id); } }}
         style={{
           transform: `translateX(-${swipeX}px)`,
-          transition: startX.current === null ? "transform 0.3s ease" : "none",
+          transition: isDragging.current ? "none" : "transform 0.3s ease",
           background: colors.card, borderRadius: 20, padding: "18px 20px",
           border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow,
           display: "flex", alignItems: "center", gap: 14,
           cursor: "pointer", position: "relative", zIndex: 1,
-        }}
-        onClick={() => { if (!swiped) onSelect(acc.id); else handleClose(); }}>
-        <div style={{ width: 48, height: 48, borderRadius: 16, background: acc.type === "shared" ? "#4F7FFA18" : "#2ecc7118", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
+        }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: 16,
+          background: acc.type === "shared" ? "#4F7FFA18" : "#2ecc7118",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0,
+        }}>
           {acc.type === "shared" ? "👥" : "👤"}
         </div>
         <div style={{ flex: 1 }}>
@@ -87,15 +102,19 @@ function SwipeableAccountRow({ acc, onSelect, onDelete, colors }) {
 export default function AccountSelectorScreen({ user, accounts, onSelect, onCreated }) {
   const { colors } = useTheme();
 
-  const [step, setStep] = useState("list"); // "list" | "create" | "members"
-  const [accountName, setAccountName] = useState("");
-  const [accountType, setAccountType] = useState("shared");
-  const [divisionSystem, setDivisionSystem] = useState("proportional");
-  const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [step,           setStep]          = useState("list");
+  const [accountName,    setAccountName]   = useState("");
+  const [accountType,    setAccountType]   = useState("shared");
+  const [divisionSystem, setDivisionSystem]= useState("proportional");
+  const [saving,         setSaving]        = useState(false);
+  const [confirmDelete,  setConfirmDelete] = useState(null);
+  // Estado local para reflejar eliminaciones inmediatamente sin esperar al padre
+  const [deletedIds,     setDeletedIds]    = useState([]);
 
-  // Integrantes locales
-  const [members, setMembers] = useState([{ name: "", color: MEMBER_COLORS[0] }]);
+  const visibleAccounts = accounts.filter(a => !deletedIds.includes(a.id));
+
+  // Integrantes
+  const [members,       setMembers]       = useState([{ name: "", color: MEMBER_COLORS[0] }]);
   const [newMemberName, setNewMemberName] = useState("");
 
   const addMember = () => {
@@ -105,8 +124,7 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
     setMembers(prev => [...prev, { name: trimmed, color }]);
     setNewMemberName("");
   };
-
-  const removeMember = (idx) => setMembers(prev => prev.filter((_, i) => i !== idx));
+  const removeMember     = (idx) => setMembers(prev => prev.filter((_, i) => i !== idx));
   const updateMemberName = (idx, val) => setMembers(prev => prev.map((m, i) => i === idx ? { ...m, name: val } : m));
 
   const handleCreate = async () => {
@@ -128,13 +146,22 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
     onCreated(ref.id);
   };
 
+  // FIX: marcar como eliminada en estado local ANTES de llamar Firestore
+  // Así el row desaparece inmediatamente y no queda colgado
   const handleDeleteConfirmed = async () => {
     if (!confirmDelete) return;
-    await deleteDoc(doc(db, "accounts", confirmDelete));
-    await setDoc(doc(db, "users", user.uid), {
-      accountIds: accounts.filter(a => a.id !== confirmDelete).map(a => a.id)
-    }, { merge: true });
+    const idToDelete = confirmDelete;
     setConfirmDelete(null);
+    setDeletedIds(prev => [...prev, idToDelete]);   // ocultar inmediatamente
+    try {
+      await deleteDoc(doc(db, "accounts", idToDelete));
+      await setDoc(doc(db, "users", user.uid), {
+        accountIds: accounts.filter(a => a.id !== idToDelete).map(a => a.id),
+      }, { merge: true });
+    } catch (err) {
+      console.error("Error eliminando cuenta:", err);
+      setDeletedIds(prev => prev.filter(id => id !== idToDelete)); // revertir si falla
+    }
   };
 
   const goToMembers = () => {
@@ -155,8 +182,8 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
       position: "fixed", inset: 0, background: colors.bg, fontFamily: FONT,
       overflowY: "auto",
       paddingBottom: "env(safe-area-inset-bottom)",
-      paddingLeft: "env(safe-area-inset-left)",
-      paddingRight: "env(safe-area-inset-right)",
+      paddingLeft:   "env(safe-area-inset-left)",
+      paddingRight:  "env(safe-area-inset-right)",
       boxSizing: "border-box",
     }}>
       <style>{`* { box-sizing: border-box; }`}</style>
@@ -186,9 +213,11 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
             </svg>
           </button>
         </div>
-        <p style={{ color: "#ffffff44", fontSize: 12, margin: "10px 2px 0", fontStyle: "italic", fontFamily: FONT }}>
-          Deslizá a la izquierda para eliminar
-        </p>
+        {step === "list" && (
+          <p style={{ color: "#ffffff44", fontSize: 12, margin: "10px 2px 0", fontStyle: "italic", fontFamily: FONT }}>
+            Deslizá a la izquierda para eliminar
+          </p>
+        )}
       </div>
 
       <div style={{ padding: 20 }}>
@@ -196,16 +225,24 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
         {/* ── LISTA ── */}
         {step === "list" && (
           <>
-            {accounts.length === 0 && (
+            {visibleAccounts.length === 0 && (
               <div style={{ textAlign: "center", padding: "40px 20px", color: colors.textMuted }}>
                 <p style={{ fontSize: 48, margin: "0 0 12px" }}>📂</p>
                 <p style={{ fontSize: 16, fontWeight: 600, color: colors.text, margin: "0 0 6px", fontFamily: FONT }}>No tenés cuentas todavía</p>
                 <p style={{ fontSize: 14, margin: 0, fontFamily: FONT }}>Creá tu primera cuenta para empezar</p>
               </div>
             )}
-            {accounts.map(acc => (
-              <SwipeableAccountRow key={acc.id} acc={acc} colors={colors} onSelect={onSelect} onDelete={(id) => setConfirmDelete(id)} />
+
+            {visibleAccounts.map(acc => (
+              <SwipeableAccountRow
+                key={acc.id}
+                acc={acc}
+                colors={colors}
+                onSelect={onSelect}
+                onDeleteRequest={(id) => setConfirmDelete(id)}
+              />
             ))}
+
             <button onClick={() => setStep("create")}
               style={{ width: "100%", padding: 16, borderRadius: 16, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               <span style={{ fontSize: 20 }}>+</span> Nueva cuenta
@@ -313,18 +350,22 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
         )}
       </div>
 
-      {/* Modal eliminar */}
-      {confirmDelete && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ background: colors.card, borderRadius: 24, padding: 24, width: "100%", maxWidth: 340, fontFamily: FONT, border: `1px solid ${colors.cardBorder}` }}>
-            <p style={{ fontSize: 40, textAlign: "center", margin: "0 0 12px" }}>🗑️</p>
-            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", textAlign: "center", fontFamily: FONT }}>¿Eliminar cuenta?</p>
-            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 24px", textAlign: "center", lineHeight: 1.5, fontFamily: FONT }}>Se van a borrar todos los datos. Esta acción no se puede deshacer.</p>
-            <button onClick={handleDeleteConfirmed} style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Sí, eliminar</button>
-            <button onClick={() => setConfirmDelete(null)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+      {/* Modal confirmar eliminación */}
+      {confirmDelete && (() => {
+        const acc = visibleAccounts.find(a => a.id === confirmDelete) || accounts.find(a => a.id === confirmDelete);
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <div style={{ background: colors.card, borderRadius: 24, padding: 24, width: "100%", maxWidth: 340, fontFamily: FONT, border: `1px solid ${colors.cardBorder}` }}>
+              <p style={{ fontSize: 40, textAlign: "center", margin: "0 0 12px" }}>🗑️</p>
+              <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 6px", textAlign: "center", fontFamily: FONT }}>¿Eliminar cuenta?</p>
+              {acc?.name && <p style={{ fontSize: 15, fontWeight: 700, color: "#4F7FFA", margin: "0 0 8px", textAlign: "center", fontFamily: FONT }}>{acc.name}</p>}
+              <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 24px", textAlign: "center", lineHeight: 1.5, fontFamily: FONT }}>Se van a borrar todos los datos. Esta acción no se puede deshacer.</p>
+              <button onClick={handleDeleteConfirmed} style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Sí, eliminar</button>
+              <button onClick={() => setConfirmDelete(null)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
