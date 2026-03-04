@@ -13,9 +13,13 @@ import DateInput from "./DateInput";
 import { NotifProvider, useNotif, NotifCenter, NOTIF_TYPES } from "./notifications";
 import { useTheme, formatAmount, CURRENCIES } from "./theme.jsx";
 
-// ── FONT ÚNICA ──
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');`;
+
+// Altura del header fijo para calcular paddingTop de cada sección
+const HEADER_HEIGHT = 90;
+// Altura de la nav bar
+const NAV_HEIGHT = 72;
 
 const DEFAULT_CATEGORIES = [
   { id: "super", label: "Supermercado", icon: "🛒" },
@@ -30,27 +34,20 @@ const DEFAULT_CATEGORIES = [
 const CAT_COLORS = ["#4F7FFA","#FA4F7F","#f39c12","#2ecc71","#9b59b6","#1abc9c","#e74c3c","#95a5a6"];
 const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
-// ── NAV: 4 ítems + botón + en el centro ──
-const NAV_ITEMS = [
-  { id: "home",     label: "Inicio" },
-  { id: "gastos",   label: "Gastos" },
-  { id: "saldos",   label: "Saldos" },
-  { id: "graficos", label: "Gráficos" },
-  { id: "ajustes",  label: "Ajustes" },
-];
+// Tamaños de fuente
+const FONT_SIZE_MAP = { small: { base: 12, sub: 10, title: 18 }, medium: { base: 14, sub: 12, title: 20 }, large: { base: 17, sub: 14, title: 22 } };
 
-function NavIcon({ id, active, color }) {
-  const s = active ? 2 : 1.5;
-  const c = active ? color : "#aaa";
-  if (id === "home") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>;
-  if (id === "gastos") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg>;
-  if (id === "saldos") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg>;
-  if (id === "graficos") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V14M9 20V8M14 20v-5M19 20V4"/></svg>;
-  if (id === "ajustes") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
-  return null;
+function useExpenseFontSize() {
+  const [size, setSize] = useState(() => localStorage.getItem("expenseFontSize") || "medium");
+  useEffect(() => {
+    const handler = (e) => setSize(e.detail);
+    window.addEventListener("expenseFontSizeChange", handler);
+    return () => window.removeEventListener("expenseFontSizeChange", handler);
+  }, []);
+  return FONT_SIZE_MAP[size] || FONT_SIZE_MAP.medium;
 }
 
-// Ícono hamburger SVG
+// ── Ícono hamburger ──
 function MenuIcon({ color = "#ffffffcc" }) {
   return (
     <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -62,6 +59,16 @@ function MenuIcon({ color = "#ffffffcc" }) {
   );
 }
 
+function NavIcon({ id, active, color }) {
+  const s = active ? 2 : 1.5;
+  const c = active ? color : "#aaa";
+  if (id === "home") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>;
+  if (id === "saldos") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg>;
+  if (id === "graficos") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V14M9 20V8M14 20v-5M19 20V4"/></svg>;
+  if (id === "ajustes") return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={s} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
+  return null;
+}
+
 function calcSaldos(expenses, members, divisionSystem) {
   if (!members || members.length < 2) return {};
   const result = {};
@@ -71,9 +78,7 @@ function calcSaldos(expenses, members, divisionSystem) {
     if (e.type === "hogar") {
       if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
       members.forEach(m => {
-        const share = divisionSystem === "proportional" && totalSalary > 0
-          ? e.amount * ((m.salary || 0) / totalSalary)
-          : e.amount / members.length;
+        const share = divisionSystem === "proportional" && totalSalary > 0 ? e.amount * ((m.salary || 0) / totalSalary) : e.amount / members.length;
         if (result[m.uid] !== undefined) result[m.uid].owes += share;
       });
     }
@@ -99,9 +104,9 @@ function Card({ children, style = {} }) {
 function Tag({ color, children }) {
   return <span style={{ background: color + "22", color, fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, fontFamily: FONT }}>{children}</span>;
 }
-function SectionTitle({ children }) {
+function SectionTitle({ children, style = {} }) {
   const { colors } = useTheme();
-  return <p style={{ fontSize: 20, fontWeight: 700, margin: "22px 0 10px", color: colors.text, fontFamily: FONT }}>{children}</p>;
+  return <p style={{ fontSize: 20, fontWeight: 700, margin: "22px 0 10px", color: colors.text, fontFamily: FONT, ...style }}>{children}</p>;
 }
 function StatPill({ label, value, color }) {
   const { colors } = useTheme();
@@ -112,7 +117,7 @@ function Spinner({ text = "Cargando..." }) {
   return <div style={{ textAlign: "center", padding: 60, color: colors.textMuted, fontSize: 14, fontFamily: FONT }}>{text}</div>;
 }
 
-// ── HEADER UNIFICADO (menú + título + campana) ──
+// ── HEADER FIJO UNIFICADO ──
 function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
   return (
     <div style={{
@@ -120,46 +125,33 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
       maxWidth: 500, margin: "0 auto",
       background: colors.headerBg,
       paddingTop: "calc(env(safe-area-inset-top) + 10px)",
-      paddingBottom: 12,
-      paddingLeft: 16,
-      paddingRight: 16,
+      paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
     }}>
       <div style={{
         display: "flex", alignItems: "center", gap: 12,
         background: "rgba(255,255,255,0.07)",
         border: "1px solid rgba(255,255,255,0.13)",
-        borderRadius: 20,
-        padding: "12px 14px",
+        borderRadius: 20, padding: "12px 14px",
       }}>
-        {/* Botón menú hamburger */}
-        <button onClick={onMenuOpen} style={{
-          background: "none", border: "none", cursor: "pointer",
-          padding: 0, display: "flex", alignItems: "center", flexShrink: 0,
-        }}>
+        <button onClick={onMenuOpen} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}>
           <MenuIcon />
         </button>
-
-        {/* Título */}
         <div style={{ flex: 1 }}>
           <p style={{ color: "#ffffff44", fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", margin: "0 0 2px", fontFamily: FONT }}>X-penses</p>
           <p style={{ fontSize: 15, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: -0.3, fontFamily: FONT }}>{account?.name || "Mis cuentas"}</p>
         </div>
-
-        {/* Campana de notificaciones */}
         <button onClick={onNotifsOpen} style={{
-          position: "relative",
-          background: "rgba(255,255,255,0.10)",
-          border: "1px solid rgba(255,255,255,0.13)",
-          borderRadius: 50, width: 38, height: 38,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: "pointer", flexShrink: 0, padding: 0,
+          position: "relative", background: "rgba(255,255,255,0.10)",
+          border: "1px solid rgba(255,255,255,0.13)", borderRadius: 50,
+          width: 38, height: 38, display: "flex", alignItems: "center",
+          justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0,
         }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffffcc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
             <path d="M13.73 21a2 2 0 01-3.46 0"/>
           </svg>
           {unreadCount > 0 && (
-            <div style={{ position: "absolute", top: 5, right: 5, width: 14, height: 14, borderRadius: 7, background: "#FA4F7F", border: "2px solid transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ position: "absolute", top: 5, right: 5, width: 14, height: 14, borderRadius: 7, background: "#FA4F7F", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <span style={{ fontSize: 8, color: "#fff", fontWeight: 700, fontFamily: FONT }}>{unreadCount > 9 ? "9+" : unreadCount}</span>
             </div>
           )}
@@ -169,44 +161,32 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
   );
 }
 
-// ── MENU PANEL (bottom sheet) ──
+// ── MENU PANEL ──
 function MenuPanel({ onClose, currentUser, userProfile, members, account, onSignOut, onSwitchAccount, isDark, onToggleTheme, colors }) {
   const me = members?.find(m => m.uid === currentUser?.uid);
   const meColor = me?.color || "#4F7FFA";
-
   const handleShare = () => {
     const url = window.location.origin;
-    if (navigator.share) {
-      navigator.share({ title: "X-penses", text: "Llevá tus gastos compartidos con X-penses 💸", url });
-    } else {
-      navigator.clipboard.writeText(url);
-      alert("¡Link copiado!");
-    }
+    if (navigator.share) navigator.share({ title: "X-penses", text: "Llevá tus gastos compartidos 💸", url });
+    else { navigator.clipboard.writeText(url); alert("¡Link copiado!"); }
   };
-
   const rows = [
     { icon: "🔀", label: "Cambiar de cuenta", sub: account?.name || "", action: () => { onClose(); onSwitchAccount(); } },
     { icon: "📤", label: "Compartir X-penses", sub: "Invitá a otros a usar la app", action: () => { onClose(); handleShare(); } },
-    { icon: isDark ? "☀️" : "🌙", label: isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro", sub: "Tema de la app", action: () => { onToggleTheme(); onClose(); } },
+    { icon: isDark ? "☀️" : "🌙", label: isDark ? "Modo claro" : "Modo oscuro", sub: "Tema de la app", action: () => { onToggleTheme(); onClose(); } },
     { icon: "🚪", label: "Cerrar sesión", sub: "", action: () => { onClose(); onSignOut(); }, danger: true },
   ];
-
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 500, margin: "0 auto", padding: "20px 20px calc(32px + env(safe-area-inset-bottom))", fontFamily: FONT }}
-        onClick={e => e.stopPropagation()}>
+      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 500, margin: "0 auto", padding: "20px 20px calc(32px + env(safe-area-inset-bottom))", fontFamily: FONT }} onClick={e => e.stopPropagation()}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-        {/* Perfil */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", background: colors.pill, borderRadius: 18, marginBottom: 16 }}>
-          {currentUser?.photoURL
-            ? <img src={currentUser.photoURL} style={{ width: 48, height: 48, borderRadius: 24, border: `2px solid ${meColor}` }} alt="" />
-            : <div style={{ width: 48, height: 48, borderRadius: 24, background: meColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
+          {currentUser?.photoURL ? <img src={currentUser.photoURL} style={{ width: 48, height: 48, borderRadius: 24, border: `2px solid ${meColor}` }} alt="" /> : <div style={{ width: 48, height: 48, borderRadius: 24, background: meColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
           <div>
             <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{userProfile?.name || currentUser?.displayName}</p>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{currentUser?.email}</p>
           </div>
         </div>
-        {/* Cuenta activa */}
         <div style={{ padding: "10px 16px", background: "#4F7FFA11", borderRadius: 14, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 20 }}>{account?.type === "shared" ? "👥" : "👤"}</span>
           <div>
@@ -229,7 +209,7 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
   );
 }
 
-// ── ADD EXPENSE MODAL con swipe-to-close ──
+// ── ADD EXPENSE MODAL con swipe-to-close y fondo bloqueado ──
 function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, customCategories }) {
   const { colors } = useTheme();
   const otherMember = members?.find(m => m.uid !== currentUser.uid);
@@ -239,23 +219,30 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const currSymbol = CURRENCIES[currency]?.symbol || "$";
 
-  // Swipe down to close
   const sheetRef = useRef(null);
-  const dragY = useRef(0);
   const startY = useRef(null);
+  const dragY = useRef(0);
   const [translateY, setTranslateY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const onTouchStart = (e) => { startY.current = e.touches[0].clientY; };
+  const onTouchStart = (e) => {
+    // Solo iniciar drag desde el handle
+    const handle = sheetRef.current?.querySelector("[data-handle]");
+    if (handle && handle.contains(e.target)) {
+      startY.current = e.touches[0].clientY;
+      setIsDragging(true);
+    }
+  };
   const onTouchMove = (e) => {
-    if (startY.current === null) return;
+    if (!isDragging || startY.current === null) return;
+    e.stopPropagation();
     const dy = e.touches[0].clientY - startY.current;
     if (dy > 0) { dragY.current = dy; setTranslateY(dy); }
   };
   const onTouchEnd = () => {
-    if (dragY.current > 120) { onClose(); }
-    else { setTranslateY(0); }
-    dragY.current = 0;
-    startY.current = null;
+    if (dragY.current > 120) onClose();
+    else setTranslateY(0);
+    dragY.current = 0; startY.current = null; setIsDragging(false);
   };
 
   const labelStyle = { fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT };
@@ -274,24 +261,25 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
   const types = [["hogar","🏠 Hogar"],["personal","🎁 Para otro"],["extraordinary","✈️ Extraordinario"],["mio","👤 Para mí"]];
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}
-      onClick={onClose}>
+    // Fondo no clickeable — no cierra al tocar afuera, solo con swipe o botón X
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
       <div
         ref={sheetRef}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        onClick={e => e.stopPropagation()}
         style={{
           background: colors.card, borderRadius: "24px 24px 0 0",
-          width: "100%", padding: "24px 20px 44px",
-          maxHeight: "88vh", overflowY: "auto", fontFamily: FONT,
+          width: "100%", padding: "0 20px 44px",
+          maxHeight: "90vh", overflowY: "auto", fontFamily: FONT,
           transform: `translateY(${translateY}px)`,
-          transition: translateY === 0 ? "transform 0.3s ease" : "none",
+          transition: isDragging ? "none" : "transform 0.3s ease",
         }}>
-        {/* Handle */}
-        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        {/* Handle — área de swipe */}
+        <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
+          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, paddingTop: 12 }}>
           <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Nuevo Gasto</span>
           <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
         </div>
@@ -327,9 +315,10 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
   );
 }
 
-// ── HOME SCREEN ──
-function HomeScreen({ expenses, currentUser, members, account, currentMonth, customCategories }) {
+// ── HOME SCREEN (con gastos unificados, filtros, gastos fijos colapsables) ──
+function HomeScreen({ expenses, currentUser, members, account, currentMonth, customCategories, fixedExpenses, onEdit, onDelete }) {
   const { colors } = useTheme();
+  const fs = useExpenseFontSize();
   const currency = account?.currency || "ARS";
   const fmt = (n) => formatAmount(n, currency);
   const me = members?.find(m => m.uid === currentUser.uid);
@@ -340,15 +329,28 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
   const saldos = calcSaldos(sharedExp, members, account?.divisionSystem);
   const myBalance = saldos[currentUser.uid]?.balance || 0;
   const myPersonalTotal = monthExp.filter(e => e.type === "mio" && e.owner === currentUser.uid).reduce((s, e) => s + e.amount, 0);
-  const recent = [...monthExp].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
   const catTotals = allCategories.map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total).slice(0, 4);
   const monthLabel = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
+
+  // Filtros de gastos
+  const [filterType, setFilterType] = useState("todos");
+  const filtered = filterType === "todos" ? monthExp : monthExp.filter(e => e.type === filterType);
+  const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
+
+  // Gastos fijos colapsables
+  const [fixedExpanded, setFixedExpanded] = useState(false);
+  const today = new Date().getDate();
+
   return (
     <div style={{ fontFamily: FONT }}>
-      <div style={{ background: colors.headerBg, borderRadius: "0 0 32px 32px", padding: "100px 20px 28px" }}>
+      {/* Hero header */}
+      <div style={{ background: colors.headerBg, borderRadius: "0 0 32px 32px", padding: `${HEADER_HEIGHT + 16}px 20px 28px` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
           {me?.photo ? <img src={me.photo} style={{ width: 44, height: 44, borderRadius: 22, border: "2px solid #ffffff44" }} alt="" /> : <div style={{ width: 44, height: 44, borderRadius: 22, background: meColor+"44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
-          <div><p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>Hola,</p><p style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, fontFamily: FONT }}>{me?.name || currentUser.displayName}</p></div>
+          <div>
+            <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>Hola,</p>
+            <p style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, fontFamily: FONT }}>{me?.name || currentUser.displayName}</p>
+          </div>
         </div>
         <div style={{ background: meColor, borderRadius: 22, padding: 20 }}>
           <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Saldo — {monthLabel}</p>
@@ -356,131 +358,130 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
           <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>{myBalance >= 0 ? "✅ Te deben a vos" : "⚠️ Debés este monto"}</p>
         </div>
       </div>
+
       <div style={{ padding: "0 20px" }}>
+        {/* Resumen */}
         <SectionTitle>Resumen del mes</SectionTitle>
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
           <StatPill label="Compartido" value={fmt(sharedExp.reduce((s,e)=>s+e.amount,0))} color="#4F7FFA" />
           <StatPill label="Mis gastos" value={fmt(myPersonalTotal)} color={meColor} />
         </div>
-        {catTotals.length > 0 && <><SectionTitle>Top categorías</SectionTitle>{catTotals.map(c => (
-          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-            <span style={{ fontSize: 22, width: 30 }}>{c.icon}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</span>
+
+        {/* Top categorías */}
+        {catTotals.length > 0 && (
+          <>
+            <SectionTitle>Top categorías</SectionTitle>
+            {catTotals.map(c => (
+              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                <span style={{ fontSize: 22, width: 30 }}>{c.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ fontSize: fs.base, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</span>
+                    <span style={{ fontSize: fs.base, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</span>
+                  </div>
+                  <div style={{ background: colors.divider, borderRadius: 4, height: 5 }}>
+                    <div style={{ background: "#4F7FFA", borderRadius: 4, height: 5, width: `${Math.min(100,(c.total/catTotals[0].total)*100)}%` }} />
+                  </div>
+                </div>
               </div>
-              <div style={{ background: colors.divider, borderRadius: 4, height: 5 }}>
-                <div style={{ background: "#4F7FFA", borderRadius: 4, height: 5, width: `${Math.min(100,(c.total/catTotals[0].total)*100)}%` }} />
+            ))}
+          </>
+        )}
+
+        {/* ── Gastos fijos colapsables ── */}
+        {fixedExpenses && fixedExpenses.length > 0 && (
+          <>
+            <button onClick={() => setFixedExpanded(v => !v)} style={{
+              width: "100%", background: "none", border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "18px 0 8px", fontFamily: FONT,
+            }}>
+              <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>
+                📋 Gastos fijos
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
+                  {fmt(fixedExpenses.reduce((s, f) => s + (f.amount || 0), 0))}
+                </span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: fixedExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
               </div>
-            </div>
-          </div>
-        ))}</>}
-        <SectionTitle>Últimos movimientos</SectionTitle>
-        {recent.length === 0 && <Card style={{ textAlign: "center", color: colors.textMuted, padding: 32 }}><p style={{ fontSize: 32, margin: "0 0 8px" }}>📭</p><p style={{ margin: 0, fontFamily: FONT }}>Sin gastos este mes</p></Card>}
-        {recent.map(e => {
+            </button>
+            {fixedExpanded && (
+              <div style={{ marginBottom: 8 }}>
+                {fixedExpenses.map(f => {
+                  const daysLeft = f.dueDay ? f.dueDay - today : null;
+                  const isUrgent = daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
+                  return (
+                    <Card key={f.id} style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 12, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                          {f.shared ? "🏠" : "👤"}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{f.name}</p>
+                          {f.dueDay && (
+                            <p style={{ margin: "2px 0 0", fontSize: fs.sub, color: isUrgent ? "#e74c3c" : colors.textMuted, fontFamily: FONT, fontWeight: isUrgent ? 700 : 400 }}>
+                              {daysLeft === 0 ? "⚠️ Vence hoy" : daysLeft < 0 ? `Venció hace ${Math.abs(daysLeft)}d` : `Vence en ${daysLeft}d (día ${f.dueDay})`}
+                            </p>
+                          )}
+                        </div>
+                        <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: isUrgent ? "#e74c3c" : colors.text, fontFamily: FONT }}>{fmt(f.amount || 0)}</p>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Todos los gastos con filtros ── */}
+        <SectionTitle>Movimientos</SectionTitle>
+
+        {/* Filtros */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
+          {[["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","✈️"],["mio","👤"]].map(([val, lbl]) => (
+            <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
+          ))}
+        </div>
+
+        {sorted.length === 0 && (
+          <Card style={{ textAlign: "center", color: colors.textMuted, padding: 32 }}>
+            <p style={{ fontSize: 32, margin: "0 0 8px" }}>📭</p>
+            <p style={{ margin: 0, fontFamily: FONT }}>Sin gastos este mes</p>
+          </Card>
+        )}
+
+        {sorted.map(e => {
           const cat = allCategories.find(c => c.id === e.category);
           const who = e.type === "mio" ? members?.find(m=>m.uid===e.owner) : members?.find(m=>m.uid===e.paidBy);
           return (
             <Card key={e.id} style={{ padding: "14px 16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
                   <span style={{ fontSize: 22 }}>{cat?.icon}</span>
-                  <div><p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>{e.concept}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{e.date} · {who?.name}</p></div>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{e.concept}</p>
+                    <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{e.date} · {who?.name}</p>
+                    <Tag color={e.type==="hogar"?"#4F7FFA":e.type==="personal"?"#FA4F7F":e.type==="extraordinary"?"#f39c12":"#2ecc71"}>{e.type==="hogar"?"Hogar":e.type==="personal"?"Para otro":e.type==="extraordinary"?"Extraordinario":"Para mí"}</Tag>
+                  </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT }}>{fmt(e.amount)}</p>
-                  <Tag color={e.type==="hogar"?"#4F7FFA":e.type==="personal"?"#FA4F7F":e.type==="extraordinary"?"#f39c12":"#2ecc71"}>{e.type==="hogar"?"Hogar":e.type==="personal"?"Para otro":e.type==="extraordinary"?"Extraordinario":"Para mí"}</Tag>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{fmt(e.amount)}</p>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => onEdit(e)} style={{ background: "#4F7FFA18", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, color: "#4F7FFA", cursor: "pointer", fontFamily: FONT, fontWeight: 600 }}>✏️</button>
+                    <button onClick={() => onDelete(e.id)} style={{ background: colors.dangerBg, border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, color: colors.danger, cursor: "pointer", fontFamily: FONT }}>✕</button>
+                  </div>
                 </div>
               </div>
             </Card>
           );
         })}
-        <div style={{ height: 100 }} />
+        <div style={{ height: 120 }} />
       </div>
-    </div>
-  );
-}
-
-// ── GASTOS SCREEN ──
-function GastosScreen({ expenses, members, currentMonth, onEdit, onDelete, account, customCategories }) {
-  const { colors } = useTheme();
-  const fmt = (n) => formatAmount(n, account?.currency || "ARS");
-  const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
-  const [filterType, setFilterType] = useState("todos");
-  const monthExp = expenses.filter(e => e.month === currentMonth);
-  const filtered = filterType === "todos" ? monthExp : monthExp.filter(e => e.type === filterType);
-  const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
-  return (
-    <div style={{ padding: "0 20px", paddingTop: 80, fontFamily: FONT }}>
-      <SectionTitle>Todos los gastos</SectionTitle>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-        {[["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","✈️"],["mio","👤"]].map(([val, lbl]) => (
-          <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
-        ))}
-      </div>
-      {sorted.length === 0 && <Card style={{ textAlign: "center", color: colors.textMuted, padding: 32 }}><p style={{ fontSize: 32, margin: "0 0 8px" }}>📭</p><p style={{ margin: 0, fontFamily: FONT }}>Sin gastos</p></Card>}
-      {sorted.map(e => {
-        const cat = allCategories.find(c => c.id === e.category);
-        const who = e.type === "mio" ? members?.find(m=>m.uid===e.owner) : members?.find(m=>m.uid===e.paidBy);
-        return (
-          <Card key={e.id} style={{ padding: "14px 16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-                <span style={{ fontSize: 22 }}>{cat?.icon}</span>
-                <div><p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>{e.concept}</p><p style={{ margin: "2px 0 4px", fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{e.date} · {who?.name}</p><Tag color={e.type==="hogar"?"#4F7FFA":e.type==="personal"?"#FA4F7F":e.type==="extraordinary"?"#f39c12":"#2ecc71"}>{e.type==="hogar"?"Hogar":e.type==="personal"?"Para otro":e.type==="extraordinary"?"Extraordinario":"Para mí"}</Tag></div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT }}>{fmt(e.amount)}</p>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => onEdit(e)} style={{ background: "#4F7FFA18", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, color: "#4F7FFA", cursor: "pointer", fontFamily: FONT, fontWeight: 600 }}>✏️</button>
-                  <button onClick={() => onDelete(e.id)} style={{ background: colors.dangerBg, border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, color: colors.danger, cursor: "pointer", fontFamily: FONT }}>✕</button>
-                </div>
-              </div>
-            </div>
-          </Card>
-        );
-      })}
-      <div style={{ height: 100 }} />
-    </div>
-  );
-}
-
-// ── MIS GASTOS SCREEN ──
-function MisGastosScreen({ expenses, currentUser, members, currentMonth, account, customCategories }) {
-  const { colors } = useTheme();
-  const fmt = (n) => formatAmount(n, account?.currency || "ARS");
-  const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
-  const me = members?.find(m => m.uid === currentUser.uid);
-  const meColor = me?.color || "#FA4F7F";
-  const myExp = expenses.filter(e => e.type === "mio" && e.owner === currentUser.uid && e.month === currentMonth);
-  const total = myExp.reduce((s, e) => s + e.amount, 0);
-  const catTotals = allCategories.map((c, i) => ({ ...c, total: myExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0), color: CAT_COLORS[i % CAT_COLORS.length] })).filter(c => c.total > 0);
-
-  // Label dentro de la torta
-  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-    if (percent < 0.07) return null;
-    const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.55;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    return <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={700} fontFamily={FONT}>{`${(percent*100).toFixed(0)}%`}</text>;
-  };
-
-  return (
-    <div style={{ padding: "0 20px", paddingTop: 80, fontFamily: FONT }}>
-      <SectionTitle>Mis gastos personales</SectionTitle>
-      <Card style={{ background: `linear-gradient(135deg, ${meColor}ee, ${meColor}88)`, border: "none" }}>
-        <p style={{ color: "#ffffff88", fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", margin: "0 0 6px", fontFamily: FONT }}>Total personal este mes</p>
-        <p style={{ color: "#fff", fontSize: 32, fontWeight: 700, margin: 0, letterSpacing: -1, fontFamily: FONT }}>{fmt(total)}</p>
-        <p style={{ color: "#ffffff88", fontSize: 12, margin: "6px 0 0", fontFamily: FONT }}>{myExp.length} gasto{myExp.length !== 1 ? "s" : ""}</p>
-      </Card>
-      {catTotals.length > 0 && <Card><ResponsiveContainer width="100%" height={180}><PieChart><Pie data={catTotals} cx="50%" cy="50%" outerRadius={75} dataKey="total" labelLine={false} label={renderCustomLabel}>{catTotals.map((e, i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={v => fmt(v)} /></PieChart></ResponsiveContainer><div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, justifyContent: "center" }}>{catTotals.map(c => <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: c.color }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{c.label}</span></div>)}</div></Card>}
-      {[...myExp].sort((a,b) => b.date.localeCompare(a.date)).map(e => {
-        const cat = allCategories.find(c => c.id === e.category);
-        return <Card key={e.id} style={{ padding: "14px 16px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 40, height: 40, borderRadius: 14, background: meColor+"18", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{cat?.icon}</div><div><p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>{e.concept}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{e.date}</p></div></div><p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: meColor, fontFamily: FONT }}>{fmt(e.amount)}</p></div></Card>;
-      })}
-      <div style={{ height: 100 }} />
     </div>
   );
 }
@@ -493,19 +494,6 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
   const monthExp = expenses.filter(e => e.month === currentMonth && e.type !== "mio");
   const saldos = calcSaldos(monthExp, members, account?.divisionSystem);
   const [settled, setSettled] = useState(false);
-
-  if (account?.type === "personal") {
-    return (
-      <div style={{ padding: "0 20px", paddingTop: 80, fontFamily: FONT }}>
-        <SectionTitle>Saldos</SectionTitle>
-        <Card style={{ textAlign: "center", padding: 32 }}>
-          <p style={{ fontSize: 32, margin: "0 0 8px" }}>👤</p>
-          <p style={{ margin: 0, color: colors.textMuted, fontSize: 14, fontFamily: FONT }}>Los saldos no están disponibles en cuentas personales</p>
-        </Card>
-      </div>
-    );
-  }
-
   const handleSettle = async () => {
     setSettled(true);
     const otherMembers = members?.filter(m => m.uid !== members[0]?.uid) || [];
@@ -520,7 +508,7 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
     return `${debtor.name} le debe ${fmt(Math.abs(debtor.balance))} a ${creditor.name}`;
   };
   return (
-    <div style={{ padding: "0 20px", paddingTop: 80, fontFamily: FONT }}>
+    <div style={{ padding: "0 20px", paddingTop: HEADER_HEIGHT + 8, fontFamily: FONT }}>
       <SectionTitle>Saldos del mes</SectionTitle>
       {members?.map(m => {
         const s = saldos[m.uid] || { paid: 0, owes: 0, balance: 0 };
@@ -530,11 +518,14 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
           <Card key={m.uid}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
               {m.photo ? <img src={m.photo} style={{ width: 44, height: 44, borderRadius: 22 }} alt="" /> : <div style={{ width: 44, height: 44, borderRadius: 22, background: (m.color||"#4F7FFA")+"22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>👤</div>}
-              <div><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{m.name}</p><p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(m.salary)} · {pct}% del hogar</p></div>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{m.name}</p>
+                <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(m.salary)} · {pct}% del hogar</p>
+              </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-              <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.5, textTransform: "uppercase", fontFamily: FONT }}>Pagó</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.paid)}</p></div>
-              <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.5, textTransform: "uppercase", fontFamily: FONT }}>Le toca</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.owes)}</p></div>
+              <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", fontFamily: FONT }}>Pagó</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.paid)}</p></div>
+              <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", fontFamily: FONT }}>Le toca</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.owes)}</p></div>
             </div>
             <div style={{ background: s.balance >= 0 ? colors.successBg : colors.dangerBg, borderRadius: 14, padding: 14, textAlign: "center" }}>
               <p style={{ margin: 0, fontWeight: 700, fontSize: 22, color: s.balance >= 0 ? colors.success : colors.danger, fontFamily: FONT }}>{s.balance >= 0 ? "+" : ""}{fmt(s.balance)}</p>
@@ -544,7 +535,7 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
         );
       })}
       <Card style={{ background: colors.headerBg, border: "none" }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: "#ffffff55", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 8, fontFamily: FONT }}>Conclusión</p>
+        <p style={{ fontSize: 11, fontWeight: 700, color: "#ffffff55", textTransform: "uppercase", marginBottom: 8, fontFamily: FONT }}>Conclusión</p>
         <p style={{ color: "#fff", fontSize: 15, fontWeight: 600, margin: 0, fontFamily: FONT }}>{debtSummary()}</p>
         {!settled ? (
           <button onClick={handleSettle} style={{ marginTop: 16, width: "100%", padding: 14, borderRadius: 14, background: "#4F7FFA", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>✅ Saldar cuentas</button>
@@ -552,12 +543,12 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
           <div style={{ marginTop: 14, background: "#2ecc7122", borderRadius: 12, padding: 14, textAlign: "center" }}><p style={{ color: "#2ecc71", fontWeight: 700, margin: 0, fontFamily: FONT }}>¡Cuentas saldadas! 🎉</p></div>
         )}
       </Card>
-      <div style={{ height: 100 }} />
+      <div style={{ height: 120 }} />
     </div>
   );
 }
 
-// ── GRAFICOS SCREEN — labels dentro de la torta ──
+// ── GRAFICOS SCREEN ──
 function GraficosScreen({ expenses, account }) {
   const { colors } = useTheme();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
@@ -578,18 +569,42 @@ function GraficosScreen({ expenses, account }) {
   };
 
   return (
-    <div style={{ padding: "0 20px", paddingTop: 80, fontFamily: FONT }}>
+    <div style={{ padding: "0 20px", paddingTop: HEADER_HEIGHT + 8, fontFamily: FONT }}>
       <SectionTitle>Comparación mensual</SectionTitle>
       <Card>
-        {barData.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p> : <ResponsiveContainer width="100%" height={210}><BarChart data={barData} barCategoryGap="30%"><XAxis dataKey="mes" tick={{ fontSize: 12, fill: colors.textMuted, fontFamily: FONT }} /><YAxis tick={{ fontSize: 10, fill: colors.textMuted, fontFamily: FONT }} tickFormatter={v=>`${(v/1000).toFixed(0)}k`} /><Tooltip formatter={v=>fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} /><Bar dataKey="Hogar" fill="#4F7FFA" radius={[6,6,0,0]} /><Bar dataKey="Personal" fill="#2ecc71" radius={[6,6,0,0]} /><Bar dataKey="Extra" fill="#f39c12" radius={[6,6,0,0]} /></BarChart></ResponsiveContainer>}
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>{[["#4F7FFA","Hogar"],["#2ecc71","Personal"],["#f39c12","Extra"]].map(([col,lbl])=><div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: col }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span></div>)}</div>
+        {barData.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p> :
+          <ResponsiveContainer width="100%" height={210}>
+            <BarChart data={barData} barCategoryGap="30%">
+              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: colors.textMuted, fontFamily: FONT }} />
+              <YAxis tick={{ fontSize: 10, fill: colors.textMuted, fontFamily: FONT }} tickFormatter={v=>`${(v/1000).toFixed(0)}k`} />
+              <Tooltip formatter={v=>fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
+              <Bar dataKey="Hogar" fill="#4F7FFA" radius={[6,6,0,0]} />
+              <Bar dataKey="Personal" fill="#2ecc71" radius={[6,6,0,0]} />
+              <Bar dataKey="Extra" fill="#f39c12" radius={[6,6,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        }
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>
+          {[["#4F7FFA","Hogar"],["#2ecc71","Personal"],["#f39c12","Extra"]].map(([col,lbl])=><div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: col }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span></div>)}
+        </div>
       </Card>
       <SectionTitle>Por categoría — último mes</SectionTitle>
       <Card>
-        {pieData.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p> : <ResponsiveContainer width="100%" height={200}><PieChart><Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" labelLine={false} label={renderCustomLabel}>{pieData.map((e,i)=><Cell key={i} fill={e.color} />)}</Pie><Tooltip formatter={v=>fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} /></PieChart></ResponsiveContainer>}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6, justifyContent: "center" }}>{pieData.map(p=><div key={p.name} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{p.name}</span></div>)}</div>
+        {pieData.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p> :
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" labelLine={false} label={renderCustomLabel}>
+                {pieData.map((e,i)=><Cell key={i} fill={e.color} />)}
+              </Pie>
+              <Tooltip formatter={v=>fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
+            </PieChart>
+          </ResponsiveContainer>
+        }
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6, justifyContent: "center" }}>
+          {pieData.map(p=><div key={p.name} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{p.name}</span></div>)}
+        </div>
       </Card>
-      <div style={{ height: 100 }} />
+      <div style={{ height: 120 }} />
     </div>
   );
 }
@@ -604,6 +619,7 @@ function AppInner() {
   const [members, setMembers] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [customCategories, setCustomCategories] = useState([]);
+  const [fixedExpenses, setFixedExpenses] = useState([]);
   const [tab, setTab] = useState("home");
   const [showAdd, setShowAdd] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -615,18 +631,12 @@ function AppInner() {
   const [pendingInviteId, setPendingInviteId] = useState(null);
   const currentMonth = getCurrentMonth();
 
-  // ── Detectar ?invite= en la URL al cargar ──
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const inviteId = params.get("invite");
-    if (inviteId) {
-      setPendingInviteId(inviteId);
-      // Limpiar el param de la URL sin recargar
-      window.history.replaceState({}, "", window.location.pathname);
-    }
+    if (inviteId) { setPendingInviteId(inviteId); window.history.replaceState({}, "", window.location.pathname); }
   }, []);
 
-  // ── Procesar invitación una vez que el usuario está autenticado ──
   useEffect(() => {
     if (!pendingInviteId || !authUser) return;
     const processInvite = async () => {
@@ -636,36 +646,22 @@ function AppInner() {
         const invite = inviteSnap.data();
         if (invite.used) return;
         const accountId = invite.accountId;
-
-        // Agregar el uid del usuario a la cuenta
         const accountSnap = await getDoc(doc(db, "accounts", accountId));
         if (!accountSnap.exists()) return;
         const accountData = accountSnap.data();
         const memberIds = accountData.memberIds || [];
         if (!memberIds.includes(authUser.uid)) {
-          await updateDoc(doc(db, "accounts", accountId), {
-            memberIds: [...memberIds, authUser.uid],
-          });
+          await updateDoc(doc(db, "accounts", accountId), { memberIds: [...memberIds, authUser.uid] });
         }
-
-        // Agregar la cuenta al usuario
         const userSnap = await getDoc(doc(db, "users", authUser.uid));
         const existingIds = userSnap.exists() ? (userSnap.data().accountIds || []) : [];
         if (!existingIds.includes(accountId)) {
-          await setDoc(doc(db, "users", authUser.uid), {
-            accountIds: [...existingIds, accountId],
-          }, { merge: true });
+          await setDoc(doc(db, "users", authUser.uid), { accountIds: [...existingIds, accountId] }, { merge: true });
         }
-
-        // Marcar invitación como usada
         await updateDoc(doc(db, "invites", pendingInviteId), { used: true });
-
-        // Ir directo a esa cuenta
         setSelectedAccountId(accountId);
         setPendingInviteId(null);
-      } catch (err) {
-        console.error("Error procesando invitación:", err);
-      }
+      } catch (err) { console.error("Error procesando invitación:", err); }
     };
     processInvite();
   }, [pendingInviteId, authUser]);
@@ -696,6 +692,7 @@ function AppInner() {
   }, [account?.memberIds?.join(",")]);
   useEffect(() => { if (!authUser) return; const q = query(collection(db, "expenses"), orderBy("date", "desc")); return onSnapshot(q, snap => { setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [authUser]);
   useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "categories"), snap => { setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
+  useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "fixedExpenses"), snap => { setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
 
   const { sendNotification } = useNotif();
 
@@ -717,9 +714,17 @@ function AppInner() {
   if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
   if (!selectedAccountId) return <AccountSelectorScreen user={authUser} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} />;
 
-  // Barra nav: 2 ítems | botón + central | 2 ítems
-  const NAV_LEFT  = [{ id: "home", label: "Inicio" }, { id: "gastos", label: "Gastos" }];
-  const NAV_RIGHT = [{ id: "saldos", label: "Saldos" }, { id: "ajustes", label: "Ajustes" }];
+  // Nav dinámica: si cuenta personal, sin Saldos
+  const isPersonal = account?.type === "personal";
+  const NAV_LEFT = isPersonal
+    ? [{ id: "home", label: "Inicio" }]
+    : [{ id: "home", label: "Inicio" }, { id: "saldos", label: "Saldos" }];
+  const NAV_RIGHT = isPersonal
+    ? [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }]
+    : [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }];
+
+  // Si estaba en saldos y cambiamos a cuenta personal, redirigir
+  if (isPersonal && tab === "saldos") setTab("home");
 
   return (
     <div style={{
@@ -732,76 +737,74 @@ function AppInner() {
     }}>
       <style>{`
         ${FONT_IMPORT}
-        * { box-sizing: border-box; font-family: '${FONT}', sans-serif; }
+        * { box-sizing: border-box; }
         ::-webkit-scrollbar { display: none; }
         html, body, #root { width: 100%; min-height: 100dvh; margin: 0; padding: 0; }
       `}</style>
 
-      {/* Header fijo unificado */}
-      <AppHeader
-        account={account}
-        onMenuOpen={() => setShowMenu(true)}
-        onNotifsOpen={() => setShowNotifs(true)}
-        unreadCount={unreadCount}
-        colors={colors}
-      />
+      {/* Header fijo */}
+      <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
 
-      {/* Contenido principal */}
-      <div style={{ paddingBottom: 80, minHeight: "100dvh" }}>
-        {tab === "home"      && <HomeScreen expenses={expenses} currentUser={authUser} members={members} account={account} currentMonth={currentMonth} customCategories={customCategories} />}
-        {tab === "gastos"    && <GastosScreen expenses={expenses} members={members} currentMonth={currentMonth} onEdit={setEditingExpense} onDelete={deleteExpense} account={account} customCategories={customCategories} />}
-        {tab === "misgastos" && <MisGastosScreen expenses={expenses} currentUser={authUser} members={members} currentMonth={currentMonth} account={account} customCategories={customCategories} />}
-        {tab === "saldos"    && <SaldosScreen expenses={expenses} members={members} account={account} currentMonth={currentMonth} />}
-        {tab === "graficos"  && <GraficosScreen expenses={expenses} account={account} />}
-        {tab === "ajustes"   && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
+      {/* Contenido */}
+      <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
+        {tab === "home" && <HomeScreen expenses={expenses} currentUser={authUser} members={members} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} />}
+        {tab === "saldos" && <SaldosScreen expenses={expenses} members={members} account={account} currentMonth={currentMonth} />}
+        {tab === "graficos" && <GraficosScreen expenses={expenses} account={account} />}
+        {tab === "ajustes" && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
       </div>
 
-      {/* Barra navegación inferior con botón + central */}
+      {/* ── NAV BAR con FAB elevado ── */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
         width: "100%", maxWidth: 500, margin: "0 auto",
-        background: colors.navBg, borderTop: `1px solid ${colors.navBorder}`,
-        display: "flex", alignItems: "center",
-        padding: `10px 8px calc(16px + env(safe-area-inset-bottom))`,
-        zIndex: 40, boxShadow: "0 -4px 20px rgba(0,0,0,0.08)",
+        zIndex: 40,
       }}>
-        {/* Ítems izquierda */}
-        {NAV_LEFT.map(n => (
-          <button key={n.id} onClick={() => setTab(n.id)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: FONT, padding: "2px 0" }}>
-            <NavIcon id={n.id} active={tab === n.id} color="#4F7FFA" />
-            <span style={{ fontSize: 9, fontWeight: tab === n.id ? 700 : 500, letterSpacing: 0.2, color: tab === n.id ? "#4F7FFA" : colors.textSubtle, textTransform: "uppercase", fontFamily: FONT }}>{n.label}</span>
-          </button>
-        ))}
-
-        {/* Botón + central — rectángulo redondeado */}
-        {tab !== "ajustes" ? (
+        {/* FAB elevado — sobresale sobre la barra */}
+        <div style={{
+          position: "absolute", top: -28, left: "50%",
+          transform: "translateX(-50%)", zIndex: 41,
+        }}>
           <button onClick={() => setShowAdd(true)} style={{
-            width: 120, height: 46, borderRadius: 23,
+            width: 64, height: 64, borderRadius: 32,
             background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)",
-            border: "none", color: "#fff", fontSize: 26, cursor: "pointer",
-            boxShadow: "0 4px 20px #4F7FFA77",
+            border: "4px solid " + colors.navBg,
+            color: "#fff", fontSize: 30, cursor: "pointer",
+            boxShadow: "0 6px 24px #4F7FFA88",
             display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0, margin: "0 4px",
           }}>+</button>
-        ) : (
-          // Placeholder cuando estamos en ajustes
-          <div style={{ width: 120, height: 46, flexShrink: 0, margin: "0 4px" }} />
-        )}
+        </div>
 
-        {/* Ítems derecha */}
-        {NAV_RIGHT.map(n => (
-          <button key={n.id} onClick={() => setTab(n.id)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: FONT, padding: "2px 0" }}>
-            <NavIcon id={n.id} active={tab === n.id} color="#4F7FFA" />
-            <span style={{ fontSize: 9, fontWeight: tab === n.id ? 700 : 500, letterSpacing: 0.2, color: tab === n.id ? "#4F7FFA" : colors.textSubtle, textTransform: "uppercase", fontFamily: FONT }}>{n.label}</span>
-          </button>
-        ))}
+        {/* Barra */}
+        <div style={{
+          background: colors.navBg, borderTop: `1px solid ${colors.navBorder}`,
+          display: "flex", alignItems: "center",
+          padding: `10px 0 calc(16px + env(safe-area-inset-bottom))`,
+          boxShadow: "0 -4px 20px rgba(0,0,0,0.08)",
+        }}>
+          {NAV_LEFT.map(n => (
+            <button key={n.id} onClick={() => setTab(n.id)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: FONT, padding: "2px 0" }}>
+              <NavIcon id={n.id} active={tab === n.id} color="#4F7FFA" />
+              <span style={{ fontSize: 9, fontWeight: tab === n.id ? 700 : 500, letterSpacing: 0.2, color: tab === n.id ? "#4F7FFA" : colors.textSubtle, textTransform: "uppercase", fontFamily: FONT }}>{n.label}</span>
+            </button>
+          ))}
+
+          {/* Espacio central para el FAB */}
+          <div style={{ flex: isPersonal ? 0.8 : 1, flexShrink: 0 }} />
+
+          {NAV_RIGHT.map(n => (
+            <button key={n.id} onClick={() => setTab(n.id)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: FONT, padding: "2px 0" }}>
+              <NavIcon id={n.id} active={tab === n.id} color="#4F7FFA" />
+              <span style={{ fontSize: 9, fontWeight: tab === n.id ? 700 : 500, letterSpacing: 0.2, color: tab === n.id ? "#4F7FFA" : colors.textSubtle, textTransform: "uppercase", fontFamily: FONT }}>{n.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Modales */}
-      {showAdd        && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} members={members} currency={account?.currency || "ARS"} customCategories={customCategories} />}
+      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} members={members} currency={account?.currency || "ARS"} customCategories={customCategories} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={members} onClose={() => setEditingExpense(null)} />}
-      {showNotifs     && <NotifCenter onClose={() => setShowNotifs(false)} />}
-      {showMenu       && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
+      {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
+      {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
     </div>
   );
 }
