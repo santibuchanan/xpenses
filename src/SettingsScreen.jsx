@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
+import DateInput from "./DateInput";
 
 const SF = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
 const CURRENCIES = ["ARS", "USD", "EUR"];
@@ -111,7 +112,9 @@ function FixedExpenseModal({ expense, onSave, onClose, colors }) {
         <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase" }}>Monto</p>
         <input type="number" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0" style={inputStyle} />
         <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase" }}>Día de vencimiento (opcional)</p>
-        <input type="number" value={form.dueDay} onChange={e => set("dueDay", e.target.value)} placeholder="Ej: 10" min="1" max="31" style={inputStyle} />
+        <input type="number" value={form.dueDay} onChange={e => set("dueDay", e.target.value)} 
+  placeholder="Ej: 10" min="1" max="31" style={inputStyle}
+  inputMode="numeric" />
         <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 8, letterSpacing: 0.6, textTransform: "uppercase" }}>Tipo</p>
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           {[[true,"🏠 Hogar"],[false,"👤 Personal"]].map(([val, lbl]) => (

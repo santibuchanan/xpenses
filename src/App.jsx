@@ -11,6 +11,7 @@ import WelcomeScreen from "./WelcomeScreen";
 import EditExpenseModal from "./EditExpenseModal";
 import { NotifProvider, useNotif, NotifCenter, NOTIF_TYPES } from "./notifications";
 import { useTheme, formatAmount, CURRENCIES } from "./theme.jsx";
+import DateInput from "./DateInput";
 
 const SF = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
 
@@ -162,8 +163,7 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
           ))}
         </div>
         <p style={labelStyle}>Fecha</p>
-        <input type="date" value={form.date} onChange={e => set("date", e.target.value)} style={inputStyle} 
-  pattern="\d{2}-\d{2}-\d{4}" />
+        <DateInput value={form.date} onChange={v => set("date", v)} />
         {form.type !== "mio" && members && (<><p style={labelStyle}>Pagó</p><div style={{ display: "flex", gap: 8, marginBottom: 14 }}>{members.map(m => (<button key={m.uid} onClick={() => set("paidBy", m.uid)} style={{ flex: 1, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: SF, borderColor: form.paidBy === m.uid ? (m.color||"#4F7FFA") : colors.inputBorder, background: form.paidBy === m.uid ? (m.color||"#4F7FFA") + "18" : colors.input, color: form.paidBy === m.uid ? (m.color||"#4F7FFA") : colors.textMuted }}>{m.name}</button>))}</div></>)}
         {form.type === "mio" && members && (<><p style={labelStyle}>¿De quién?</p><div style={{ display: "flex", gap: 8, marginBottom: 14 }}>{members.map(m => (<button key={m.uid} onClick={() => set("owner", m.uid)} style={{ flex: 1, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: SF, borderColor: form.owner === m.uid ? (m.color||"#4F7FFA") : colors.inputBorder, background: form.owner === m.uid ? (m.color||"#4F7FFA") + "18" : colors.input, color: form.owner === m.uid ? (m.color||"#4F7FFA") : colors.textMuted }}>{m.name}</button>))}</div></>)}
         {form.type === "personal" && members && (<><p style={labelStyle}>Para...</p><div style={{ display: "flex", gap: 8, marginBottom: 14 }}>{members.map(m => (<button key={m.uid} onClick={() => set("forWhom", m.uid)} style={{ flex: 1, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: SF, borderColor: form.forWhom === m.uid ? (m.color||"#4F7FFA") : colors.inputBorder, background: form.forWhom === m.uid ? (m.color||"#4F7FFA") + "18" : colors.input, color: form.forWhom === m.uid ? (m.color||"#4F7FFA") : colors.textMuted }}>{m.name}</button>))}</div></>)}
