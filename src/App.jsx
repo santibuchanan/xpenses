@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, getDoc, updateDoc, setDoc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, where, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -15,10 +15,6 @@ import { useTheme, formatAmount, CURRENCIES } from "./theme.jsx";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');`;
-
-// Altura del header fijo — safe area (~44px iPhone) + padding + contenido
-const HEADER_HEIGHT = 80;
-// Altura de la nav bar
 const NAV_HEIGHT = 72;
 
 const DEFAULT_CATEGORIES = [
@@ -34,7 +30,14 @@ const DEFAULT_CATEGORIES = [
 const CAT_COLORS = ["#4F7FFA","#FA4F7F","#f39c12","#2ecc71","#9b59b6","#1abc9c","#e74c3c","#95a5a6"];
 const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
-// Tamaños de fuente
+// Formato fecha yyyy-mm-dd → dd-mm-yyyy
+const fmtDate = (iso) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}-${m}-${y}`;
+};
+
 const FONT_SIZE_MAP = { small: { base: 12, sub: 10, title: 18 }, medium: { base: 14, sub: 12, title: 20 }, large: { base: 17, sub: 14, title: 22 } };
 
 function useExpenseFontSize() {
@@ -47,7 +50,6 @@ function useExpenseFontSize() {
   return FONT_SIZE_MAP[size] || FONT_SIZE_MAP.medium;
 }
 
-// ── Ícono hamburger ──
 function MenuIcon({ color = "#ffffffcc" }) {
   return (
     <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -78,7 +80,9 @@ function calcSaldos(expenses, members, divisionSystem) {
     if (e.type === "hogar") {
       if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
       members.forEach(m => {
-        const share = divisionSystem === "proportional" && totalSalary > 0 ? e.amount * ((m.salary || 0) / totalSalary) : e.amount / members.length;
+        const share = divisionSystem === "proportional" && totalSalary > 0
+          ? e.amount * ((m.salary || 0) / totalSalary)
+          : e.amount / members.length;
         if (result[m.uid] !== undefined) result[m.uid].owes += share;
       });
     }
@@ -117,7 +121,7 @@ function Spinner({ text = "Cargando..." }) {
   return <div style={{ textAlign: "center", padding: 60, color: colors.textMuted, fontSize: 14, fontFamily: FONT }}>{text}</div>;
 }
 
-// ── HEADER FIJO UNIFICADO ──
+// ── HEADER ──
 function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
   return (
     <div style={{
@@ -127,7 +131,6 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
       paddingTop: "calc(env(safe-area-inset-top) + 12px)",
       paddingBottom: 14, paddingLeft: 20, paddingRight: 20,
     }}>
-      {/* Fila de contenido — sin borde/rectángulo */}
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <button onClick={onMenuOpen} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}>
           <MenuIcon />
@@ -153,11 +156,7 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
           )}
         </button>
       </div>
-      {/* Línea separadora en degradado */}
-      <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0, height: 1,
-        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15) 30%, rgba(255,255,255,0.15) 70%, transparent)",
-      }} />
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15) 30%, rgba(255,255,255,0.15) 70%, transparent)" }} />
     </div>
   );
 }
@@ -166,23 +165,12 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
 function MenuPanel({ onClose, currentUser, userProfile, members, account, onSignOut, onSwitchAccount, isDark, onToggleTheme, colors }) {
   const me = members?.find(m => m.uid === currentUser?.uid);
   const meColor = me?.color || "#4F7FFA";
-
-  // Swipe-to-close
   const startY = useRef(null);
   const [dragY, setDragY] = useState(0);
   const dragging = useRef(false);
   const onTouchStart = (e) => { startY.current = e.touches[0].clientY; dragging.current = true; };
-  const onTouchMove = (e) => {
-    if (!dragging.current) return;
-    const dy = e.touches[0].clientY - startY.current;
-    if (dy > 0) setDragY(dy);
-  };
-  const onTouchEnd = () => {
-    if (dragY > 100) onClose();
-    else setDragY(0);
-    dragging.current = false; startY.current = null;
-  };
-
+  const onTouchMove = (e) => { if (!dragging.current) return; const dy = e.touches[0].clientY - startY.current; if (dy > 0) setDragY(dy); };
+  const onTouchEnd = () => { if (dragY > 100) onClose(); else setDragY(0); dragging.current = false; startY.current = null; };
   const handleShare = () => {
     const url = window.location.origin;
     if (navigator.share) navigator.share({ title: "X-penses", text: "Llevá tus gastos compartidos 💸", url });
@@ -196,18 +184,8 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
   ];
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
-      <div
-        onClick={e => e.stopPropagation()}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        style={{
-          background: colors.card, borderRadius: "24px 24px 0 0",
-          width: "100%", maxWidth: 500, margin: "0 auto",
-          padding: "20px 20px calc(32px + env(safe-area-inset-bottom))", fontFamily: FONT,
-          transform: `translateY(${dragY}px)`,
-          transition: dragging.current ? "none" : "transform 0.3s ease",
-        }}>
+      <div onClick={e => e.stopPropagation()} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 500, margin: "0 auto", padding: "20px 20px calc(32px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: dragging.current ? "none" : "transform 0.3s ease" }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", background: colors.pill, borderRadius: 18, marginBottom: 16 }}>
           {currentUser?.photoURL ? <img src={currentUser.photoURL} style={{ width: 48, height: 48, borderRadius: 24, border: `2px solid ${meColor}` }} alt="" /> : <div style={{ width: 48, height: 48, borderRadius: 24, background: meColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
@@ -238,29 +216,28 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
   );
 }
 
-// ── ADD EXPENSE MODAL con swipe-to-close y fondo bloqueado ──
+// ── ADD EXPENSE MODAL ──
 function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, customCategories }) {
   const { colors } = useTheme();
-  const otherMember = members?.find(m => m.uid !== currentUser.uid);
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
-  const [form, setForm] = useState({ type: "hogar", concept: "", amount: "", category: "super", date: new Date().toISOString().slice(0, 10), paidBy: currentUser.uid, forWhom: otherMember?.uid || "", owner: currentUser.uid });
+  const [form, setForm] = useState({
+    type: "hogar", concept: "", amount: "", category: "super",
+    date: new Date().toISOString().slice(0, 10),
+    paidBy: currentUser.uid, forWhom: [], owner: currentUser.uid,
+  });
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const currSymbol = CURRENCIES[currency]?.symbol || "$";
 
+  // Swipe to close
   const sheetRef = useRef(null);
   const startY = useRef(null);
   const dragY = useRef(0);
   const [translateY, setTranslateY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-
   const onTouchStart = (e) => {
-    // Solo iniciar drag desde el handle
     const handle = sheetRef.current?.querySelector("[data-handle]");
-    if (handle && handle.contains(e.target)) {
-      startY.current = e.touches[0].clientY;
-      setIsDragging(true);
-    }
+    if (handle && handle.contains(e.target)) { startY.current = e.touches[0].clientY; setIsDragging(true); }
   };
   const onTouchMove = (e) => {
     if (!isDragging || startY.current === null) return;
@@ -269,42 +246,42 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
     if (dy > 0) { dragY.current = dy; setTranslateY(dy); }
   };
   const onTouchEnd = () => {
-    if (dragY.current > 120) onClose();
-    else setTranslateY(0);
+    if (dragY.current > 120) onClose(); else setTranslateY(0);
     dragY.current = 0; startY.current = null; setIsDragging(false);
   };
 
   const labelStyle = { fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT };
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
 
+  // Toggle forWhom (múltiple selección)
+  const toggleForWhom = (uid) => {
+    setForm(f => {
+      const cur = f.forWhom || [];
+      return { ...f, forWhom: cur.includes(uid) ? cur.filter(u => u !== uid) : [...cur, uid] };
+    });
+  };
+
   const handleAdd = async () => {
     if (!form.concept || !form.amount) return;
     setLoading(true);
     const amount = parseFloat(form.amount);
     const extra = {};
-    if (form.type === "extraordinary" && members) { members.forEach(m => { extra[`paid_${m.uid}`] = m.uid === form.paidBy ? amount : 0; }); }
+    if (form.type === "extraordinary" && members) {
+      members.forEach(m => { extra[`paid_${m.uid}`] = m.uid === form.paidBy ? amount : 0; });
+    }
     await onAdd({ ...form, ...extra, amount, month: form.date.slice(0, 7) });
     setLoading(false); onClose();
   };
 
   const types = [["hogar","🏠 Hogar"],["personal","🎁 Para otro"],["extraordinary","✈️ Extraordinario"],["mio","👤 Para mí"]];
 
+  // Todos los miembros disponibles incluyendo memberLabels no vinculados
+  const allMembers = members || [];
+
   return (
-    // Fondo no clickeable — no cierra al tocar afuera, solo con swipe o botón X
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
-      <div
-        ref={sheetRef}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        style={{
-          background: colors.card, borderRadius: "24px 24px 0 0",
-          width: "100%", padding: "0 20px 44px",
-          maxHeight: "90vh", overflowY: "auto", fontFamily: FONT,
-          transform: `translateY(${translateY}px)`,
-          transition: isDragging ? "none" : "transform 0.3s ease",
-        }}>
-        {/* Handle — área de swipe */}
+      <div ref={sheetRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px 44px", maxHeight: "90vh", overflowY: "auto", fontFamily: FONT, transform: `translateY(${translateY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
         <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
           <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
         </div>
@@ -312,30 +289,93 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
           <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Nuevo Gasto</span>
           <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
         </div>
+
         <p style={labelStyle}>Tipo</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
           {types.map(([val, lbl]) => (
             <button key={val} onClick={() => set("type", val)} style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.type === val ? "#4F7FFA" : colors.inputBorder, background: form.type === val ? "#4F7FFA11" : colors.input, color: form.type === val ? "#4F7FFA" : colors.textMuted }}>{lbl}</button>
           ))}
         </div>
+
         <p style={labelStyle}>Concepto</p>
         <input value={form.concept} onChange={e => set("concept", e.target.value)} placeholder="Ej: Supermercado" style={inputStyle} />
+
         <p style={labelStyle}>Monto ({currSymbol})</p>
         <div style={{ position: "relative", marginBottom: 14 }}>
           <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
           <input type="number" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0" style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36 }} />
         </div>
+
         <p style={labelStyle}>Categoría</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
           {allCategories.map(c => (
             <button key={c.id} onClick={() => set("category", c.id)} style={{ padding: "7px 12px", borderRadius: 12, border: "2px solid", fontSize: 12, cursor: "pointer", fontFamily: FONT, borderColor: form.category === c.id ? "#4F7FFA" : colors.inputBorder, background: form.category === c.id ? "#4F7FFA11" : colors.input, color: form.category === c.id ? "#4F7FFA" : colors.text }}>{c.icon} {c.label}</button>
           ))}
         </div>
+
         <p style={labelStyle}>Fecha</p>
         <DateInput value={form.date} onChange={v => set("date", v)} />
-        {form.type !== "mio" && members && (<><p style={labelStyle}>Pagó</p><div style={{ display: "flex", gap: 8, marginBottom: 14 }}>{members.map(m => (<button key={m.uid} onClick={() => set("paidBy", m.uid)} style={{ flex: 1, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.paidBy === m.uid ? (m.color||"#4F7FFA") : colors.inputBorder, background: form.paidBy === m.uid ? (m.color||"#4F7FFA") + "18" : colors.input, color: form.paidBy === m.uid ? (m.color||"#4F7FFA") : colors.textMuted }}>{m.name}</button>))}</div></>)}
-        {form.type === "mio" && members && (<><p style={labelStyle}>¿De quién?</p><div style={{ display: "flex", gap: 8, marginBottom: 14 }}>{members.map(m => (<button key={m.uid} onClick={() => set("owner", m.uid)} style={{ flex: 1, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.owner === m.uid ? (m.color||"#4F7FFA") : colors.inputBorder, background: form.owner === m.uid ? (m.color||"#4F7FFA") + "18" : colors.input, color: form.owner === m.uid ? (m.color||"#4F7FFA") : colors.textMuted }}>{m.name}</button>))}</div></>)}
-        {form.type === "personal" && members && (<><p style={labelStyle}>Para...</p><div style={{ display: "flex", gap: 8, marginBottom: 14 }}>{members.map(m => (<button key={m.uid} onClick={() => set("forWhom", m.uid)} style={{ flex: 1, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.forWhom === m.uid ? (m.color||"#4F7FFA") : colors.inputBorder, background: form.forWhom === m.uid ? (m.color||"#4F7FFA") + "18" : colors.input, color: form.forWhom === m.uid ? (m.color||"#4F7FFA") : colors.textMuted }}>{m.name}</button>))}</div></>)}
+
+        {/* Pagó — siempre visible si hay miembros */}
+        {allMembers.length > 0 && form.type !== "mio" && (
+          <>
+            <p style={labelStyle}>Pagó</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              {allMembers.map(m => (
+                <button key={m.uid} onClick={() => set("paidBy", m.uid)}
+                  style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                    borderColor: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder,
+                    background: form.paidBy === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input,
+                    color: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>
+                  {m.name}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Para quién — selección múltiple */}
+        {allMembers.length > 0 && (form.type === "personal" || form.type === "extraordinary" || form.type === "hogar") && (
+          <>
+            <p style={labelStyle}>{form.type === "personal" ? "Para..." : "Aplica a"}</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              {allMembers.map(m => {
+                const selected = form.type === "personal"
+                  ? form.forWhom?.includes(m.uid)
+                  : true; // hogar/extraordinary siempre aplica a todos (visual)
+                if (form.type === "hogar" || form.type === "extraordinary") return null;
+                return (
+                  <button key={m.uid} onClick={() => toggleForWhom(m.uid)}
+                    style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                      borderColor: selected ? (m.color || "#4F7FFA") : colors.inputBorder,
+                      background: selected ? (m.color || "#4F7FFA") + "18" : colors.input,
+                      color: selected ? (m.color || "#4F7FFA") : colors.textMuted }}>
+                    {m.name}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* De quién — gastos personales */}
+        {allMembers.length > 0 && form.type === "mio" && (
+          <>
+            <p style={labelStyle}>¿De quién?</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              {allMembers.map(m => (
+                <button key={m.uid} onClick={() => set("owner", m.uid)}
+                  style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                    borderColor: form.owner === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder,
+                    background: form.owner === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input,
+                    color: form.owner === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>
+                  {m.name}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
         <button onClick={handleAdd} disabled={loading} style={{ width: "100%", padding: 16, borderRadius: 16, background: loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 600, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginTop: 4 }}>
           {loading ? "Guardando..." : "Agregar ✓"}
         </button>
@@ -345,89 +385,40 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
 }
 
 // ── CLAIM IDENTITY MODAL ──
-// Aparece cuando alguien abre un link de invitación y la cuenta tiene etiquetas sin vincular
 function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
   const { memberLabels, accountData } = claimData;
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  const handleClaim = async () => {
-    if (!selected) return;
-    setLoading(true);
-    await onClaim(selected);
-    setLoading(false);
-  };
-
+  const handleClaim = async () => { if (!selected) return; setLoading(true); await onClaim(selected); setLoading(false); };
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
       <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 500, margin: "0 auto", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 24px" }} />
-
-        {/* Encabezado */}
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <p style={{ fontSize: 40, margin: "0 0 10px" }}>👋</p>
-          <p style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: "0 0 6px", fontFamily: FONT }}>
-            ¡Te invitaron a <span style={{ color: "#4F7FFA" }}>{accountData.name}</span>!
-          </p>
-          <p style={{ fontSize: 14, color: colors.textMuted, margin: 0, fontFamily: FONT, lineHeight: 1.5 }}>
-            Elegí tu nombre para que los demás te reconozcan
-          </p>
+          <p style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: "0 0 6px", fontFamily: FONT }}>¡Te invitaron a <span style={{ color: "#4F7FFA" }}>{accountData.name}</span>!</p>
+          <p style={{ fontSize: 14, color: colors.textMuted, margin: 0, fontFamily: FONT, lineHeight: 1.5 }}>Elegí tu nombre para que los demás te reconozcan</p>
         </div>
-
-        {/* Lista de etiquetas */}
         <div style={{ marginBottom: 20 }}>
           {memberLabels.map(label => (
-            <button
-              key={label.id}
-              onClick={() => setSelected(label.id)}
-              style={{
-                width: "100%", padding: "14px 16px", borderRadius: 16,
-                border: "2px solid", marginBottom: 8,
-                cursor: "pointer", fontFamily: FONT, textAlign: "left",
-                display: "flex", alignItems: "center", gap: 14,
-                borderColor: selected === label.id ? label.color || "#4F7FFA" : colors.inputBorder,
-                background: selected === label.id ? (label.color || "#4F7FFA") + "14" : colors.input,
-                transition: "all 0.15s",
-              }}>
-              {/* Avatar con inicial */}
-              <div style={{
-                width: 44, height: 44, borderRadius: 22, flexShrink: 0,
-                background: (label.color || "#4F7FFA") + "33",
-                border: `2px solid ${label.color || "#4F7FFA"}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <span style={{ fontSize: 18, fontWeight: 700, color: label.color || "#4F7FFA", fontFamily: FONT }}>
-                  {label.name[0].toUpperCase()}
-                </span>
+            <button key={label.id} onClick={() => setSelected(label.id)}
+              style={{ width: "100%", padding: "14px 16px", borderRadius: 16, border: "2px solid", marginBottom: 8, cursor: "pointer", fontFamily: FONT, textAlign: "left", display: "flex", alignItems: "center", gap: 14, borderColor: selected === label.id ? label.color || "#4F7FFA" : colors.inputBorder, background: selected === label.id ? (label.color || "#4F7FFA") + "14" : colors.input, transition: "all 0.15s" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 22, flexShrink: 0, background: (label.color || "#4F7FFA") + "33", border: `2px solid ${label.color || "#4F7FFA"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: label.color || "#4F7FFA", fontFamily: FONT }}>{label.name[0].toUpperCase()}</span>
               </div>
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: selected === label.id ? (label.color || "#4F7FFA") : colors.text, fontFamily: FONT }}>{label.name}</p>
                 <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>Miembro de {accountData.name}</p>
               </div>
-              {selected === label.id && (
-                <div style={{ width: 24, height: 24, borderRadius: 12, background: label.color || "#4F7FFA", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <span style={{ color: "#fff", fontSize: 14 }}>✓</span>
-                </div>
-              )}
+              {selected === label.id && <div style={{ width: 24, height: 24, borderRadius: 12, background: label.color || "#4F7FFA", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><span style={{ color: "#fff", fontSize: 14 }}>✓</span></div>}
             </button>
           ))}
         </div>
-
-        <button
-          onClick={handleClaim}
-          disabled={!selected || loading}
-          style={{
-            width: "100%", padding: 16, borderRadius: 16, border: "none",
-            background: !selected || loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)",
-            color: "#fff", fontSize: 16, fontWeight: 700,
-            cursor: !selected || loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10,
-          }}>
+        <button onClick={handleClaim} disabled={!selected || loading}
+          style={{ width: "100%", padding: 16, borderRadius: 16, border: "none", background: !selected || loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", fontSize: 16, fontWeight: 700, cursor: !selected || loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10 }}>
           {loading ? "Uniéndome..." : "¡Soy yo, unirme! →"}
         </button>
-
-        <button
-          onClick={onSkip}
-          style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", background: colors.pill, color: colors.textMuted, fontSize: 14, cursor: "pointer", fontFamily: FONT }}>
+        <button onClick={onSkip} style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", background: colors.pill, color: colors.textMuted, fontSize: 14, cursor: "pointer", fontFamily: FONT }}>
           Mi nombre no está en la lista
         </button>
       </div>
@@ -435,7 +426,73 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
   );
 }
 
-// ── HOME SCREEN (con gastos unificados, filtros, gastos fijos colapsables) ──
+// ── SWIPEABLE EXPENSE ROW ──
+// Deslizá izquierda para revelar Editar y Eliminar (estilo iOS)
+function SwipeableExpenseRow({ e, allCategories, members, fmt, fs, colors, onEdit, onDelete }) {
+  const [offsetX, setOffsetX] = useState(0);
+  const startX = useRef(null);
+  const EDIT_W = 64, DEL_W = 64, TOTAL = EDIT_W + DEL_W + 8;
+
+  const onTouchStart = (ev) => { startX.current = ev.touches[0].clientX; };
+  const onTouchMove = (ev) => {
+    if (startX.current === null) return;
+    const dx = startX.current - ev.touches[0].clientX;
+    if (dx > 0) setOffsetX(Math.min(dx, TOTAL + 16));
+  };
+  const onTouchEnd = () => {
+    if (offsetX > TOTAL / 2) setOffsetX(TOTAL); else setOffsetX(0);
+    startX.current = null;
+  };
+
+  const cat = allCategories.find(c => c.id === e.category);
+  const who = e.type === "mio" ? members?.find(m => m.uid === e.owner) : members?.find(m => m.uid === e.paidBy);
+  const typeColor = e.type === "hogar" ? "#4F7FFA" : e.type === "personal" ? "#FA4F7F" : e.type === "extraordinary" ? "#f39c12" : "#2ecc71";
+  const typeLabel = e.type === "hogar" ? "Hogar" : e.type === "personal" ? "Para otro" : e.type === "extraordinary" ? "Extraordinario" : "Para mí";
+
+  return (
+    <div style={{ position: "relative", marginBottom: 10, borderRadius: 20, overflow: "hidden" }}>
+      {/* Acciones ocultas */}
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, display: "flex", gap: 8, padding: "0 4px", alignItems: "center" }}>
+        <button onClick={() => { setOffsetX(0); onEdit(e); }}
+          style={{ width: EDIT_W, height: "calc(100% - 8px)", borderRadius: 16, background: "#4F7FFA", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3 }}>
+          <span style={{ fontSize: 18 }}>✏️</span>
+          <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Editar</span>
+        </button>
+        <button onClick={() => { setOffsetX(0); onDelete(e.id); }}
+          style={{ width: DEL_W, height: "calc(100% - 8px)", borderRadius: 16, background: "#e74c3c", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3 }}>
+          <span style={{ fontSize: 18 }}>🗑️</span>
+          <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+        </button>
+      </div>
+
+      {/* Tarjeta deslizable */}
+      <div
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        onClick={() => offsetX > 0 && setOffsetX(0)}
+        style={{
+          background: colors.card, borderRadius: 20, padding: "14px 16px",
+          border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow,
+          transform: `translateX(-${offsetX}px)`,
+          transition: startX.current === null ? "transform 0.25s ease" : "none",
+          position: "relative", zIndex: 1,
+        }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+            <span style={{ fontSize: 22, flexShrink: 0 }}>{cat?.icon || "📦"}</span>
+            <div>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{e.concept}</p>
+              <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(e.date)} · {who?.name || "—"}</p>
+              <Tag color={typeColor}>{typeLabel}</Tag>
+            </div>
+          </div>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT, flexShrink: 0, marginLeft: 8 }}>{fmt(e.amount)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── HOME SCREEN ──
 function HomeScreen({ expenses, currentUser, members, account, currentMonth, customCategories, fixedExpenses, onEdit, onDelete }) {
   const { colors } = useTheme();
   const fs = useExpenseFontSize();
@@ -451,22 +508,17 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
   const myPersonalTotal = monthExp.filter(e => e.type === "mio" && e.owner === currentUser.uid).reduce((s, e) => s + e.amount, 0);
   const catTotals = allCategories.map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total).slice(0, 4);
   const monthLabel = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
-
-  // Filtros de gastos
   const [filterType, setFilterType] = useState("todos");
   const filtered = filterType === "todos" ? monthExp : monthExp.filter(e => e.type === filterType);
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
-
-  // Gastos fijos colapsables
   const [fixedExpanded, setFixedExpanded] = useState(false);
   const today = new Date().getDate();
 
   return (
     <div style={{ fontFamily: FONT }}>
-      {/* Hero header */}
       <div style={{ background: colors.headerBg, borderRadius: "0 0 32px 32px", padding: "calc(env(safe-area-inset-top) + 76px) 20px 28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-          {me?.photo ? <img src={me.photo} style={{ width: 44, height: 44, borderRadius: 22, border: "2px solid #ffffff44" }} alt="" /> : <div style={{ width: 44, height: 44, borderRadius: 22, background: meColor+"44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
+          {me?.photo ? <img src={me.photo} style={{ width: 44, height: 44, borderRadius: 22, border: "2px solid #ffffff44" }} alt="" /> : <div style={{ width: 44, height: 44, borderRadius: 22, background: meColor + "44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
           <div>
             <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>Hola,</p>
             <p style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, fontFamily: FONT }}>{me?.name || currentUser.displayName}</p>
@@ -480,14 +532,12 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
       </div>
 
       <div style={{ padding: "0 20px" }}>
-        {/* Resumen */}
         <SectionTitle>Resumen del mes</SectionTitle>
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-          <StatPill label="Compartido" value={fmt(sharedExp.reduce((s,e)=>s+e.amount,0))} color="#4F7FFA" />
+          <StatPill label="Compartido" value={fmt(sharedExp.reduce((s, e) => s + e.amount, 0))} color="#4F7FFA" />
           <StatPill label="Mis gastos" value={fmt(myPersonalTotal)} color={meColor} />
         </div>
 
-        {/* Top categorías */}
         {catTotals.length > 0 && (
           <>
             <SectionTitle>Top categorías</SectionTitle>
@@ -500,7 +550,7 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
                     <span style={{ fontSize: fs.base, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</span>
                   </div>
                   <div style={{ background: colors.divider, borderRadius: 4, height: 5 }}>
-                    <div style={{ background: "#4F7FFA", borderRadius: 4, height: 5, width: `${Math.min(100,(c.total/catTotals[0].total)*100)}%` }} />
+                    <div style={{ background: "#4F7FFA", borderRadius: 4, height: 5, width: `${Math.min(100, (c.total / catTotals[0].total) * 100)}%` }} />
                   </div>
                 </div>
               </div>
@@ -508,62 +558,37 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
           </>
         )}
 
-        {/* ── Gastos fijos colapsables ── */}
         {fixedExpenses && fixedExpenses.length > 0 && (
           <>
-            <button onClick={() => setFixedExpanded(v => !v)} style={{
-              width: "100%", background: "none", border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "18px 0 8px", fontFamily: FONT,
-            }}>
-              <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>
-                📋 Gastos fijos
-              </span>
+            <button onClick={() => setFixedExpanded(v => !v)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 0 8px", fontFamily: FONT }}>
+              <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>📋 Gastos fijos</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
-                  {fmt(fixedExpenses.reduce((s, f) => s + (f.amount || 0), 0))}
-                </span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ transform: fixedExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
-                  <path d="M6 9l6 6 6-6"/>
-                </svg>
+                <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(fixedExpenses.reduce((s, f) => s + (f.amount || 0), 0))}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
               </div>
             </button>
-            {fixedExpanded && (
-              <div style={{ marginBottom: 8 }}>
-                {fixedExpenses.map(f => {
-                  const daysLeft = f.dueDay ? f.dueDay - today : null;
-                  const isUrgent = daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
-                  return (
-                    <Card key={f.id} style={{ padding: "12px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 12, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-                          {f.shared ? "🏠" : "👤"}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{f.name}</p>
-                          {f.dueDay && (
-                            <p style={{ margin: "2px 0 0", fontSize: fs.sub, color: isUrgent ? "#e74c3c" : colors.textMuted, fontFamily: FONT, fontWeight: isUrgent ? 700 : 400 }}>
-                              {daysLeft === 0 ? "⚠️ Vence hoy" : daysLeft < 0 ? `Venció hace ${Math.abs(daysLeft)}d` : `Vence en ${daysLeft}d (día ${f.dueDay})`}
-                            </p>
-                          )}
-                        </div>
-                        <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: isUrgent ? "#e74c3c" : colors.text, fontFamily: FONT }}>{fmt(f.amount || 0)}</p>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+            {fixedExpanded && fixedExpenses.map(f => {
+              const daysLeft = f.dueDay ? f.dueDay - today : null;
+              const isUrgent = daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
+              return (
+                <Card key={f.id} style={{ padding: "12px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 12, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{f.shared ? "🏠" : "👤"}</div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{f.name}</p>
+                      {f.dueDay && <p style={{ margin: "2px 0 0", fontSize: fs.sub, color: isUrgent ? "#e74c3c" : colors.textMuted, fontFamily: FONT, fontWeight: isUrgent ? 700 : 400 }}>{daysLeft === 0 ? "⚠️ Vence hoy" : daysLeft < 0 ? `Venció hace ${Math.abs(daysLeft)}d` : `Vence en ${daysLeft}d (día ${f.dueDay})`}</p>}
+                    </div>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: isUrgent ? "#e74c3c" : colors.text, fontFamily: FONT }}>{fmt(f.amount || 0)}</p>
+                  </div>
+                </Card>
+              );
+            })}
           </>
         )}
 
-        {/* ── Todos los gastos con filtros ── */}
         <SectionTitle>Movimientos</SectionTitle>
-
-        {/* Filtros */}
         <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-          {[["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","✈️"],["mio","👤"]].map(([val, lbl]) => (
+          {[["todos", "Todos"], ["hogar", "🏠"], ["personal", "🎁"], ["extraordinary", "✈️"], ["mio", "👤"]].map(([val, lbl]) => (
             <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
           ))}
         </div>
@@ -575,31 +600,9 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
           </Card>
         )}
 
-        {sorted.map(e => {
-          const cat = allCategories.find(c => c.id === e.category);
-          const who = e.type === "mio" ? members?.find(m=>m.uid===e.owner) : members?.find(m=>m.uid===e.paidBy);
-          return (
-            <Card key={e.id} style={{ padding: "14px 16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-                  <span style={{ fontSize: 22 }}>{cat?.icon}</span>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{e.concept}</p>
-                    <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{e.date} · {who?.name}</p>
-                    <Tag color={e.type==="hogar"?"#4F7FFA":e.type==="personal"?"#FA4F7F":e.type==="extraordinary"?"#f39c12":"#2ecc71"}>{e.type==="hogar"?"Hogar":e.type==="personal"?"Para otro":e.type==="extraordinary"?"Extraordinario":"Para mí"}</Tag>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                  <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{fmt(e.amount)}</p>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => onEdit(e)} style={{ background: "#4F7FFA18", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, color: "#4F7FFA", cursor: "pointer", fontFamily: FONT, fontWeight: 600 }}>✏️</button>
-                    <button onClick={() => onDelete(e.id)} style={{ background: colors.dangerBg, border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, color: colors.danger, cursor: "pointer", fontFamily: FONT }}>✕</button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
+        {sorted.map(e => (
+          <SwipeableExpenseRow key={e.id} e={e} allCategories={allCategories} members={members} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} />
+        ))}
         <div style={{ height: 120 }} />
       </div>
     </div>
@@ -630,17 +633,22 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
   };
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
+      <SectionTitle>Saldos del mes</SectionTitle>
       {members?.map(m => {
         const s = saldos[m.uid] || { paid: 0, owes: 0, balance: 0 };
         const totalSalary = members.reduce((acc, mb) => acc + (mb.salary || 0), 0);
-        const pct = totalSalary > 0 ? ((m.salary || 0) / totalSalary * 100).toFixed(0) : 50;
+        // Solo mostrar % en cuentas proporcionales
+        const showPct = account?.divisionSystem === "proportional" && totalSalary > 0;
+        const pct = showPct ? ((m.salary || 0) / totalSalary * 100).toFixed(0) : null;
         return (
           <Card key={m.uid}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-              {m.photo ? <img src={m.photo} style={{ width: 44, height: 44, borderRadius: 22 }} alt="" /> : <div style={{ width: 44, height: 44, borderRadius: 22, background: (m.color||"#4F7FFA")+"22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>👤</div>}
+              {m.photo ? <img src={m.photo} style={{ width: 44, height: 44, borderRadius: 22 }} alt="" /> : <div style={{ width: 44, height: 44, borderRadius: 22, background: (m.color || "#4F7FFA") + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>👤</div>}
               <div>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{m.name}</p>
-                <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(m.salary)} · {pct}% del hogar</p>
+                <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
+                  {showPct ? `${fmt(m.salary)} · ${pct}% de la cuenta` : "Miembro"}
+                </p>
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
@@ -675,19 +683,17 @@ function GraficosScreen({ expenses, account }) {
   const allMonths = [...new Set(expenses.map(e => e.month))].sort();
   const last3 = allMonths.slice(-3);
   const monthLabel = (m) => new Date(m + "-02").toLocaleString("es-AR", { month: "short" });
-  const barData = last3.map(m => ({ mes: monthLabel(m), Hogar: expenses.filter(e=>e.month===m&&e.type==="hogar").reduce((s,e)=>s+e.amount,0), Personal: expenses.filter(e=>e.month===m&&e.type==="mio").reduce((s,e)=>s+e.amount,0), Extra: expenses.filter(e=>e.month===m&&e.type==="extraordinary").reduce((s,e)=>s+e.amount,0) }));
+  const barData = last3.map(m => ({ mes: monthLabel(m), Hogar: expenses.filter(e => e.month === m && e.type === "hogar").reduce((s, e) => s + e.amount, 0), Personal: expenses.filter(e => e.month === m && e.type === "mio").reduce((s, e) => s + e.amount, 0), Extra: expenses.filter(e => e.month === m && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0) }));
   const lastMonth = last3[last3.length - 1];
-  const pieData = DEFAULT_CATEGORIES.map((c,i)=>({ name:c.label, value:expenses.filter(e=>e.month===lastMonth&&e.category===c.id).reduce((s,e)=>s+e.amount,0), color:CAT_COLORS[i] })).filter(c=>c.value>0);
-
+  const pieData = DEFAULT_CATEGORIES.map((c, i) => ({ name: c.label, value: expenses.filter(e => e.month === lastMonth && e.category === c.id).reduce((s, e) => s + e.amount, 0), color: CAT_COLORS[i] })).filter(c => c.value > 0);
   const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     if (percent < 0.07) return null;
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.55;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    return <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={700} fontFamily={FONT}>{`${(percent*100).toFixed(0)}%`}</text>;
+    return <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={700} fontFamily={FONT}>{`${(percent * 100).toFixed(0)}%`}</text>;
   };
-
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
       <SectionTitle>Comparación mensual</SectionTitle>
@@ -696,16 +702,16 @@ function GraficosScreen({ expenses, account }) {
           <ResponsiveContainer width="100%" height={210}>
             <BarChart data={barData} barCategoryGap="30%">
               <XAxis dataKey="mes" tick={{ fontSize: 12, fill: colors.textMuted, fontFamily: FONT }} />
-              <YAxis tick={{ fontSize: 10, fill: colors.textMuted, fontFamily: FONT }} tickFormatter={v=>`${(v/1000).toFixed(0)}k`} />
-              <Tooltip formatter={v=>fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
-              <Bar dataKey="Hogar" fill="#4F7FFA" radius={[6,6,0,0]} />
-              <Bar dataKey="Personal" fill="#2ecc71" radius={[6,6,0,0]} />
-              <Bar dataKey="Extra" fill="#f39c12" radius={[6,6,0,0]} />
+              <YAxis tick={{ fontSize: 10, fill: colors.textMuted, fontFamily: FONT }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
+              <Bar dataKey="Hogar" fill="#4F7FFA" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Personal" fill="#2ecc71" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Extra" fill="#f39c12" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         }
         <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>
-          {[["#4F7FFA","Hogar"],["#2ecc71","Personal"],["#f39c12","Extra"]].map(([col,lbl])=><div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: col }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span></div>)}
+          {[["#4F7FFA", "Hogar"], ["#2ecc71", "Personal"], ["#f39c12", "Extra"]].map(([col, lbl]) => <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: col }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span></div>)}
         </div>
       </Card>
       <SectionTitle>Por categoría — último mes</SectionTitle>
@@ -714,14 +720,14 @@ function GraficosScreen({ expenses, account }) {
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" labelLine={false} label={renderCustomLabel}>
-                {pieData.map((e,i)=><Cell key={i} fill={e.color} />)}
+                {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
               </Pie>
-              <Tooltip formatter={v=>fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
+              <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
             </PieChart>
           </ResponsiveContainer>
         }
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6, justifyContent: "center" }}>
-          {pieData.map(p=><div key={p.name} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{p.name}</span></div>)}
+          {pieData.map(p => <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{p.name}</span></div>)}
         </div>
       </Card>
       <div style={{ height: 120 }} />
@@ -749,7 +755,7 @@ function AppInner() {
   const [userAccounts, setUserAccounts] = useState([]);
   const [showWelcome, setShowWelcome] = useState(true);
   const [pendingInviteId, setPendingInviteId] = useState(null);
-  const [claimData, setClaimData] = useState(null); // { inviteId, accountId, accountData, memberLabels }
+  const [claimData, setClaimData] = useState(null);
   const currentMonth = getCurrentMonth();
 
   useEffect(() => {
@@ -771,14 +777,12 @@ function AppInner() {
         if (!accountSnap.exists()) return;
         const accountData = accountSnap.data();
         const labels = accountData.memberLabels || [];
-        // Si hay etiquetas sin vincular, mostrar modal para que el usuario elija quién es
         const unlinked = labels.filter(l => !l.linkedUid);
         if (unlinked.length > 0) {
           setClaimData({ inviteId: pendingInviteId, accountId, accountData, memberLabels: unlinked });
           setPendingInviteId(null);
           return;
         }
-        // Sin etiquetas: agregar directo
         await finishJoinAccount({ inviteId: pendingInviteId, accountId, accountData, claimedLabelId: null });
         setPendingInviteId(null);
       } catch (err) { console.error("Error procesando invitación:", err); }
@@ -786,34 +790,23 @@ function AppInner() {
     processInvite();
   }, [pendingInviteId, authUser]);
 
-  // Finaliza el proceso de unirse a una cuenta (con o sin label elegida)
   const finishJoinAccount = async ({ inviteId, accountId, accountData, claimedLabelId }) => {
     try {
       const memberIds = accountData.memberIds || [];
-      if (!memberIds.includes(authUser.uid)) {
-        await updateDoc(doc(db, "accounts", accountId), { memberIds: [...memberIds, authUser.uid] });
-      }
-      // Si eligió una etiqueta, vincularla con su uid
+      if (!memberIds.includes(authUser.uid)) await updateDoc(doc(db, "accounts", accountId), { memberIds: [...memberIds, authUser.uid] });
       if (claimedLabelId) {
-        const updatedLabels = (accountData.memberLabels || []).map(l =>
-          l.id === claimedLabelId ? { ...l, linkedUid: authUser.uid } : l
-        );
+        const updatedLabels = (accountData.memberLabels || []).map(l => l.id === claimedLabelId ? { ...l, linkedUid: authUser.uid } : l);
         await updateDoc(doc(db, "accounts", accountId), { memberLabels: updatedLabels });
-        // También actualizar el nombre en el perfil del usuario si no tiene uno
         const labelName = (accountData.memberLabels || []).find(l => l.id === claimedLabelId)?.name;
-        if (labelName) {
-          await setDoc(doc(db, "users", authUser.uid), { name: labelName }, { merge: true });
-        }
+        if (labelName) await setDoc(doc(db, "users", authUser.uid), { name: labelName }, { merge: true });
       }
       const userSnap = await getDoc(doc(db, "users", authUser.uid));
       const existingIds = userSnap.exists() ? (userSnap.data().accountIds || []) : [];
-      if (!existingIds.includes(accountId)) {
-        await setDoc(doc(db, "users", authUser.uid), { accountIds: [...existingIds, accountId] }, { merge: true });
-      }
+      if (!existingIds.includes(accountId)) await setDoc(doc(db, "users", authUser.uid), { accountIds: [...existingIds, accountId] }, { merge: true });
       await updateDoc(doc(db, "invites", inviteId), { used: true });
       setClaimData(null);
       setSelectedAccountId(accountId);
-    } catch (err) { console.error("Error al unirse a la cuenta:", err); }
+    } catch (err) { console.error("Error al unirse:", err); }
   };
 
   useEffect(() => { return onAuthStateChanged(auth, user => setAuthUser(user || null)); }, []);
@@ -840,7 +833,12 @@ function AppInner() {
     const unsubs = ids.map(uid => onSnapshot(doc(db, "users", uid), snap => { if (snap.exists()) setMembers(prev => [...prev.filter(m => m.uid !== uid), { uid, ...snap.data() }]); }));
     return () => unsubs.forEach(u => u());
   }, [account?.memberIds?.join(",")]);
-  useEffect(() => { if (!authUser) return; const q = query(collection(db, "expenses"), orderBy("date", "desc")); return onSnapshot(q, snap => { setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [authUser]);
+  // Expenses filtradas por cuenta
+  useEffect(() => {
+    if (!account?.id) return;
+    const q = query(collection(db, "expenses"), where("accountId", "==", account.id), orderBy("date", "desc"));
+    return onSnapshot(q, snap => { setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+  }, [account?.id]);
   useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "categories"), snap => { setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
   useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "fixedExpenses"), snap => { setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
 
@@ -850,11 +848,8 @@ function AppInner() {
     await addDoc(collection(db, "expenses"), { ...e, createdBy: authUser.uid, accountId: account?.id });
     const otherMembers = members?.filter(m => m.uid !== authUser.uid) || [];
     const myName = members?.find(m => m.uid === authUser.uid)?.name || "Alguien";
-    if (otherMembers.length > 0) {
-      await sendNotification({ type: NOTIF_TYPES.EXPENSE_ADDED, title: `Nuevo gasto: ${e.concept}`, body: `${myName} agregó ${formatAmount(e.amount, account?.currency || "ARS")}`, fromName: myName, toUids: otherMembers.map(m => m.uid), accountId: account?.id });
-    }
+    if (otherMembers.length > 0) await sendNotification({ type: NOTIF_TYPES.EXPENSE_ADDED, title: `Nuevo gasto: ${e.concept}`, body: `${myName} agregó ${formatAmount(e.amount, account?.currency || "ARS")}`, fromName: myName, toUids: otherMembers.map(m => m.uid), accountId: account?.id });
   };
-
   const deleteExpense = async (id) => { await deleteDoc(doc(db, "expenses", id)); };
   const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); setShowWelcome(true); };
 
@@ -864,45 +859,31 @@ function AppInner() {
   if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
   if (!selectedAccountId) return <AccountSelectorScreen user={authUser} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} />;
 
-  // Nav dinámica: si cuenta personal, sin Saldos
   const isPersonal = account?.type === "personal";
-  const NAV_LEFT = isPersonal
-    ? [{ id: "home", label: "Inicio" }]
-    : [{ id: "home", label: "Inicio" }, { id: "saldos", label: "Saldos" }];
-  const NAV_RIGHT = isPersonal
-    ? [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }]
-    : [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }];
-
-  // Si estaba en saldos y cambiamos a cuenta personal, redirigir
   if (isPersonal && tab === "saldos") setTab("home");
 
+  // Nav: personal = 4 ítems sin hueco raro (home, graficos, ajustes + espacio FAB)
+  // shared = home, saldos | graficos, ajustes
+  const NAV_LEFT = isPersonal
+    ? [{ id: "home", label: "Inicio" }, { id: "graficos", label: "Gráficos" }]
+    : [{ id: "home", label: "Inicio" }, { id: "saldos", label: "Saldos" }];
+  const NAV_RIGHT = isPersonal
+    ? [{ id: "ajustes", label: "Ajustes" }]
+    : [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }];
+
   return (
-    <div style={{
-      width: "100%", maxWidth: 500, margin: "0 auto",
-      background: colors.bg, minHeight: "100dvh",
-      position: "relative", fontFamily: FONT,
-      paddingLeft: "env(safe-area-inset-left)",
-      paddingRight: "env(safe-area-inset-right)",
-      boxSizing: "border-box", overflowX: "hidden",
-    }}>
+    <div style={{ width: "100%", maxWidth: 500, margin: "0 auto", background: colors.bg, minHeight: "100dvh", position: "relative", fontFamily: FONT, paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", boxSizing: "border-box", overflowX: "hidden" }}>
       <style>{`
         ${FONT_IMPORT}
         *, *::before, *::after { box-sizing: border-box; }
-        html, body, #root {
-          width: 100%; min-height: 100dvh; margin: 0; padding: 0;
-          font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-        }
+        html, body, #root { width: 100%; min-height: 100dvh; margin: 0; padding: 0; font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; }
         body { -webkit-font-smoothing: antialiased; }
-        input, button, select, textarea {
-          font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-        }
+        input, button, select, textarea { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; }
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* Header fijo */}
       <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
 
-      {/* Contenido */}
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
         {tab === "home" && <HomeScreen expenses={expenses} currentUser={authUser} members={members} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} />}
         {tab === "saldos" && <SaldosScreen expenses={expenses} members={members} account={account} currentMonth={currentMonth} />}
@@ -910,44 +891,20 @@ function AppInner() {
         {tab === "ajustes" && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
       </div>
 
-      {/* ── NAV BAR con FAB elevado ── */}
-      <div style={{
-        position: "fixed", bottom: 0, left: 0, right: 0,
-        width: "100%", maxWidth: 500, margin: "0 auto",
-        zIndex: 40,
-      }}>
-        {/* FAB elevado — sobresale sobre la barra */}
-        <div style={{
-          position: "absolute", top: -28, left: "50%",
-          transform: "translateX(-50%)", zIndex: 41,
-        }}>
-          <button onClick={() => setShowAdd(true)} style={{
-            width: 64, height: 64, borderRadius: 32,
-            background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)",
-            border: "4px solid " + colors.navBg,
-            color: "#fff", fontSize: 30, cursor: "pointer",
-            boxShadow: "0 6px 24px #4F7FFA88",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>+</button>
+      {/* NAV BAR */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, width: "100%", maxWidth: 500, margin: "0 auto", zIndex: 40 }}>
+        {/* FAB */}
+        <div style={{ position: "absolute", top: -28, left: "50%", transform: "translateX(-50%)", zIndex: 41 }}>
+          <button onClick={() => setShowAdd(true)} style={{ width: 64, height: 64, borderRadius: 32, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", border: "4px solid " + colors.navBg, color: "#fff", fontSize: 30, cursor: "pointer", boxShadow: "0 6px 24px #4F7FFA88", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
         </div>
-
-        {/* Barra */}
-        <div style={{
-          background: colors.navBg, borderTop: `1px solid ${colors.navBorder}`,
-          display: "flex", alignItems: "center",
-          padding: `10px 0 calc(16px + env(safe-area-inset-bottom))`,
-          boxShadow: "0 -4px 20px rgba(0,0,0,0.08)",
-        }}>
+        <div style={{ background: colors.navBg, borderTop: `1px solid ${colors.navBorder}`, display: "flex", alignItems: "center", padding: `10px 0 calc(16px + env(safe-area-inset-bottom))`, boxShadow: "0 -4px 20px rgba(0,0,0,0.08)" }}>
           {NAV_LEFT.map(n => (
             <button key={n.id} onClick={() => setTab(n.id)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: FONT, padding: "2px 0" }}>
               <NavIcon id={n.id} active={tab === n.id} color="#4F7FFA" />
               <span style={{ fontSize: 9, fontWeight: tab === n.id ? 700 : 500, letterSpacing: 0.2, color: tab === n.id ? "#4F7FFA" : colors.textSubtle, textTransform: "uppercase", fontFamily: FONT }}>{n.label}</span>
             </button>
           ))}
-
-          {/* Espacio central para el FAB */}
-          <div style={{ flex: isPersonal ? 0.8 : 1, flexShrink: 0 }} />
-
+          <div style={{ flex: 1 }} />
           {NAV_RIGHT.map(n => (
             <button key={n.id} onClick={() => setTab(n.id)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: FONT, padding: "2px 0" }}>
               <NavIcon id={n.id} active={tab === n.id} color="#4F7FFA" />
@@ -957,18 +914,14 @@ function AppInner() {
         </div>
       </div>
 
-      {/* Modales */}
       {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} members={members} currency={account?.currency || "ARS"} customCategories={customCategories} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={members} onClose={() => setEditingExpense(null)} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
       {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
       {claimData && (
-        <ClaimIdentityModal
-          claimData={claimData}
-          colors={colors}
+        <ClaimIdentityModal claimData={claimData} colors={colors}
           onClaim={(labelId) => finishJoinAccount({ inviteId: claimData.inviteId, accountId: claimData.accountId, accountData: claimData.accountData, claimedLabelId: labelId })}
-          onSkip={() => finishJoinAccount({ inviteId: claimData.inviteId, accountId: claimData.accountId, accountData: claimData.accountData, claimedLabelId: null })}
-        />
+          onSkip={() => finishJoinAccount({ inviteId: claimData.inviteId, accountId: claimData.accountId, accountData: claimData.accountData, claimedLabelId: null })} />
       )}
     </div>
   );
