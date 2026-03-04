@@ -226,12 +226,36 @@ export function NotifCenter({ onClose }) {
   const { colors } = useTheme();
   const [showConfirmClear, setShowConfirmClear] = useState(false);
 
+  // Swipe-to-close
+  const startY = useRef(null);
+  const [dragY, setDragY] = useState(0);
+  const isDragging = useRef(false);
+  const onTouchStart = (e) => { startY.current = e.touches[0].clientY; isDragging.current = true; };
+  const onTouchMove = (e) => {
+    if (!isDragging.current) return;
+    const dy = e.touches[0].clientY - startY.current;
+    if (dy > 0) setDragY(dy);
+  };
+  const onTouchEnd = () => {
+    if (dragY > 120) onClose();
+    else setDragY(0);
+    isDragging.current = false; startY.current = null;
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "flex-end" }}
       onClick={onClose}>
       <div
         onClick={e => e.stopPropagation()}
-        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", maxHeight: "78vh", display: "flex", flexDirection: "column", fontFamily: FONT }}>
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{
+          background: colors.card, borderRadius: "24px 24px 0 0", width: "100%",
+          maxHeight: "78vh", display: "flex", flexDirection: "column", fontFamily: FONT,
+          transform: `translateY(${dragY}px)`,
+          transition: isDragging.current ? "none" : "transform 0.3s ease",
+        }}>
 
         {/* Handle */}
         <div style={{ padding: "20px 20px 0" }}>
@@ -263,9 +287,11 @@ export function NotifCenter({ onClose }) {
         <div style={{ overflowY: "auto", flex: 1, padding: "0 20px 32px" }}>
           {notifications.length === 0 && (
             <div style={{ textAlign: "center", padding: "48px 20px", color: colors.textMuted }}>
-              {/* Ícono campana igual al del header */}
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, opacity: 0.4 }}>
-                <BellIcon size={52} color={colors.textMuted} />
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 14, opacity: 0.35 }}>
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 01-3.46 0"/>
+                </svg>
               </div>
               <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: colors.textMuted, fontFamily: FONT }}>Sin notificaciones</p>
               <p style={{ margin: "4px 0 0", fontSize: 13, color: colors.textMuted, fontFamily: FONT }}>Acá vas a ver las novedades de tus cuentas</p>

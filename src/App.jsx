@@ -16,8 +16,8 @@ import { useTheme, formatAmount, CURRENCIES } from "./theme.jsx";
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');`;
 
-// Altura del header fijo para calcular paddingTop de cada sección
-const HEADER_HEIGHT = 90;
+// Altura del header fijo — safe area (~44px iPhone) + padding + contenido
+const HEADER_HEIGHT = 80;
 // Altura de la nav bar
 const NAV_HEIGHT = 72;
 
@@ -124,25 +124,21 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
       position: "fixed", top: 0, left: 0, right: 0, zIndex: 60,
       maxWidth: 500, margin: "0 auto",
       background: colors.headerBg,
-      paddingTop: "calc(env(safe-area-inset-top) + 10px)",
-      paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
+      paddingTop: "calc(env(safe-area-inset-top) + 12px)",
+      paddingBottom: 14, paddingLeft: 20, paddingRight: 20,
     }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 12,
-        background: "rgba(255,255,255,0.07)",
-        border: "1px solid rgba(255,255,255,0.13)",
-        borderRadius: 20, padding: "12px 14px",
-      }}>
+      {/* Fila de contenido — sin borde/rectángulo */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <button onClick={onMenuOpen} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}>
           <MenuIcon />
         </button>
         <div style={{ flex: 1 }}>
-          <p style={{ color: "#ffffff44", fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", margin: "0 0 2px", fontFamily: FONT }}>X-penses</p>
-          <p style={{ fontSize: 15, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: -0.3, fontFamily: FONT }}>{account?.name || "Mis cuentas"}</p>
+          <p style={{ color: "#ffffff55", fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", margin: "0 0 1px", fontFamily: FONT }}>X-penses</p>
+          <p style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: -0.3, fontFamily: FONT }}>{account?.name || "Mis cuentas"}</p>
         </div>
         <button onClick={onNotifsOpen} style={{
-          position: "relative", background: "rgba(255,255,255,0.10)",
-          border: "1px solid rgba(255,255,255,0.13)", borderRadius: 50,
+          position: "relative", background: "rgba(255,255,255,0.12)",
+          border: "none", borderRadius: 50,
           width: 38, height: 38, display: "flex", alignItems: "center",
           justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0,
         }}>
@@ -157,6 +153,11 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
           )}
         </button>
       </div>
+      {/* Línea separadora en degradado */}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0, height: 1,
+        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15) 30%, rgba(255,255,255,0.15) 70%, transparent)",
+      }} />
     </div>
   );
 }
@@ -165,6 +166,23 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
 function MenuPanel({ onClose, currentUser, userProfile, members, account, onSignOut, onSwitchAccount, isDark, onToggleTheme, colors }) {
   const me = members?.find(m => m.uid === currentUser?.uid);
   const meColor = me?.color || "#4F7FFA";
+
+  // Swipe-to-close
+  const startY = useRef(null);
+  const [dragY, setDragY] = useState(0);
+  const dragging = useRef(false);
+  const onTouchStart = (e) => { startY.current = e.touches[0].clientY; dragging.current = true; };
+  const onTouchMove = (e) => {
+    if (!dragging.current) return;
+    const dy = e.touches[0].clientY - startY.current;
+    if (dy > 0) setDragY(dy);
+  };
+  const onTouchEnd = () => {
+    if (dragY > 100) onClose();
+    else setDragY(0);
+    dragging.current = false; startY.current = null;
+  };
+
   const handleShare = () => {
     const url = window.location.origin;
     if (navigator.share) navigator.share({ title: "X-penses", text: "Llevá tus gastos compartidos 💸", url });
@@ -178,7 +196,18 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
   ];
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 500, margin: "0 auto", padding: "20px 20px calc(32px + env(safe-area-inset-bottom))", fontFamily: FONT }} onClick={e => e.stopPropagation()}>
+      <div
+        onClick={e => e.stopPropagation()}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{
+          background: colors.card, borderRadius: "24px 24px 0 0",
+          width: "100%", maxWidth: 500, margin: "0 auto",
+          padding: "20px 20px calc(32px + env(safe-area-inset-bottom))", fontFamily: FONT,
+          transform: `translateY(${dragY}px)`,
+          transition: dragging.current ? "none" : "transform 0.3s ease",
+        }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", background: colors.pill, borderRadius: 18, marginBottom: 16 }}>
           {currentUser?.photoURL ? <img src={currentUser.photoURL} style={{ width: 48, height: 48, borderRadius: 24, border: `2px solid ${meColor}` }} alt="" /> : <div style={{ width: 48, height: 48, borderRadius: 24, background: meColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
@@ -315,6 +344,97 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
   );
 }
 
+// ── CLAIM IDENTITY MODAL ──
+// Aparece cuando alguien abre un link de invitación y la cuenta tiene etiquetas sin vincular
+function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
+  const { memberLabels, accountData } = claimData;
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleClaim = async () => {
+    if (!selected) return;
+    setLoading(true);
+    await onClaim(selected);
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 500, margin: "0 auto", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 24px" }} />
+
+        {/* Encabezado */}
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <p style={{ fontSize: 40, margin: "0 0 10px" }}>👋</p>
+          <p style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: "0 0 6px", fontFamily: FONT }}>
+            ¡Te invitaron a <span style={{ color: "#4F7FFA" }}>{accountData.name}</span>!
+          </p>
+          <p style={{ fontSize: 14, color: colors.textMuted, margin: 0, fontFamily: FONT, lineHeight: 1.5 }}>
+            Elegí tu nombre para que los demás te reconozcan
+          </p>
+        </div>
+
+        {/* Lista de etiquetas */}
+        <div style={{ marginBottom: 20 }}>
+          {memberLabels.map(label => (
+            <button
+              key={label.id}
+              onClick={() => setSelected(label.id)}
+              style={{
+                width: "100%", padding: "14px 16px", borderRadius: 16,
+                border: "2px solid", marginBottom: 8,
+                cursor: "pointer", fontFamily: FONT, textAlign: "left",
+                display: "flex", alignItems: "center", gap: 14,
+                borderColor: selected === label.id ? label.color || "#4F7FFA" : colors.inputBorder,
+                background: selected === label.id ? (label.color || "#4F7FFA") + "14" : colors.input,
+                transition: "all 0.15s",
+              }}>
+              {/* Avatar con inicial */}
+              <div style={{
+                width: 44, height: 44, borderRadius: 22, flexShrink: 0,
+                background: (label.color || "#4F7FFA") + "33",
+                border: `2px solid ${label.color || "#4F7FFA"}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: label.color || "#4F7FFA", fontFamily: FONT }}>
+                  {label.name[0].toUpperCase()}
+                </span>
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: selected === label.id ? (label.color || "#4F7FFA") : colors.text, fontFamily: FONT }}>{label.name}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>Miembro de {accountData.name}</p>
+              </div>
+              {selected === label.id && (
+                <div style={{ width: 24, height: 24, borderRadius: 12, background: label.color || "#4F7FFA", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ color: "#fff", fontSize: 14 }}>✓</span>
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={handleClaim}
+          disabled={!selected || loading}
+          style={{
+            width: "100%", padding: 16, borderRadius: 16, border: "none",
+            background: !selected || loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)",
+            color: "#fff", fontSize: 16, fontWeight: 700,
+            cursor: !selected || loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10,
+          }}>
+          {loading ? "Uniéndome..." : "¡Soy yo, unirme! →"}
+        </button>
+
+        <button
+          onClick={onSkip}
+          style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", background: colors.pill, color: colors.textMuted, fontSize: 14, cursor: "pointer", fontFamily: FONT }}>
+          Mi nombre no está en la lista
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── HOME SCREEN (con gastos unificados, filtros, gastos fijos colapsables) ──
 function HomeScreen({ expenses, currentUser, members, account, currentMonth, customCategories, fixedExpenses, onEdit, onDelete }) {
   const { colors } = useTheme();
@@ -344,7 +464,7 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
   return (
     <div style={{ fontFamily: FONT }}>
       {/* Hero header */}
-      <div style={{ background: colors.headerBg, borderRadius: "0 0 32px 32px", padding: `${HEADER_HEIGHT + 16}px 20px 28px` }}>
+      <div style={{ background: colors.headerBg, borderRadius: "0 0 32px 32px", padding: "calc(env(safe-area-inset-top) + 76px) 20px 28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
           {me?.photo ? <img src={me.photo} style={{ width: 44, height: 44, borderRadius: 22, border: "2px solid #ffffff44" }} alt="" /> : <div style={{ width: 44, height: 44, borderRadius: 22, background: meColor+"44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
           <div>
@@ -490,6 +610,7 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
 function SaldosScreen({ expenses, members, account, currentMonth }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
+  const fs = useExpenseFontSize();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const monthExp = expenses.filter(e => e.month === currentMonth && e.type !== "mio");
   const saldos = calcSaldos(monthExp, members, account?.divisionSystem);
@@ -508,8 +629,7 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
     return `${debtor.name} le debe ${fmt(Math.abs(debtor.balance))} a ${creditor.name}`;
   };
   return (
-    <div style={{ padding: "0 20px", paddingTop: HEADER_HEIGHT + 8, fontFamily: FONT }}>
-      <SectionTitle>Saldos del mes</SectionTitle>
+    <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
       {members?.map(m => {
         const s = saldos[m.uid] || { paid: 0, owes: 0, balance: 0 };
         const totalSalary = members.reduce((acc, mb) => acc + (mb.salary || 0), 0);
@@ -569,7 +689,7 @@ function GraficosScreen({ expenses, account }) {
   };
 
   return (
-    <div style={{ padding: "0 20px", paddingTop: HEADER_HEIGHT + 8, fontFamily: FONT }}>
+    <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
       <SectionTitle>Comparación mensual</SectionTitle>
       <Card>
         {barData.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p> :
@@ -629,6 +749,7 @@ function AppInner() {
   const [userAccounts, setUserAccounts] = useState([]);
   const [showWelcome, setShowWelcome] = useState(true);
   const [pendingInviteId, setPendingInviteId] = useState(null);
+  const [claimData, setClaimData] = useState(null); // { inviteId, accountId, accountData, memberLabels }
   const currentMonth = getCurrentMonth();
 
   useEffect(() => {
@@ -649,22 +770,51 @@ function AppInner() {
         const accountSnap = await getDoc(doc(db, "accounts", accountId));
         if (!accountSnap.exists()) return;
         const accountData = accountSnap.data();
-        const memberIds = accountData.memberIds || [];
-        if (!memberIds.includes(authUser.uid)) {
-          await updateDoc(doc(db, "accounts", accountId), { memberIds: [...memberIds, authUser.uid] });
+        const labels = accountData.memberLabels || [];
+        // Si hay etiquetas sin vincular, mostrar modal para que el usuario elija quién es
+        const unlinked = labels.filter(l => !l.linkedUid);
+        if (unlinked.length > 0) {
+          setClaimData({ inviteId: pendingInviteId, accountId, accountData, memberLabels: unlinked });
+          setPendingInviteId(null);
+          return;
         }
-        const userSnap = await getDoc(doc(db, "users", authUser.uid));
-        const existingIds = userSnap.exists() ? (userSnap.data().accountIds || []) : [];
-        if (!existingIds.includes(accountId)) {
-          await setDoc(doc(db, "users", authUser.uid), { accountIds: [...existingIds, accountId] }, { merge: true });
-        }
-        await updateDoc(doc(db, "invites", pendingInviteId), { used: true });
-        setSelectedAccountId(accountId);
+        // Sin etiquetas: agregar directo
+        await finishJoinAccount({ inviteId: pendingInviteId, accountId, accountData, claimedLabelId: null });
         setPendingInviteId(null);
       } catch (err) { console.error("Error procesando invitación:", err); }
     };
     processInvite();
   }, [pendingInviteId, authUser]);
+
+  // Finaliza el proceso de unirse a una cuenta (con o sin label elegida)
+  const finishJoinAccount = async ({ inviteId, accountId, accountData, claimedLabelId }) => {
+    try {
+      const memberIds = accountData.memberIds || [];
+      if (!memberIds.includes(authUser.uid)) {
+        await updateDoc(doc(db, "accounts", accountId), { memberIds: [...memberIds, authUser.uid] });
+      }
+      // Si eligió una etiqueta, vincularla con su uid
+      if (claimedLabelId) {
+        const updatedLabels = (accountData.memberLabels || []).map(l =>
+          l.id === claimedLabelId ? { ...l, linkedUid: authUser.uid } : l
+        );
+        await updateDoc(doc(db, "accounts", accountId), { memberLabels: updatedLabels });
+        // También actualizar el nombre en el perfil del usuario si no tiene uno
+        const labelName = (accountData.memberLabels || []).find(l => l.id === claimedLabelId)?.name;
+        if (labelName) {
+          await setDoc(doc(db, "users", authUser.uid), { name: labelName }, { merge: true });
+        }
+      }
+      const userSnap = await getDoc(doc(db, "users", authUser.uid));
+      const existingIds = userSnap.exists() ? (userSnap.data().accountIds || []) : [];
+      if (!existingIds.includes(accountId)) {
+        await setDoc(doc(db, "users", authUser.uid), { accountIds: [...existingIds, accountId] }, { merge: true });
+      }
+      await updateDoc(doc(db, "invites", inviteId), { used: true });
+      setClaimData(null);
+      setSelectedAccountId(accountId);
+    } catch (err) { console.error("Error al unirse a la cuenta:", err); }
+  };
 
   useEffect(() => { return onAuthStateChanged(auth, user => setAuthUser(user || null)); }, []);
   useEffect(() => { if (!authUser) return; return onSnapshot(doc(db, "users", authUser.uid), snap => { setUserProfile(snap.exists() ? snap.data() : null); }); }, [authUser]);
@@ -737,9 +887,16 @@ function AppInner() {
     }}>
       <style>{`
         ${FONT_IMPORT}
-        * { box-sizing: border-box; }
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body, #root {
+          width: 100%; min-height: 100dvh; margin: 0; padding: 0;
+          font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+        }
+        body { -webkit-font-smoothing: antialiased; }
+        input, button, select, textarea {
+          font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+        }
         ::-webkit-scrollbar { display: none; }
-        html, body, #root { width: 100%; min-height: 100dvh; margin: 0; padding: 0; }
       `}</style>
 
       {/* Header fijo */}
@@ -805,6 +962,14 @@ function AppInner() {
       {editingExpense && <EditExpenseModal expense={editingExpense} members={members} onClose={() => setEditingExpense(null)} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
       {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
+      {claimData && (
+        <ClaimIdentityModal
+          claimData={claimData}
+          colors={colors}
+          onClaim={(labelId) => finishJoinAccount({ inviteId: claimData.inviteId, accountId: claimData.accountId, accountData: claimData.accountData, claimedLabelId: labelId })}
+          onSkip={() => finishJoinAccount({ inviteId: claimData.inviteId, accountId: claimData.accountId, accountData: claimData.accountData, claimedLabelId: null })}
+        />
+      )}
     </div>
   );
 }

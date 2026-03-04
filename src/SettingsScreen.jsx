@@ -234,7 +234,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const personalFixed = fixedExpenses.filter(f => !f.shared);
 
   return (
-    <div style={{ padding: "16px 20px", paddingTop: 90, fontFamily: FONT, background: colors.bg, minHeight: "100vh" }}>
+    <div style={{ padding: "16px 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT, background: colors.bg, minHeight: "100vh" }}>
 
       {/* MI PERFIL */}
       <SectionHeader title="Mi Perfil" colors={colors} />
@@ -408,18 +408,6 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           </button>
         </div>
       </div>
-
-      {/* COMPARTIR */}
-      <SectionHeader title="Compartir" colors={colors} />
-      <SettingRow colors={colors} icon="📤" label="Compartir X-penses" value="Invitá a otros a usar la app" onPress={() => setShowShareApp(true)} />
-
-      {/* CUENTAS */}
-      <SectionHeader title="Cuentas" colors={colors} />
-      <SettingRow colors={colors} icon="🔀" label="Cambiar de cuenta" value="Crear o seleccionar otra cuenta" onPress={onSwitchAccount} />
-
-      {/* SESIÓN */}
-      <SectionHeader title="Sesión" colors={colors} />
-      <SettingRow colors={colors} icon="🚪" label="Cerrar sesión" danger onPress={onSignOut} />
 
       <div style={{ height: 100 }} />
 
