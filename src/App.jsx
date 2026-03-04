@@ -9,9 +9,9 @@ import SettingsScreen from "./SettingsScreen";
 import AccountSelectorScreen from "./AccountSelectorScreen";
 import WelcomeScreen from "./WelcomeScreen";
 import EditExpenseModal from "./EditExpenseModal";
+import DateInput from "./DateInput";
 import { NotifProvider, useNotif, NotifCenter, NOTIF_TYPES } from "./notifications";
 import { useTheme, formatAmount, CURRENCIES } from "./theme.jsx";
-import DateInput from "./DateInput";
 
 const SF = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
 
@@ -115,6 +115,65 @@ function Spinner({ text = "Cargando..." }) {
   return <div style={{ textAlign: "center", padding: 60, color: colors.textMuted, fontSize: 14, fontFamily: SF }}>{text}</div>;
 }
 
+// ── MENU PANEL ──
+function MenuPanel({ onClose, currentUser, userProfile, members, account, onSignOut, onSwitchAccount, isDark, onToggleTheme, colors }) {
+  const me = members?.find(m => m.uid === currentUser?.uid);
+  const meColor = me?.color || "#4F7FFA";
+
+  const handleShare = () => {
+    const url = window.location.origin;
+    if (navigator.share) {
+      navigator.share({ title: "X-penses", text: "Llevá tus gastos compartidos con X-penses 💸", url });
+    } else {
+      navigator.clipboard.writeText(url);
+      alert("¡Link copiado!");
+    }
+  };
+
+  const rows = [
+    { icon: "🔀", label: "Cambiar de cuenta", sub: account?.name || "", action: () => { onClose(); onSwitchAccount(); } },
+    { icon: "📤", label: "Compartir X-penses", sub: "Invitá a otros a usar la app", action: () => { onClose(); handleShare(); } },
+    { icon: isDark ? "☀️" : "🌙", label: isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro", sub: "Tema de la app", action: () => { onToggleTheme(); onClose(); } },
+    { icon: "🚪", label: "Cerrar sesión", sub: "", action: () => { onClose(); onSignOut(); }, danger: true },
+  ];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
+      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 500, margin: "0 auto", padding: "20px 20px calc(32px + env(safe-area-inset-bottom))", fontFamily: SF }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", background: colors.pill, borderRadius: 18, marginBottom: 16 }}>
+          {currentUser?.photoURL
+            ? <img src={currentUser.photoURL} style={{ width: 48, height: 48, borderRadius: 24, border: `2px solid ${meColor}` }} alt="" />
+            : <div style={{ width: 48, height: 48, borderRadius: 24, background: meColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
+          <div>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text }}>{userProfile?.name || currentUser?.displayName}</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted }}>{currentUser?.email}</p>
+          </div>
+        </div>
+        <div style={{ padding: "10px 16px", background: "#4F7FFA11", borderRadius: 14, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20 }}>{account?.type === "shared" ? "👥" : "👤"}</span>
+          <div>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#4F7FFA" }}>{account?.name}</p>
+            <p style={{ margin: 0, fontSize: 11, color: colors.textMuted }}>{account?.type === "shared" ? "Cuenta compartida" : "Cuenta personal"}</p>
+          </div>
+        </div>
+        {rows.map((r, i) => (
+          <button key={i} onClick={r.action} style={{ width: "100%", background: "none", border: "none", borderRadius: 14, padding: "13px 16px", marginBottom: 4, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", fontFamily: SF, textAlign: "left" }}>
+            <span style={{ fontSize: 22, width: 32 }}>{r.icon}</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: r.danger ? colors.danger : colors.text }}>{r.label}</p>
+              {r.sub && <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted }}>{r.sub}</p>}
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── ADD EXPENSE MODAL ──
 function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, customCategories }) {
   const { colors } = useTheme();
   const otherMember = members?.find(m => m.uid !== currentUser.uid);
@@ -175,6 +234,7 @@ function AddExpenseModal({ onClose, onAdd, currentUser, members, currency, custo
   );
 }
 
+// ── HOME SCREEN ──
 function HomeScreen({ expenses, currentUser, members, account, currentMonth, customCategories }) {
   const { colors } = useTheme();
   const currency = account?.currency || "ARS";
@@ -183,10 +243,10 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
   const meColor = me?.color || "#4F7FFA";
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const monthExp = expenses.filter(e => e.month === currentMonth);
-  const sharedExp = monthExp.filter(e => e.type !== "Para mí");
+  const sharedExp = monthExp.filter(e => e.type !== "mio");
   const saldos = calcSaldos(sharedExp, members, account?.divisionSystem);
   const myBalance = saldos[currentUser.uid]?.balance || 0;
-  const myPersonalTotal = monthExp.filter(e => e.type === "Para mí" && e.owner === currentUser.uid).reduce((s, e) => s + e.amount, 0);
+  const myPersonalTotal = monthExp.filter(e => e.type === "mio" && e.owner === currentUser.uid).reduce((s, e) => s + e.amount, 0);
   const recent = [...monthExp].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
   const catTotals = allCategories.map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total).slice(0, 4);
   const monthLabel = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
@@ -238,7 +298,7 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15, color: colors.text }}>{fmt(e.amount)}</p>
-                  <Tag color={e.type==="hogar"?"#4F7FFA":e.type==="personal"?"#FA4F7F":e.type==="extraordinary"?"#f39c12":"#2ecc71"}>{e.type==="hogar"?"Hogar":e.type==="personal"?"Para otro":e.type==="extraordinary"?"Extra":"Mío"}</Tag>
+                  <Tag color={e.type==="hogar"?"#4F7FFA":e.type==="personal"?"#FA4F7F":e.type==="extraordinary"?"#f39c12":"#2ecc71"}>{e.type==="hogar"?"Hogar":e.type==="personal"?"Para otro":e.type==="extraordinary"?"Extraordinario":"Para mí"}</Tag>
                 </div>
               </div>
             </Card>
@@ -250,6 +310,7 @@ function HomeScreen({ expenses, currentUser, members, account, currentMonth, cus
   );
 }
 
+// ── GASTOS SCREEN ──
 function GastosScreen({ expenses, members, currentMonth, onEdit, onDelete, account, customCategories }) {
   const { colors } = useTheme();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
@@ -262,20 +323,20 @@ function GastosScreen({ expenses, members, currentMonth, onEdit, onDelete, accou
     <div style={{ padding: "0 20px", fontFamily: SF }}>
       <SectionTitle>Todos los gastos</SectionTitle>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-        {[["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","✈️"],["Para mí","👤"]].map(([val, lbl]) => (
+        {[["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","✈️"],["mio","👤"]].map(([val, lbl]) => (
           <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: SF, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
         ))}
       </div>
       {sorted.length === 0 && <Card style={{ textAlign: "center", color: colors.textMuted, padding: 32 }}><p style={{ fontSize: 32, margin: "0 0 8px" }}>📭</p><p style={{ margin: 0 }}>Sin gastos</p></Card>}
       {sorted.map(e => {
         const cat = allCategories.find(c => c.id === e.category);
-        const who = e.type === "Para mí" ? members?.find(m=>m.uid===e.owner) : members?.find(m=>m.uid===e.paidBy);
+        const who = e.type === "mio" ? members?.find(m=>m.uid===e.owner) : members?.find(m=>m.uid===e.paidBy);
         return (
           <Card key={e.id} style={{ padding: "14px 16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
                 <span style={{ fontSize: 22 }}>{cat?.icon}</span>
-                <div><p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text }}>{e.concept}</p><p style={{ margin: "2px 0 4px", fontSize: 11, color: colors.textMuted }}>{e.date} · {who?.name}</p><Tag color={e.type==="hogar"?"#4F7FFA":e.type==="personal"?"#FA4F7F":e.type==="extraordinary"?"#f39c12":"#2ecc71"}>{e.type==="hogar"?"Hogar":e.type==="personal"?"Para otro":e.type==="extraordinary"?"Extra":"Mío"}</Tag></div>
+                <div><p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text }}>{e.concept}</p><p style={{ margin: "2px 0 4px", fontSize: 11, color: colors.textMuted }}>{e.date} · {who?.name}</p><Tag color={e.type==="hogar"?"#4F7FFA":e.type==="personal"?"#FA4F7F":e.type==="extraordinary"?"#f39c12":"#2ecc71"}>{e.type==="hogar"?"Hogar":e.type==="personal"?"Para otro":e.type==="extraordinary"?"Extraordinario":"Para mí"}</Tag></div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: colors.text }}>{fmt(e.amount)}</p>
@@ -293,13 +354,14 @@ function GastosScreen({ expenses, members, currentMonth, onEdit, onDelete, accou
   );
 }
 
+// ── MIS GASTOS SCREEN ──
 function MisGastosScreen({ expenses, currentUser, members, currentMonth, account, customCategories }) {
   const { colors } = useTheme();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const me = members?.find(m => m.uid === currentUser.uid);
   const meColor = me?.color || "#FA4F7F";
-  const myExp = expenses.filter(e => e.type === "Para mí" && e.owner === currentUser.uid && e.month === currentMonth);
+  const myExp = expenses.filter(e => e.type === "mio" && e.owner === currentUser.uid && e.month === currentMonth);
   const total = myExp.reduce((s, e) => s + e.amount, 0);
   const catTotals = allCategories.map((c, i) => ({ ...c, total: myExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0), color: CAT_COLORS[i % CAT_COLORS.length] })).filter(c => c.total > 0);
   return (
@@ -320,13 +382,27 @@ function MisGastosScreen({ expenses, currentUser, members, currentMonth, account
   );
 }
 
+// ── SALDOS SCREEN ──
 function SaldosScreen({ expenses, members, account, currentMonth }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
-  const monthExp = expenses.filter(e => e.month === currentMonth && e.type !== "Para mí");
+  const monthExp = expenses.filter(e => e.month === currentMonth && e.type !== "mio");
   const saldos = calcSaldos(monthExp, members, account?.divisionSystem);
   const [settled, setSettled] = useState(false);
+
+  if (account?.type === "personal") {
+    return (
+      <div style={{ padding: "0 20px", fontFamily: SF }}>
+        <SectionTitle>Saldos</SectionTitle>
+        <Card style={{ textAlign: "center", padding: 32 }}>
+          <p style={{ fontSize: 32, margin: "0 0 8px" }}>👤</p>
+          <p style={{ margin: 0, color: colors.textMuted, fontSize: 14 }}>Los saldos no están disponibles en cuentas personales</p>
+        </Card>
+      </div>
+    );
+  }
+
   const handleSettle = async () => {
     setSettled(true);
     const otherMembers = members?.filter(m => m.uid !== members[0]?.uid) || [];
@@ -340,19 +416,6 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
     if (!creditor || !debtor) return "¡Están al día! 🎉";
     return `${debtor.name} le debe ${fmt(Math.abs(debtor.balance))} a ${creditor.name}`;
   };
-  if (account?.type === "personal") {
-  return (
-    <div style={{ padding: "0 20px", fontFamily: SF }}>
-      <SectionTitle>Saldos</SectionTitle>
-      <Card style={{ textAlign: "center", padding: 32 }}>
-        <p style={{ fontSize: 32, margin: "0 0 8px" }}>👤</p>
-        <p style={{ margin: 0, color: colors.textMuted, fontSize: 14 }}>
-          Los saldos no están disponibles en cuentas personales
-        </p>
-      </Card>
-    </div>
-  );
-}
   return (
     <div style={{ padding: "0 20px", fontFamily: SF }}>
       <SectionTitle>Saldos del mes</SectionTitle>
@@ -391,6 +454,7 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
   );
 }
 
+// ── GRAFICOS SCREEN ──
 function GraficosScreen({ expenses, account }) {
   const { colors } = useTheme();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
@@ -417,8 +481,9 @@ function GraficosScreen({ expenses, account }) {
   );
 }
 
+// ── APP INNER ──
 function AppInner() {
-  const { colors } = useTheme();
+  const { colors, toggleTheme, isDark } = useTheme();
   const { unreadCount } = useNotif();
   const [authUser, setAuthUser] = useState(undefined);
   const [userProfile, setUserProfile] = useState(null);
@@ -430,6 +495,7 @@ function AppInner() {
   const [showAdd, setShowAdd] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [userAccounts, setUserAccounts] = useState([]);
   const [showWelcome, setShowWelcome] = useState(true);
@@ -482,7 +548,7 @@ function AppInner() {
   if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
   if (!selectedAccountId) return <AccountSelectorScreen user={authUser} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} />;
 
-return (
+  return (
     <div style={{
       width: "100%",
       maxWidth: 500,
@@ -500,16 +566,22 @@ return (
       <style>{`
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { display: none; }
-        html, body, #root {
-          width: 100%;
-          min-height: 100dvh;
-          margin: 0;
-          padding: 0;
-          background: ${colors.bg};
-        }
+        html, body, #root { width: 100%; min-height: 100dvh; margin: 0; padding: 0; }
       `}</style>
 
-      {/* Botón notificaciones */}
+      {/* Botón menú — arriba izquierda */}
+      <button onClick={() => setShowMenu(true)} style={{
+        position: "fixed", top: "calc(14px + env(safe-area-inset-top))", left: 14,
+        zIndex: 60, background: colors.card, border: `1px solid ${colors.cardBorder}`,
+        borderRadius: 20, width: 40, height: 40, display: "flex", alignItems: "center",
+        justifyContent: "center", cursor: "pointer", boxShadow: colors.shadow, overflow: "hidden", padding: 0
+      }}>
+        {authUser?.photoURL
+          ? <img src={authUser.photoURL} style={{ width: 40, height: 40, borderRadius: 20 }} alt="" />
+          : <span style={{ fontSize: 18 }}>👤</span>}
+      </button>
+
+      {/* Botón notificaciones — arriba derecha */}
       <button onClick={() => setShowNotifs(true)} style={{
         position: "fixed", top: "calc(14px + env(safe-area-inset-top))", right: 14,
         zIndex: 60, background: colors.card, border: `1px solid ${colors.cardBorder}`,
@@ -548,7 +620,7 @@ return (
         }}>+</button>
       )}
 
-      {/* Barra de navegación inferior */}
+      {/* Barra navegación inferior */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
         width: "100%", maxWidth: 500, margin: "0 auto",
@@ -565,9 +637,10 @@ return (
       </div>
 
       {/* Modales */}
-      {showAdd       && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} members={members} currency={account?.currency || "ARS"} customCategories={customCategories} />}
+      {showAdd        && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} members={members} currency={account?.currency || "ARS"} customCategories={customCategories} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={members} onClose={() => setEditingExpense(null)} />}
-      {showNotifs    && <NotifCenter onClose={() => setShowNotifs(false)} />}
+      {showNotifs     && <NotifCenter onClose={() => setShowNotifs(false)} />}
+      {showMenu       && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
     </div>
   );
 }

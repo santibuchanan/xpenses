@@ -3,15 +3,27 @@ import { createContext, useContext, useEffect, useState } from "react";
 const ThemeContext = createContext({});
 
 export function ThemeProvider({ children }) {
-  const [isDark, setIsDark] = useState(false);
+  const [systemDark, setSystemDark] = useState(false);
+  const [manualTheme, setManualTheme] = useState(null); // null = sigue el sistema
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    setIsDark(mq.matches);
-    const handler = (e) => setIsDark(e.matches);
+    setSystemDark(mq.matches);
+    const handler = (e) => setSystemDark(e.matches);
     mq.addEventListener("change", handler);
+    // Recuperar preferencia guardada
+    const saved = localStorage.getItem("xpenses-theme");
+    if (saved) setManualTheme(saved);
     return () => mq.removeEventListener("change", handler);
   }, []);
+
+  const isDark = manualTheme ? manualTheme === "dark" : systemDark;
+
+  const toggleTheme = () => {
+    const next = isDark ? "light" : "dark";
+    setManualTheme(next);
+    localStorage.setItem("xpenses-theme", next);
+  };
 
   const colors = isDark ? {
     bg: "#0f0f13",
@@ -60,7 +72,7 @@ export function ThemeProvider({ children }) {
   };
 
   return (
-    <ThemeContext.Provider value={{ isDark, colors }}>
+    <ThemeContext.Provider value={{ isDark, colors, toggleTheme }}>
       <div style={{ background: colors.bg, minHeight: "100vh" }}>
         {children}
       </div>
@@ -72,7 +84,6 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
-// Currency config
 export const CURRENCIES = {
   ARS: { symbol: "$", name: "Peso argentino", locale: "es-AR", code: "ARS" },
   USD: { symbol: "US$", name: "Dólar estadounidense", locale: "en-US", code: "USD" },
