@@ -468,11 +468,40 @@ function AppInner() {
   if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
   if (!selectedAccountId) return <AccountSelectorScreen user={authUser} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} />;
 
-  return (
-    <div style={{ maxWidth: 430, margin: "0 auto", background: colors.bg, minHeight: "100vh", position: "relative", fontFamily: SF }}>
-      <style>{`* { box-sizing: border-box; } ::-webkit-scrollbar { display: none; }`}</style>
+return (
+    <div style={{
+      width: "100%",
+      maxWidth: 500,
+      margin: "0 auto",
+      background: colors.bg,
+      minHeight: "100dvh",
+      position: "relative",
+      fontFamily: SF,
+      paddingTop: "env(safe-area-inset-top)",
+      paddingLeft: "env(safe-area-inset-left)",
+      paddingRight: "env(safe-area-inset-right)",
+      boxSizing: "border-box",
+      overflowX: "hidden",
+    }}>
+      <style>{`
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { display: none; }
+        html, body, #root {
+          width: 100%;
+          min-height: 100dvh;
+          margin: 0;
+          padding: 0;
+          background: ${colors.bg};
+        }
+      `}</style>
 
-      <button onClick={() => setShowNotifs(true)} style={{ position: "fixed", top: 14, right: "calc(50% - 215px + 14px)", zIndex: 60, background: colors.card, border: `1px solid ${colors.cardBorder}`, borderRadius: 20, width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: colors.shadow }}>
+      {/* Botón notificaciones */}
+      <button onClick={() => setShowNotifs(true)} style={{
+        position: "fixed", top: "calc(14px + env(safe-area-inset-top))", right: 14,
+        zIndex: 60, background: colors.card, border: `1px solid ${colors.cardBorder}`,
+        borderRadius: 20, width: 40, height: 40, display: "flex", alignItems: "center",
+        justifyContent: "center", cursor: "pointer", boxShadow: colors.shadow
+      }}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
         </svg>
@@ -483,20 +512,36 @@ function AppInner() {
         )}
       </button>
 
-      <div style={{ paddingBottom: 80, minHeight: "100vh" }}>
-        {tab === "home" && <HomeScreen expenses={expenses} currentUser={authUser} members={members} account={account} currentMonth={currentMonth} customCategories={customCategories} />}
-        {tab === "gastos" && <GastosScreen expenses={expenses} members={members} currentMonth={currentMonth} onEdit={setEditingExpense} onDelete={deleteExpense} account={account} customCategories={customCategories} />}
+      {/* Contenido principal */}
+      <div style={{ paddingBottom: 80, minHeight: "100dvh" }}>
+        {tab === "home"      && <HomeScreen expenses={expenses} currentUser={authUser} members={members} account={account} currentMonth={currentMonth} customCategories={customCategories} />}
+        {tab === "gastos"    && <GastosScreen expenses={expenses} members={members} currentMonth={currentMonth} onEdit={setEditingExpense} onDelete={deleteExpense} account={account} customCategories={customCategories} />}
         {tab === "misgastos" && <MisGastosScreen expenses={expenses} currentUser={authUser} members={members} currentMonth={currentMonth} account={account} customCategories={customCategories} />}
-        {tab === "saldos" && <SaldosScreen expenses={expenses} members={members} account={account} currentMonth={currentMonth} />}
-        {tab === "graficos" && <GraficosScreen expenses={expenses} account={account} />}
-        {tab === "ajustes" && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
+        {tab === "saldos"    && <SaldosScreen expenses={expenses} members={members} account={account} currentMonth={currentMonth} />}
+        {tab === "graficos"  && <GraficosScreen expenses={expenses} account={account} />}
+        {tab === "ajustes"   && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
       </div>
 
+      {/* Botón + agregar gasto */}
       {tab !== "ajustes" && (
-        <button onClick={() => setShowAdd(true)} style={{ position: "fixed", bottom: 88, right: "calc(50% - 215px + 16px)", width: 54, height: 54, borderRadius: 27, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", border: "none", color: "#fff", fontSize: 28, cursor: "pointer", boxShadow: "0 4px 20px #4F7FFA77", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>+</button>
+        <button onClick={() => setShowAdd(true)} style={{
+          position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom))", right: 16,
+          width: 54, height: 54, borderRadius: 27,
+          background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)",
+          border: "none", color: "#fff", fontSize: 28, cursor: "pointer",
+          boxShadow: "0 4px 20px #4F7FFA77",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50
+        }}>+</button>
       )}
 
-      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, background: colors.navBg, borderTop: `1px solid ${colors.navBorder}`, display: "flex", padding: "10px 0 20px", zIndex: 40, boxShadow: "0 -4px 20px rgba(0,0,0,0.08)" }}>
+      {/* Barra de navegación inferior */}
+      <div style={{
+        position: "fixed", bottom: 0, left: 0, right: 0,
+        width: "100%", maxWidth: 500, margin: "0 auto",
+        background: colors.navBg, borderTop: `1px solid ${colors.navBorder}`,
+        display: "flex", padding: `10px 0 calc(20px + env(safe-area-inset-bottom))`,
+        zIndex: 40, boxShadow: "0 -4px 20px rgba(0,0,0,0.08)"
+      }}>
         {NAV.map(n => (
           <button key={n.id} onClick={() => setTab(n.id)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: SF, padding: "2px 0" }}>
             {NAV_ICONS[n.id]?.(tab === n.id, "#4F7FFA")}
@@ -505,9 +550,10 @@ function AppInner() {
         ))}
       </div>
 
-      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} members={members} currency={account?.currency || "ARS"} customCategories={customCategories} />}
+      {/* Modales */}
+      {showAdd       && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} members={members} currency={account?.currency || "ARS"} customCategories={customCategories} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={members} onClose={() => setEditingExpense(null)} />}
-      {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
+      {showNotifs    && <NotifCenter onClose={() => setShowNotifs(false)} />}
     </div>
   );
 }
