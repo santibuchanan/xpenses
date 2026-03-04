@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
-import DateInput from "./DateInput";
 
 const SF = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
 const CURRENCIES = ["ARS", "USD", "EUR"];
@@ -112,9 +111,7 @@ function FixedExpenseModal({ expense, onSave, onClose, colors }) {
         <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase" }}>Monto</p>
         <input type="number" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0" style={inputStyle} />
         <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase" }}>Día de vencimiento (opcional)</p>
-        <input type="number" value={form.dueDay} onChange={e => set("dueDay", e.target.value)} 
-  placeholder="Ej: 10" min="1" max="31" style={inputStyle}
-  inputMode="numeric" />
+        <input type="number" value={form.dueDay} onChange={e => set("dueDay", e.target.value)} placeholder="Ej: 10" min="1" max="31" style={inputStyle} />
         <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 8, letterSpacing: 0.6, textTransform: "uppercase" }}>Tipo</p>
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           {[[true,"🏠 Hogar"],[false,"👤 Personal"]].map(([val, lbl]) => (
@@ -276,53 +273,83 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       ))}
       <SettingRow colors={colors} icon="🔗" label="Invitar a la cuenta" value="Compartí un link para que se unan" onPress={generateInvite} />
 
-      {/* GASTOS FIJOS — HOGAR */}
-      <SectionHeader title="Gastos Fijos del Hogar" colors={colors} />
-      <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: SF }}>Expensas, servicios, alquiler y todo lo que se repite cada mes</p>
-      {sharedFixed.length === 0 && (
-        <div style={{ ...cardStyle, textAlign: "center", color: colors.textMuted, padding: 24 }}>
-          <p style={{ fontSize: 28, margin: "0 0 6px" }}>🏠</p>
-          <p style={{ margin: 0, fontSize: 13 }}>Sin gastos fijos del hogar</p>
-        </div>
-      )}
-      {sharedFixed.map(f => (
-        <div key={f.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 14, background: "#4F7FFA14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🏠</div>
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text }}>{f.name}</p>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted }}>${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}</p>
-          </div>
-          <button onClick={() => setEditingFixed(f)} style={{ background: "#4F7FFA11", border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: "#4F7FFA", cursor: "pointer", fontFamily: SF }}>✏️</button>
-          <button onClick={() => handleDeleteFixed(f.id)} style={{ background: colors.dangerBg, border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: colors.danger, cursor: "pointer", fontFamily: SF }}>✕</button>
-        </div>
-      ))}
-      <button onClick={() => setShowNewFixed("hogar")} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, border: `2px dashed #4F7FFA`, color: "#4F7FFA", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: SF, marginBottom: 8 }}>
-        + Agregar gasto fijo del hogar
-      </button>
+      {/* GASTOS FIJOS */}
+      {account?.type === "personal" ? (
+        <>
+          <SectionHeader title="Mis Gastos Fijos" colors={colors} />
+          <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: SF }}>Gastos que se repiten cada mes</p>
+          {fixedExpenses.length === 0 && (
+            <div style={{ ...cardStyle, textAlign: "center", color: colors.textMuted, padding: 24 }}>
+              <p style={{ fontSize: 28, margin: "0 0 6px" }}>📋</p>
+              <p style={{ margin: 0, fontSize: 13 }}>Sin gastos fijos</p>
+            </div>
+          )}
+          {fixedExpenses.map(f => (
+            <div key={f.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 14, background: "#4F7FFA14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>📋</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text }}>{f.name}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted }}>${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}</p>
+              </div>
+              <button onClick={() => setEditingFixed(f)} style={{ background: "#4F7FFA11", border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: "#4F7FFA", cursor: "pointer", fontFamily: SF }}>✏️</button>
+              <button onClick={() => handleDeleteFixed(f.id)} style={{ background: colors.dangerBg, border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: colors.danger, cursor: "pointer", fontFamily: SF }}>✕</button>
+            </div>
+          ))}
+          <button onClick={() => setShowNewFixed("personal")} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, border: `2px dashed #4F7FFA`, color: "#4F7FFA", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: SF, marginBottom: 8 }}>
+            + Agregar gasto fijo
+          </button>
+        </>
+      ) : (
+        <>
+          {/* GASTOS FIJOS — HOGAR */}
+          <SectionHeader title="Gastos Fijos del Hogar" colors={colors} />
+          <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: SF }}>Expensas, servicios, alquiler y todo lo que se repite cada mes</p>
+          {sharedFixed.length === 0 && (
+            <div style={{ ...cardStyle, textAlign: "center", color: colors.textMuted, padding: 24 }}>
+              <p style={{ fontSize: 28, margin: "0 0 6px" }}>🏠</p>
+              <p style={{ margin: 0, fontSize: 13 }}>Sin gastos fijos del hogar</p>
+            </div>
+          )}
+          {sharedFixed.map(f => (
+            <div key={f.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 14, background: "#4F7FFA14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🏠</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text }}>{f.name}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted }}>${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}</p>
+              </div>
+              <button onClick={() => setEditingFixed(f)} style={{ background: "#4F7FFA11", border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: "#4F7FFA", cursor: "pointer", fontFamily: SF }}>✏️</button>
+              <button onClick={() => handleDeleteFixed(f.id)} style={{ background: colors.dangerBg, border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: colors.danger, cursor: "pointer", fontFamily: SF }}>✕</button>
+            </div>
+          ))}
+          <button onClick={() => setShowNewFixed("hogar")} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, border: `2px dashed #4F7FFA`, color: "#4F7FFA", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: SF, marginBottom: 8 }}>
+            + Agregar gasto fijo del hogar
+          </button>
 
-      {/* GASTOS FIJOS — PERSONALES */}
-      <SectionHeader title="Mis Gastos Fijos" colors={colors} />
-      <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: SF }}>Agrega tus gastos fijos personales</p>
-      {personalFixed.length === 0 && (
-        <div style={{ ...cardStyle, textAlign: "center", color: colors.textMuted, padding: 24 }}>
-          <p style={{ fontSize: 28, margin: "0 0 6px" }}>👤</p>
-          <p style={{ margin: 0, fontSize: 13 }}>Sin gastos fijos personales</p>
-        </div>
+          {/* GASTOS FIJOS — PERSONALES */}
+          <SectionHeader title="Mis Gastos Fijos" colors={colors} />
+          <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: SF }}>Agrega tus gastos fijos personales</p>
+          {personalFixed.length === 0 && (
+            <div style={{ ...cardStyle, textAlign: "center", color: colors.textMuted, padding: 24 }}>
+              <p style={{ fontSize: 28, margin: "0 0 6px" }}>👤</p>
+              <p style={{ margin: 0, fontSize: 13 }}>Sin gastos fijos personales</p>
+            </div>
+          )}
+          {personalFixed.map(f => (
+            <div key={f.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 14, background: "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>👤</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text }}>{f.name}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted }}>${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}</p>
+              </div>
+              <button onClick={() => setEditingFixed(f)} style={{ background: "#4F7FFA11", border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: "#4F7FFA", cursor: "pointer", fontFamily: SF }}>✏️</button>
+              <button onClick={() => handleDeleteFixed(f.id)} style={{ background: colors.dangerBg, border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: colors.danger, cursor: "pointer", fontFamily: SF }}>✕</button>
+            </div>
+          ))}
+          <button onClick={() => setShowNewFixed("personal")} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, border: `2px dashed #FA4F7F`, color: "#FA4F7F", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: SF, marginBottom: 8 }}>
+            + Agregar gasto fijo personal
+          </button>
+        </>
       )}
-      {personalFixed.map(f => (
-        <div key={f.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 14, background: "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>👤</div>
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text }}>{f.name}</p>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted }}>${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}</p>
-          </div>
-          <button onClick={() => setEditingFixed(f)} style={{ background: "#4F7FFA11", border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: "#4F7FFA", cursor: "pointer", fontFamily: SF }}>✏️</button>
-          <button onClick={() => handleDeleteFixed(f.id)} style={{ background: colors.dangerBg, border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: colors.danger, cursor: "pointer", fontFamily: SF }}>✕</button>
-        </div>
-      ))}
-      <button onClick={() => setShowNewFixed("personal")} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, border: `2px dashed #FA4F7F`, color: "#FA4F7F", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: SF, marginBottom: 8 }}>
-        + Agregar gasto fijo personal
-      </button>
 
       {/* CATEGORÍAS */}
       <SectionHeader title="Categorías" colors={colors} />

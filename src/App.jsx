@@ -340,6 +340,19 @@ function SaldosScreen({ expenses, members, account, currentMonth }) {
     if (!creditor || !debtor) return "¡Están al día! 🎉";
     return `${debtor.name} le debe ${fmt(Math.abs(debtor.balance))} a ${creditor.name}`;
   };
+  if (account?.type === "personal") {
+  return (
+    <div style={{ padding: "0 20px", fontFamily: SF }}>
+      <SectionTitle>Saldos</SectionTitle>
+      <Card style={{ textAlign: "center", padding: 32 }}>
+        <p style={{ fontSize: 32, margin: "0 0 8px" }}>👤</p>
+        <p style={{ margin: 0, color: colors.textMuted, fontSize: 14 }}>
+          Los saldos no están disponibles en cuentas personales
+        </p>
+      </Card>
+    </div>
+  );
+}
   return (
     <div style={{ padding: "0 20px", fontFamily: SF }}>
       <SectionTitle>Saldos del mes</SectionTitle>
