@@ -272,7 +272,14 @@ function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, cu
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const currSymbol = CURRENCIES[currency]?.symbol || "$";
-  const setType = (t) => { setForm(f => ({ ...f, type: t, forWhom: (t === "hogar" || t === "extraordinary") ? memberList.map(m => m.uid) : [] })); };
+  const setType = (t) => {
+    setForm(f => ({
+      ...f, type: t,
+      forWhom: (t === "hogar" || t === "extraordinary") ? memberList.map(m => m.uid) : [],
+      // Si es "Para mí", el owner siempre soy yo
+      owner: t === "mio" ? currentUser.uid : f.owner,
+    }));
+  };
   const toggleForWhom = (uid) => { setForm(f => { const cur = f.forWhom || []; return { ...f, forWhom: cur.includes(uid) ? cur.filter(u => u !== uid) : [...cur, uid] }; }); };
   const sheetRef = useRef(null);
   const startY = useRef(null);
@@ -296,7 +303,7 @@ function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, cu
   const types = [["hogar","🏠 Hogar"],["personal","🎁 Para otro"],["extraordinary","✈️ Extraordinario"],["mio","👤 Para mí"]];
   const showPaidBy  = !isPersonal && form.type !== "mio" && memberList.length > 0;
   const showForWhom = !isPersonal && (form.type === "personal" || form.type === "extraordinary" || form.type === "hogar") && memberList.length > 0;
-  const showOwner   = !isPersonal && form.type === "mio" && memberList.length > 0;
+  // "Para mí" → owner = currentUser automático, no se muestra selector
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
       <div ref={sheetRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
@@ -351,16 +358,6 @@ function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, cu
                 const sel = form.forWhom?.includes(m.uid);
                 return <button key={m.uid} onClick={() => toggleForWhom(m.uid)} style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: sel ? (m.color || "#4F7FFA") : colors.inputBorder, background: sel ? (m.color || "#4F7FFA") + "18" : colors.input, color: sel ? (m.color || "#4F7FFA") : colors.textMuted }}>{m.name}</button>;
               })}
-            </div>
-          </>
-        )}
-        {showOwner && (
-          <>
-            <p style={labelStyle}>¿De quién?</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {memberList.map(m => (
-                <button key={m.uid} onClick={() => set("owner", m.uid)} style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.owner === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder, background: form.owner === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input, color: form.owner === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>{m.name}</button>
-              ))}
             </div>
           </>
         )}
@@ -707,7 +704,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
                 {!isPersonal && sharedFixed.length > 0 && (
                   <>
                     <button onClick={() => setFixedSharedExpanded(v => !v)} style={{ width: "100%", background: colors.pill, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 14, marginBottom: 6, fontFamily: FONT }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", fontFamily: FONT }}>🏠 Gastos fijos del Hogar</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#4F7FFA", fontFamily: FONT }}>🏠 Gastos fijos del Hogar</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(sharedFixed.reduce((s, f) => s + (f.amount || 0), 0))}</span>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedSharedExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
@@ -723,7 +720,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
                 {!isPersonal && personalFixed.length > 0 && (
                   <>
                     <button onClick={() => setFixedPersonalExpanded(v => !v)} style={{ width: "100%", background: colors.pill, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 14, marginBottom: 6, fontFamily: FONT }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", fontFamily: FONT }}>👤 Gastos fijos Personales</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#FA4F7F", fontFamily: FONT }}>👤 Gastos fijos Personales</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(personalFixed.reduce((s, f) => s + (f.amount || 0), 0))}</span>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedPersonalExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
