@@ -94,8 +94,14 @@ function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMon
     }
     if (e.type === "personal") {
       if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
-      const targets = Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []);
-      targets.forEach(uid => { if (result[uid] !== undefined) result[uid].owes += e.amount / (targets.length || 1); });
+      const targets = (Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []))
+        .filter(uid => result[uid] !== undefined); // solo uids que existen en members
+      if (targets.length > 0) {
+        targets.forEach(uid => { result[uid].owes += e.amount / targets.length; });
+      } else if (result[e.paidBy] !== undefined) {
+        // fallback: si no hay destinatario válido, imputar al pagador para no romper el balance
+        result[e.paidBy].owes += e.amount;
+      }
     }
     if (e.type === "extraordinary") {
       members.forEach(m => {
@@ -406,7 +412,7 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
 }
 
 // ── SWIPEABLE EXPENSE ROW ──
-function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, onEdit, onDelete, isPersonal }) {
+function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, onEdit, onDelete, isPersonal, currentUser }) {
   const [offsetX, setOffsetX] = useState(0);
   const startX = useRef(null);
   const EDIT_W = 64, DEL_W = 64, TOTAL = EDIT_W + DEL_W + 8;
@@ -414,9 +420,44 @@ function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, on
   const onTouchMove = (ev) => { if (startX.current === null) return; const dx = startX.current - ev.touches[0].clientX; if (dx > 0) setOffsetX(Math.min(dx, TOTAL + 16)); };
   const onTouchEnd = () => { if (offsetX > TOTAL / 2) setOffsetX(TOTAL); else setOffsetX(0); startX.current = null; };
   const cat = allCategories.find(c => c.id === e.category);
-  const who = e.type === "mio" ? allMembers?.find(m => m.uid === e.owner) : allMembers?.find(m => m.uid === e.paidBy);
-  const typeColor = e.type === "hogar" ? "#4F7FFA" : e.type === "personal" ? "#FA4F7F" : e.type === "extraordinary" ? "#f39c12" : "#2ecc71";
-  const typeLabel = e.type === "hogar" ? "Hogar" : e.type === "personal" ? "Para otro" : e.type === "extraordinary" ? "Extraordinario" : "Para mí";
+
+  // Quién pagó
+  const payer = allMembers?.find(m => m.uid === e.paidBy);
+  // Dueño para "Para mí"
+  const owner = allMembers?.find(m => m.uid === e.owner);
+  // Destinatarios para "Para otro"
+  const forWhomUids = Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []);
+  const forWhomNames = forWhomUids.map(uid => allMembers?.find(m => m.uid === uid)?.name).filter(Boolean);
+
+  // Etiqueta dinámica según tipo y quién mira
+  const getTypeLabel = () => {
+    if (e.type === "hogar") return { label: "Hogar", color: "#4F7FFA" };
+    if (e.type === "extraordinary") return { label: "Extraordinario", color: "#f39c12" };
+    if (e.type === "mio") {
+      // Si el dueño soy yo → "Para mí", si es otro → "Para {nombre}"
+      const ownerName = owner?.name || "?";
+      const isMine = e.owner === currentUser?.uid;
+      return { label: isMine ? "Para mí" : `Para ${ownerName}`, color: "#2ecc71" };
+    }
+    if (e.type === "personal") {
+      // Quien pagó ve "Para {destinatarios}"
+      // Destinatario ve "Pagó {pagador} para {destinatarios}"
+      const isInForWhom = forWhomUids.includes(currentUser?.uid);
+      const isPayer = e.paidBy === currentUser?.uid;
+      const destStr = forWhomNames.join(" y ") || "?";
+      const payerName = payer?.name || "?";
+      if (isPayer) return { label: `Para ${destStr}`, color: "#FA4F7F" };
+      if (isInForWhom) return { label: `Pagó ${payerName} para ${destStr}`, color: "#FA4F7F" };
+      return { label: `Para ${destStr}`, color: "#FA4F7F" };
+    }
+    return { label: e.type, color: "#aaa" };
+  };
+
+  const { label: typeLabel, color: typeColor } = getTypeLabel();
+
+  // Línea de subtítulo: fecha + quién pagó (para hogar/extraordinario)
+  const who = (e.type === "hogar" || e.type === "extraordinary") ? payer : null;
+
   return (
     <div style={{ position: "relative", marginBottom: 10, borderRadius: 20, overflow: "hidden" }}>
       <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, display: "flex", gap: 8, padding: "0 4px", alignItems: "center" }}>
@@ -434,7 +475,9 @@ function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, on
             <span style={{ fontSize: 22, flexShrink: 0 }}>{cat?.icon || "📦"}</span>
             <div>
               <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{e.concept}</p>
-              <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(e.date)}{who ? ` · ${who.name}` : ""}</p>
+              <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>
+                {fmtDate(e.date)}{who ? ` · ${who.name}` : ""}
+              </p>
               {!isPersonal && <Tag color={typeColor}>{typeLabel}</Tag>}
             </div>
           </div>
@@ -664,7 +707,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
                 {!isPersonal && sharedFixed.length > 0 && (
                   <>
                     <button onClick={() => setFixedSharedExpanded(v => !v)} style={{ width: "100%", background: colors.pill, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 14, marginBottom: 6, fontFamily: FONT }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#4F7FFA", fontFamily: FONT }}>🏠 Gastos fijos del Hogar</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", fontFamily: FONT }}>🏠 Gastos fijos del Hogar</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(sharedFixed.reduce((s, f) => s + (f.amount || 0), 0))}</span>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedSharedExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
@@ -680,7 +723,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
                 {!isPersonal && personalFixed.length > 0 && (
                   <>
                     <button onClick={() => setFixedPersonalExpanded(v => !v)} style={{ width: "100%", background: colors.pill, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 14, marginBottom: 6, fontFamily: FONT }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#FA4F7F", fontFamily: FONT }}>👤 Gastos fijos Personales</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", fontFamily: FONT }}>👤 Gastos fijos Personales</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(personalFixed.reduce((s, f) => s + (f.amount || 0), 0))}</span>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedPersonalExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
@@ -720,7 +763,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
           </Card>
         )}
         {sorted.map(e => (
-          <SwipeableExpenseRow key={e.id} e={e} allCategories={allCategories} allMembers={allMembers} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} isPersonal={isPersonal} />
+          <SwipeableExpenseRow key={e.id} e={e} allCategories={allCategories} allMembers={allMembers} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} isPersonal={isPersonal} currentUser={currentUser} />
         ))}
         <div style={{ height: 120 }} />
       </div>
@@ -1350,7 +1393,7 @@ function AppInner() {
       </div>
 
       {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={customCategories} isPersonal={isPersonal} />}
-      {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} onClose={() => setEditingExpense(null)} />}
+      {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={customCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
       {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
       {claimData && (
