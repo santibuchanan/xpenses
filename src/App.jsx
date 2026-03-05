@@ -426,31 +426,37 @@ function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, on
   const forWhomUids = Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []);
   const forWhomNames = forWhomUids.map(uid => allMembers?.find(m => m.uid === uid)?.name).filter(Boolean);
 
-  // Etiqueta dinámica según tipo y quién mira
-  const getTypeLabel = () => {
+  // Etiqueta y tipo relativos al usuario que mira
+  const getTypeInfo = () => {
     if (e.type === "hogar") return { label: "Hogar", color: "#4F7FFA" };
     if (e.type === "extraordinary") return { label: "Extraordinario", color: "#f39c12" };
-    if (e.type === "mio") {
-      // Si el dueño soy yo → "Para mí", si es otro → "Para {nombre}"
-      const ownerName = owner?.name || "?";
-      const isMine = e.owner === currentUser?.uid;
-      return { label: isMine ? "Para mí" : `Para ${ownerName}`, color: "#2ecc71" };
+
+    // "mio" (Para mí) y "personal" (Para otro) son perspectiva-dependientes
+    // El owner/forWhom determina de quién es el gasto
+    const ownerUid  = e.type === "mio" ? e.owner : null;
+    const destUids  = e.type === "personal"
+      ? (Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []))
+      : (ownerUid ? [ownerUid] : []);
+
+    const iAmDest   = destUids.includes(currentUser?.uid);
+    const destNames = destUids.map(uid => {
+      if (uid === currentUser?.uid) return "mí";
+      return allMembers?.find(m => m.uid === uid)?.name || "?";
+    }).filter(Boolean);
+    const destStr   = destNames.length === 1 && destNames[0] === "mí"
+      ? "mí"
+      : destNames.join(" y ");
+
+    if (iAmDest) {
+      // Soy el destinatario → "Para mí"
+      return { label: "Para mí", color: "#2ecc71", perspectiveType: "mio" };
+    } else {
+      // No soy el destinatario → "Para {nombre/s}"
+      return { label: `Para ${destStr || "?"}`, color: "#FA4F7F", perspectiveType: "personal" };
     }
-    if (e.type === "personal") {
-      // Quien pagó ve "Para {destinatarios}"
-      // Destinatario ve "Pagó {pagador} para {destinatarios}"
-      const isInForWhom = forWhomUids.includes(currentUser?.uid);
-      const isPayer = e.paidBy === currentUser?.uid;
-      const destStr = forWhomNames.join(" y ") || "?";
-      const payerName = payer?.name || "?";
-      if (isPayer) return { label: `Para ${destStr}`, color: "#FA4F7F" };
-      if (isInForWhom) return { label: `Pagó ${payerName} para ${destStr}`, color: "#FA4F7F" };
-      return { label: `Para ${destStr}`, color: "#FA4F7F" };
-    }
-    return { label: e.type, color: "#aaa" };
   };
 
-  const { label: typeLabel, color: typeColor } = getTypeLabel();
+  const { label: typeLabel, color: typeColor } = getTypeInfo();
 
   // Línea de subtítulo: fecha + quién pagó (para hogar/extraordinario)
   const who = (e.type === "hogar" || e.type === "extraordinary") ? payer : null;

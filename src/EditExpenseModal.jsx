@@ -17,20 +17,43 @@ const DEFAULT_CATEGORIES = [
   { id: "otros",      label: "Otros",                  icon: "📦" },
 ];
 
+// Calcula el tipo desde la perspectiva del usuario que mira
+function getPerspectiveType(expense, currentUserUid) {
+  if (expense.type === "hogar" || expense.type === "extraordinary") return expense.type;
+  // Para "mio" y "personal": depende de si el usuario es el destinatario
+  const destUids = expense.type === "mio"
+    ? (expense.owner ? [expense.owner] : [])
+    : (Array.isArray(expense.forWhom) ? expense.forWhom : (expense.forWhom ? [expense.forWhom] : []));
+  const iAmDest = destUids.includes(currentUserUid);
+  return iAmDest ? "mio" : "personal";
+}
+
 export default function EditExpenseModal({ expense, members, customCategories, currentUser, onClose }) {
   const { colors } = useTheme();
   const profiles = members?.filter(m => !m._isLabel) || [];
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
 
+  // El tipo que ve el usuario es relativo a su perspectiva
+  const perspectiveType = getPerspectiveType(expense, currentUser?.uid);
+
+  // form guarda el tipo REAL (mio/personal), la perspectiva solo afecta lo que se muestra
   const [form, setForm]   = useState({ ...expense });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const setType = (t) => {
-    setForm(f => ({
-      ...f, type: t,
-      forWhom: (t === "hogar" || t === "extraordinary") ? profiles.map(m => m.uid) : f.forWhom || [],
-    }));
+  // Al cambiar tipo desde la UI (perspectiva), convertir a tipo real
+  const setTypeFromPerspective = (perspType) => {
+    if (perspType === "hogar" || perspType === "extraordinary") {
+      setForm(f => ({ ...f, type: perspType, forWhom: profiles.map(m => m.uid) }));
+      return;
+    }
+    if (perspType === "mio") {
+      // "Para mí" desde mi perspectiva → owner = currentUser
+      setForm(f => ({ ...f, type: "mio", owner: currentUser?.uid, forWhom: [] }));
+    } else {
+      // "Para otro" desde mi perspectiva → personal
+      setForm(f => ({ ...f, type: "personal", owner: null, forWhom: [] }));
+    }
   };
 
   const toggleForWhom = (uid) => {
@@ -73,16 +96,19 @@ export default function EditExpenseModal({ expense, members, customCategories, c
     marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT,
   };
 
+  // Tipo que se muestra en el selector (perspectiva del usuario)
+  const displayType = getPerspectiveType(form, currentUser?.uid);
+
   const types = [
-    ["hogar", "🏠 Hogar"],
-    ["personal", "🎁 Para otro"],
+    ["hogar",         "🏠 Hogar"],
+    ["personal",      "🎁 Para otro"],
     ["extraordinary", "✈️ Extra"],
-    ["mio", "👤 Para mí"],
+    ["mio",           "👤 Para mí"],
   ];
 
   const showPaidBy  = form.type !== "mio" && profiles.length > 0;
   const showForWhom = form.type === "personal" && profiles.length > 0;
-  const showOwner   = form.type === "mio" && profiles.length > 0;
+  // owner se asigna automáticamente, no se muestra selector
 
   const forWhomArr = Array.isArray(form.forWhom) ? form.forWhom : (form.forWhom ? [form.forWhom] : []);
 
@@ -95,15 +121,15 @@ export default function EditExpenseModal({ expense, members, customCategories, c
           <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
         </div>
 
-        {/* TIPO */}
+        {/* TIPO — muestra perspectiva del usuario */}
         <p style={labelStyle}>Tipo</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
           {types.map(([val, lbl]) => (
-            <button key={val} onClick={() => setType(val)}
+            <button key={val} onClick={() => setTypeFromPerspective(val)}
               style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                borderColor: form.type === val ? "#4F7FFA" : colors.inputBorder,
-                background: form.type === val ? "#4F7FFA11" : colors.input,
-                color: form.type === val ? "#4F7FFA" : colors.textMuted }}>
+                borderColor: displayType === val ? "#4F7FFA" : colors.inputBorder,
+                background: displayType === val ? "#4F7FFA11" : colors.input,
+                color: displayType === val ? "#4F7FFA" : colors.textMuted }}>
               {lbl}
             </button>
           ))}
@@ -173,24 +199,6 @@ export default function EditExpenseModal({ expense, members, customCategories, c
               })}
             </div>
             {forWhomArr.length === 0 && <p style={{ fontSize: 12, color: "#e74c3c", margin: "-10px 0 12px", fontFamily: FONT }}>Seleccioná al menos un destinatario</p>}
-          </>
-        )}
-
-        {/* DUEÑO (type=mio) */}
-        {showOwner && (
-          <>
-            <p style={labelStyle}>¿De quién?</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {profiles.map(p => (
-                <button key={p.uid} onClick={() => set("owner", p.uid)}
-                  style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                    borderColor: form.owner === p.uid ? (p.color || "#4F7FFA") : colors.inputBorder,
-                    background: form.owner === p.uid ? (p.color || "#4F7FFA") + "18" : colors.input,
-                    color: form.owner === p.uid ? (p.color || "#4F7FFA") : colors.textMuted }}>
-                  {p.name}
-                </button>
-              ))}
-            </div>
           </>
         )}
 
