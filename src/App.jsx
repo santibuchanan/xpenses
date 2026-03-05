@@ -856,7 +856,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
           </Card>
         )}
         {sorted.map(e => (
-          <SwipeableExpenseRow key={e.id} e={e} allCategories={allCategories} allMembers={allMembers} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} isPersonal={isPersonal} currentUser={currentUser} />
+          <SwipeableExpenseRow key={`${e.id}-${e.deleted ? "del" : "ok"}`} e={e} allCategories={allCategories} allMembers={allMembers} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} isPersonal={isPersonal} currentUser={currentUser} />
         ))}
         {/* Settlements del mes */}
         {!isPersonal && monthSettlements.map(s => {
@@ -1385,7 +1385,7 @@ function AppInner() {
     const q = query(collection(db, "expenses"), orderBy("date", "desc"));
     return onSnapshot(q, snap => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      console.log("snapshot expenses — deleted count:", data.filter(e => e.deleted).length);
+      console.log("snapshot expenses — deleted count:", data.filter(e => e.deleted).length, "at:", new Date().toISOString().slice(11,19));
       setExpenses(data);
     });
   }, [authUser]);
