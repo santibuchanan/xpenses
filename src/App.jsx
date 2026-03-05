@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, getDoc, updateDoc, setDoc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, getDoc, getDocs, updateDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -424,85 +424,111 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
 }
 
 // ── SWIPEABLE EXPENSE ROW ──
+// ── POPUP CONFIRMAR ELIMINACIÓN ──
+function DeleteConfirmPopup({ expense, fmt, allCategories, colors, onConfirm, onCancel }) {
+  const cat = allCategories?.find(c => c.id === expense.category);
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 14, background: "#e74c3c14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{cat?.icon || "📦"}</div>
+          <div>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{expense.concept}</p>
+            <p style={{ margin: "2px 0 0", fontSize: 13, color: colors.textMuted, fontFamily: FONT }}>{fmt(expense.amount)}</p>
+          </div>
+        </div>
+        <p style={{ fontSize: 15, color: colors.text, margin: "0 0 20px", fontFamily: FONT, lineHeight: 1.5 }}>¿Eliminás este gasto? Esta acción no se puede deshacer.</p>
+        <button onClick={onConfirm} style={{ width: "100%", padding: 15, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>🗑️ Eliminar</button>
+        <button onClick={onCancel} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+// ── SWIPEABLE EXPENSE ROW ──
+// Click → abre edición | Swipe parcial → peek rojo | Swipe total → popup eliminar
 function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, onEdit, onDelete, isPersonal, currentUser }) {
-  const [offsetX, setOffsetX] = useState(0);
-  const startX = useRef(null);
-  const EDIT_W = 64, DEL_W = 64, TOTAL = EDIT_W + DEL_W + 8;
-  const onTouchStart = (ev) => { startX.current = ev.touches[0].clientX; };
-  const onTouchMove = (ev) => { if (startX.current === null) return; const dx = startX.current - ev.touches[0].clientX; if (dx > 0) setOffsetX(Math.min(dx, TOTAL + 16)); };
-  const onTouchEnd = () => { if (offsetX > TOTAL / 2) setOffsetX(TOTAL); else setOffsetX(0); startX.current = null; };
+  const [offsetX, setOffsetX]       = useState(0);
+  const [showDelete, setShowDelete] = useState(false);
+  const startX    = useRef(null);
+  const isDragging = useRef(false);
+  const PEEK = 80;   // distancia para mostrar peek
+  const FULL = 180;  // distancia para disparar popup
+
+  const onTouchStart = (ev) => { startX.current = ev.touches[0].clientX; isDragging.current = false; };
+  const onTouchMove  = (ev) => {
+    if (startX.current === null) return;
+    const dx = startX.current - ev.touches[0].clientX;
+    if (dx > 6) isDragging.current = true;
+    if (dx > 0) setOffsetX(Math.min(dx, FULL + 20));
+  };
+  const onTouchEnd = () => {
+    if (offsetX >= FULL) { setOffsetX(0); setShowDelete(true); }
+    else if (offsetX > PEEK / 2) setOffsetX(PEEK);
+    else setOffsetX(0);
+    startX.current = null;
+  };
+  const handleClick = () => {
+    if (isDragging.current) return;
+    if (offsetX > 0) { setOffsetX(0); return; }
+    onEdit(e);
+  };
+
   const cat = allCategories.find(c => c.id === e.category);
-
-  // Quién pagó
   const payer = allMembers?.find(m => m.uid === e.paidBy);
-  // Dueño para "Para mí"
-  const owner = allMembers?.find(m => m.uid === e.owner);
-  // Destinatarios para "Para otro"
   const forWhomUids = Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []);
-  const forWhomNames = forWhomUids.map(uid => allMembers?.find(m => m.uid === uid)?.name).filter(Boolean);
 
-  // Etiqueta y tipo relativos al usuario que mira
   const getTypeInfo = () => {
     if (e.type === "hogar") return { label: "Hogar", color: "#4F7FFA" };
     if (e.type === "extraordinary") return { label: "Extraordinario", color: "#f39c12" };
-
-    // "mio" (Para mí) y "personal" (Para otro) son perspectiva-dependientes
-    // El owner/forWhom determina de quién es el gasto
-    const ownerUid  = e.type === "mio" ? e.owner : null;
-    const destUids  = e.type === "personal"
-      ? (Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []))
-      : (ownerUid ? [ownerUid] : []);
-
-    const iAmDest   = destUids.includes(currentUser?.uid);
-    const destNames = destUids.map(uid => {
-      if (uid === currentUser?.uid) return "mí";
-      return allMembers?.find(m => m.uid === uid)?.name || "?";
-    }).filter(Boolean);
-    const destStr   = destNames.length === 1 && destNames[0] === "mí"
-      ? "mí"
-      : destNames.join(" y ");
-
-    if (iAmDest) {
-      // Soy el destinatario → "Para mí"
-      return { label: "Para mí", color: "#2ecc71", perspectiveType: "mio" };
-    } else {
-      // No soy el destinatario → "Para {nombre/s}"
-      return { label: `Para ${destStr || "?"}`, color: "#FA4F7F", perspectiveType: "personal" };
-    }
+    const destUids = e.type === "mio" ? (e.owner ? [e.owner] : []) : forWhomUids;
+    const iAmDest  = destUids.includes(currentUser?.uid);
+    const destNames = destUids.map(uid => uid === currentUser?.uid ? "mí" : allMembers?.find(m => m.uid === uid)?.name || "?").filter(Boolean);
+    const destStr = destNames.length === 1 && destNames[0] === "mí" ? "mí" : destNames.join(" y ");
+    if (iAmDest) return { label: "Para mí", color: "#2ecc71" };
+    return { label: `Para ${destStr || "?"}`, color: "#FA4F7F" };
   };
 
   const { label: typeLabel, color: typeColor } = getTypeInfo();
-
-  // Línea de subtítulo: fecha + quién pagó (para hogar/extraordinario)
   const who = (e.type === "hogar" || e.type === "extraordinary") ? payer : null;
+  const peekProgress = Math.min(1, offsetX / FULL);
 
   return (
-    <div style={{ position: "relative", marginBottom: 10, borderRadius: 20, overflow: "hidden" }}>
-      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, display: "flex", gap: 8, padding: "0 4px", alignItems: "center" }}>
-        <button onClick={() => { setOffsetX(0); onEdit(e); }} style={{ width: EDIT_W, height: "calc(100% - 8px)", borderRadius: 16, background: "#4F7FFA", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3 }}>
-          <span style={{ fontSize: 18 }}>✏️</span><span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Editar</span>
-        </button>
-        <button onClick={() => { setOffsetX(0); onDelete(e.id); }} style={{ width: DEL_W, height: "calc(100% - 8px)", borderRadius: 16, background: "#e74c3c", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3 }}>
-          <span style={{ fontSize: 18 }}>🗑️</span><span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
-        </button>
-      </div>
-      <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onClick={() => offsetX > 0 && setOffsetX(0)}
-        style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, transform: `translateX(-${offsetX}px)`, transition: startX.current === null ? "transform 0.25s ease" : "none", position: "relative", zIndex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-            <span style={{ fontSize: 22, flexShrink: 0 }}>{cat?.icon || "📦"}</span>
-            <div>
-              <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{e.concept}</p>
-              <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>
-                {fmtDate(e.date)}{who ? ` · ${who.name}` : ""}
-              </p>
-              {!isPersonal && <Tag color={typeColor}>{typeLabel}</Tag>}
+    <>
+      <div style={{ position: "relative", marginBottom: 10, borderRadius: 20, overflow: "hidden" }}>
+        {/* Fondo rojo animado */}
+        <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK, borderRadius: "0 20px 20px 0", display: "flex", alignItems: "center", justifyContent: "center", background: `rgba(231,76,60,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
+            <span style={{ fontSize: 20 }}>🗑️</span>
+            <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+          </div>
+        </div>
+        {/* Card */}
+        <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onClick={handleClick}
+          style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, transform: `translateX(-${offsetX}px)`, transition: startX.current === null ? "transform 0.25s ease" : "none", position: "relative", zIndex: 1, cursor: "pointer" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+              <span style={{ fontSize: 22, flexShrink: 0 }}>{cat?.icon || "📦"}</span>
+              <div>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{e.concept}</p>
+                <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(e.date)}{who ? ` · ${who.name}` : ""}</p>
+                {!isPersonal && <Tag color={typeColor}>{typeLabel}</Tag>}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{fmt(e.amount)}</p>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
             </div>
           </div>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT, flexShrink: 0, marginLeft: 8 }}>{fmt(e.amount)}</p>
         </div>
       </div>
-    </div>
+      {showDelete && (
+        <DeleteConfirmPopup expense={e} fmt={fmt} allCategories={allCategories} colors={colors}
+          onConfirm={() => { setShowDelete(false); onDelete(e.id); }}
+          onCancel={() => setShowDelete(false)} />
+      )}
+    </>
   );
 }
 
@@ -725,7 +751,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
                 {!isPersonal && sharedFixed.length > 0 && (
                   <>
                     <button onClick={() => setFixedSharedExpanded(v => !v)} style={{ width: "100%", background: colors.pill, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 14, marginBottom: 6, fontFamily: FONT }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#4F7FFA", fontFamily: FONT }}>🏠 Gastos fijos del Hogar</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", fontFamily: FONT }}>🏠 Gastos fijos del Hogar</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(sharedFixed.reduce((s, f) => s + (f.amount || 0), 0))}</span>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedSharedExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
@@ -741,7 +767,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
                 {!isPersonal && personalFixed.length > 0 && (
                   <>
                     <button onClick={() => setFixedPersonalExpanded(v => !v)} style={{ width: "100%", background: colors.pill, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 14, marginBottom: 6, fontFamily: FONT }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#FA4F7F", fontFamily: FONT }}>👤 Gastos fijos Personales</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", fontFamily: FONT }}>👤 Gastos fijos Personales</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(personalFixed.reduce((s, f) => s + (f.amount || 0), 0))}</span>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedPersonalExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
@@ -764,15 +790,14 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
 
         <SectionTitle>Movimientos</SectionTitle>
         <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-          {isPersonal ? (
-            [["todos", "Todos"], ...allCategories.filter(c => monthExp.some(e => e.category === c.id)).map(c => [c.id, c.icon])].map(([val, lbl]) => (
-              <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
-            ))
-          ) : (
-            [["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","✈️"],["mio","👤"]].map(([val, lbl]) => (
-              <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
-            ))
-          )}
+          {/* Filtro por tipo (solo cuentas compartidas) */}
+          {!isPersonal && [["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","✈️"],["mio","👤"]].map(([val, lbl]) => (
+            <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
+          ))}
+          {/* Filtro por categoría (ambos tipos de cuenta) */}
+          {isPersonal && [["todos", "Todos"], ...allCategories.filter(c => monthExp.some(e => e.category === c.id)).map(c => [c.id, c.icon])].map(([val, lbl]) => (
+            <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
+          ))}
         </div>
         {sorted.length === 0 && (
           <Card style={{ textAlign: "center", color: colors.textMuted, padding: 32 }}>
@@ -1337,7 +1362,33 @@ function AppInner() {
     }
   };
 
-  const deleteExpense = async (id) => { await deleteDoc(doc(db, "expenses", id)); };
+  const [deleteWarning, setDeleteWarning] = useState(null); // { expenseId }
+
+  const deleteExpense = async (id) => {
+    // Verificar si hay settlements este mes antes de eliminar
+    if (account?.id) {
+      const settSnap = await getDocs(query(collection(db, "accounts", account.id, "settlements")));
+      const monthSettlements = settSnap.docs
+        .map(d => d.data())
+        .filter(s => s.month === currentMonth);
+      if (monthSettlements.length > 0) {
+        setDeleteWarning({ expenseId: id });
+        return;
+      }
+    }
+    await deleteDoc(doc(db, "expenses", id));
+  };
+
+  const confirmDeleteExpense = async (expenseId, clearSettlements) => {
+    await deleteDoc(doc(db, "expenses", expenseId));
+    if (clearSettlements && account?.id) {
+      const settSnap = await getDocs(query(collection(db, "accounts", account.id, "settlements")));
+      settSnap.docs
+        .filter(d => d.data().month === currentMonth)
+        .forEach(d => deleteDoc(doc(db, "accounts", account.id, "settlements", d.id)));
+    }
+    setDeleteWarning(null);
+  };
 
   // Marcar gasto fijo como pagado en el mes actual
   const markFixedPaid = async (fixedId, paidByUid, month) => {
@@ -1414,6 +1465,29 @@ function AppInner() {
       {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={customCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
       {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
+      {deleteWarning && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+            <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>⚠️ Hay settlements registrados</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT, lineHeight: 1.5 }}>
+              Eliminaste gastos con settlements del mes. ¿Querés limpiar también los settlements para que los saldos sean correctos?
+            </p>
+            <button onClick={() => confirmDeleteExpense(deleteWarning.expenseId, true)}
+              style={{ width: "100%", padding: 15, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+              🗑️ Eliminar gasto y limpiar settlements
+            </button>
+            <button onClick={() => confirmDeleteExpense(deleteWarning.expenseId, false)}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.text, border: "none", fontSize: 14, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+              Eliminar solo el gasto
+            </button>
+            <button onClick={() => setDeleteWarning(null)}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: "none", color: colors.textMuted, border: "none", fontSize: 14, cursor: "pointer", fontFamily: FONT }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
       {claimData && (
         <ClaimIdentityModal claimData={claimData} colors={colors}
           onClaim={(labelId) => finishJoinAccount({ inviteId: claimData.inviteId, accountId: claimData.accountId, accountData: claimData.accountData, claimedLabelId: labelId })}

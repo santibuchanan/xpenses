@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
@@ -33,13 +33,19 @@ export default function EditExpenseModal({ expense, members, customCategories, c
   const profiles = members?.filter(m => !m._isLabel) || [];
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
 
-  // El tipo que ve el usuario es relativo a su perspectiva
   const perspectiveType = getPerspectiveType(expense, currentUser?.uid);
-
-  // form guarda el tipo REAL (mio/personal), la perspectiva solo afecta lo que se muestra
   const [form, setForm]   = useState({ ...expense });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Swipe down para cerrar
+  const sheetRef  = useRef(null);
+  const startY    = useRef(null);
+  const [dragY, setDragY]     = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const onTouchStart = (ev) => { const h = sheetRef.current?.querySelector("[data-handle]"); if (h?.contains(ev.target)) { startY.current = ev.touches[0].clientY; setDragging(true); } };
+  const onTouchMove  = (ev) => { if (!dragging || startY.current === null) return; const dy = ev.touches[0].clientY - startY.current; if (dy > 0) setDragY(dy); };
+  const onTouchEnd   = () => { if (dragY > 120) onClose(); else setDragY(0); startY.current = null; setDragging(false); };
 
   // Al cambiar tipo desde la UI (perspectiva), convertir a tipo real
   const setTypeFromPerspective = (perspType) => {
@@ -114,9 +120,12 @@ export default function EditExpenseModal({ expense, members, customCategories, c
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", maxHeight: "90vh", overflowY: "auto", fontFamily: FONT }}>
-        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+      <div ref={sheetRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px 44px", maxHeight: "90vh", overflowY: "auto", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: dragging ? "none" : "transform 0.3s ease" }}>
+        <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
+          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, paddingTop: 4 }}>
           <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Editar Gasto</span>
           <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
         </div>
