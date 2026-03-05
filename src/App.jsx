@@ -675,7 +675,8 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
   const me = allMembers?.find(m => m.uid === currentUser.uid);
   const meColor = me?.color || "#4F7FFA";
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
-  const monthExp = expenses.filter(e => e.month === currentMonth && !e.deleted);
+  const monthExp    = expenses.filter(e => e.month === currentMonth && !e.deleted); // para cálculos
+  const monthExpAll = expenses.filter(e => e.month === currentMonth); // para lista visual (incluye eliminados)
   const sharedExp = monthExp.filter(e => e.type !== "mio");
 
   // Gastos fijos visibles para este usuario
@@ -704,12 +705,10 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
 
   const [filterType, setFilterType] = useState("todos");
   const filtered = isPersonal
-    ? (filterType === "todos" ? monthExp : monthExp.filter(e => e.category === filterType))
-    : (filterType === "todos" ? monthExp : monthExp.filter(e => e.type === filterType));
-  // Settlements del mes para mostrar en movimientos
+    ? (filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.category === filterType))
+    : (filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.type === filterType));
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth && !s.isCorrection && s.amount > 0);
-
-  const sorted = [...filtered].sort((a, b) => b.date?.localeCompare(a.date));
+  const sorted = [...filtered].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
   // Estado de expansión de gastos fijos — 3 niveles
   const [fixedExpanded,         setFixedExpanded]         = useState(false);
