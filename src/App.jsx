@@ -791,7 +791,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
                 {!isPersonal && sharedFixed.length > 0 && (
                   <>
                     <button onClick={() => setFixedSharedExpanded(v => !v)} style={{ width: "100%", background: colors.pill, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 14, marginBottom: 6, fontFamily: FONT }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", fontFamily: FONT }}>🏠 Gastos fijos del Hogar</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>🏠 Gastos fijos del Hogar</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(sharedFixed.reduce((s, f) => s + (f.amount || 0), 0))}</span>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedSharedExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
@@ -807,7 +807,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
                 {!isPersonal && personalFixed.length > 0 && (
                   <>
                     <button onClick={() => setFixedPersonalExpanded(v => !v)} style={{ width: "100%", background: colors.pill, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 14, marginBottom: 6, fontFamily: FONT }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", fontFamily: FONT }}>👤 Gastos fijos Personales</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>👤 Gastos fijos Personales</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(personalFixed.reduce((s, f) => s + (f.amount || 0), 0))}</span>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedPersonalExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
@@ -855,7 +855,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
           return (
             <div key={s.id} style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 22 }}>✅</span>
+                <span style={{ fontSize: 22 }}>🫱🏼‍🫲🏾</span>
                 <div>
                   <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>
                     {debtor?.name || "?"} saldó con {creditor?.name || "?"}
@@ -864,7 +864,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
                   <Tag color="#2ecc71">{s.full ? "Saldo total" : "Saldo parcial"}</Tag>
                 </div>
               </div>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: "#2ecc71", fontFamily: FONT, flexShrink: 0, marginLeft: 8 }}>{fmt(s.amount)}</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT, flexShrink: 0, marginLeft: 8 }}>{fmt(s.amount)}</p>
             </div>
           );
         })}
@@ -1435,6 +1435,8 @@ function AppInner() {
   // Soft-delete: marca el gasto como deleted, agrega settlement negativo si corresponde,
   // y notifica a los demás miembros
   const deleteExpense = async (expenseId) => {
+    console.log("deleteExpense llamado con id:", expenseId);
+    console.log("accountExpenses ids:", accountExpenses.map(e => e.id));
     const expense = accountExpenses.find(e => e.id === expenseId);
     if (!expense) return;
     // Verificar si hay settlements activos este mes
@@ -1449,11 +1451,17 @@ function AppInner() {
 
   const doDeleteExpense = async (expense, addCorrectiveSettlement) => {
     // 1. Soft-delete: marcar como eliminado en lugar de borrar
-    await updateDoc(doc(db, "expenses", expense.id), {
-      deleted: true,
-      deletedAt: new Date().toISOString(),
-      deletedBy: authUser.uid,
-    });
+    try {
+      await updateDoc(doc(db, "expenses", expense.id), {
+        deleted: true,
+        deletedAt: new Date().toISOString(),
+        deletedBy: authUser.uid,
+      });
+    } catch (err) {
+      console.error("Error soft-delete:", err, "expenseId:", expense.id);
+      // Fallback: eliminar físicamente si el update falla
+      await deleteDoc(doc(db, "expenses", expense.id));
+    }
 
     // 2. Si hay settlements activos, agregar settlement correctivo negativo
     if (addCorrectiveSettlement && account?.id) {
