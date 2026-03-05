@@ -1472,6 +1472,8 @@ function AppInner() {
         deletedAt: new Date().toISOString(),
         deletedBy: authUser.uid,
       });
+      // Actualizar estado local inmediatamente sin esperar el snapshot
+      setExpenses(prev => prev.map(e => e.id === expense.id ? { ...e, deleted: true } : e));
       console.log("updateDoc OK — gasto marcado como deleted");
     } catch (err) {
       console.error("Error soft-delete:", err, "expenseId:", expense.id);
