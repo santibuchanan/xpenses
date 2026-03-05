@@ -427,10 +427,18 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
 // ── POPUP CONFIRMAR ELIMINACIÓN ──
 function DeleteConfirmPopup({ expense, fmt, allCategories, colors, onConfirm, onCancel }) {
   const cat = allCategories?.find(c => c.id === expense.category);
+  const startY = useRef(null);
+  const [dragY, setDragY] = useState(0);
+  const onTouchStart = (ev) => { startY.current = ev.touches[0].clientY; };
+  const onTouchMove  = (ev) => { const dy = ev.touches[0].clientY - startY.current; if (dy > 0) setDragY(dy); };
+  const onTouchEnd   = () => { if (dragY > 100) onCancel(); else setDragY(0); startY.current = null; };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
-        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }} onClick={onCancel}>
+      <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onClick={e => e.stopPropagation()}
+        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: startY.current ? "none" : "transform 0.3s ease" }}>
+        <div style={{ padding: "16px 0 8px", touchAction: "none" }}>
+          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
           <div style={{ width: 44, height: 44, borderRadius: 14, background: "#e74c3c14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{cat?.icon || "📦"}</div>
           <div>
@@ -460,8 +468,10 @@ function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, on
   const onTouchMove  = (ev) => {
     if (startX.current === null) return;
     const dx = startX.current - ev.touches[0].clientX;
-    if (dx > 6) isDragging.current = true;
+    if (Math.abs(dx) > 6) isDragging.current = true;
+    // Permite deslizar izquierda (positivo) y derecha (negativo para cerrar peek)
     if (dx > 0) setOffsetX(Math.min(dx, FULL + 20));
+    else if (offsetX > 0) setOffsetX(Math.max(0, offsetX + dx)); // deslizar derecha cierra
   };
   const onTouchEnd = () => {
     if (offsetX >= FULL) { setOffsetX(0); setShowDelete(true); }
@@ -493,6 +503,25 @@ function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, on
   const { label: typeLabel, color: typeColor } = getTypeInfo();
   const who = (e.type === "hogar" || e.type === "extraordinary") ? payer : null;
   const peekProgress = Math.min(1, offsetX / FULL);
+
+  // Gasto eliminado (soft-delete) — mostrar tachado, sin swipe
+  if (e.deleted) {
+    return (
+      <div style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, marginBottom: 10, opacity: 0.5 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+            <span style={{ fontSize: 22, flexShrink: 0, filter: "grayscale(1)" }}>{cat?.icon || "📦"}</span>
+            <div>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.textMuted, fontFamily: FONT, textDecoration: "line-through" }}>{e.concept}</p>
+              <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(e.date)}</p>
+              <Tag color="#e74c3c">Eliminado</Tag>
+            </div>
+          </div>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.textMuted, fontFamily: FONT, flexShrink: 0, marginLeft: 8, textDecoration: "line-through" }}>{fmt(e.amount)}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -627,7 +656,7 @@ function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, on
 }
 
 // ── HOME SCREEN ──
-function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, customCategories, fixedExpenses, onEdit, onDelete, onMarkFixedPaid }) {
+function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, customCategories, fixedExpenses, onEdit, onDelete, onMarkFixedPaid, settlements }) {
   const { colors } = useTheme();
   const fs = useExpenseFontSize();
   const isPersonal = account?.type === "personal";
@@ -636,7 +665,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
   const me = allMembers?.find(m => m.uid === currentUser.uid);
   const meColor = me?.color || "#4F7FFA";
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
-  const monthExp = expenses.filter(e => e.month === currentMonth);
+  const monthExp = expenses.filter(e => e.month === currentMonth && !e.deleted);
   const sharedExp = monthExp.filter(e => e.type !== "mio");
 
   // Gastos fijos visibles para este usuario
@@ -659,14 +688,18 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
   const totalMonthExp = normalTotal + fixedTotal;
   const myPersonalTotal = monthExp.filter(e => e.type === "mio" && e.owner === currentUser.uid).reduce((s, e) => s + e.amount, 0);
 
-  const catTotals = allCategories.map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total).slice(0, 4);
+  const catTotals = allCategories.map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total);
+  const [catExpanded, setCatExpanded] = useState(false);
   const monthLabel = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
 
   const [filterType, setFilterType] = useState("todos");
   const filtered = isPersonal
     ? (filterType === "todos" ? monthExp : monthExp.filter(e => e.category === filterType))
     : (filterType === "todos" ? monthExp : monthExp.filter(e => e.type === filterType));
-  const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
+  // Settlements del mes para mostrar en movimientos
+  const monthSettlements = (settlements || []).filter(s => s.month === currentMonth && !s.isCorrection && s.amount > 0);
+
+  const sorted = [...filtered].sort((a, b) => b.date?.localeCompare(a.date));
 
   // Estado de expansión de gastos fijos — 3 niveles
   const [fixedExpanded,         setFixedExpanded]         = useState(false);
@@ -715,8 +748,15 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
 
         {catTotals.length > 0 && (
           <>
-            <SectionTitle>Top categorías</SectionTitle>
-            {catTotals.map(c => (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "22px 0 10px" }}>
+              <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Top categorías</span>
+              {catTotals.length > 4 && (
+                <button onClick={() => setCatExpanded(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#4F7FFA", fontWeight: 600, fontFamily: FONT }}>
+                  {catExpanded ? "Ver menos ▲" : `Ver todas (${catTotals.length}) ▼`}
+                </button>
+              )}
+            </div>
+            {(catExpanded ? catTotals : catTotals.slice(0, 4)).map(c => (
               <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
                 <span style={{ fontSize: 22, width: 30 }}>{c.icon}</span>
                 <div style={{ flex: 1 }}>
@@ -808,6 +848,26 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
         {sorted.map(e => (
           <SwipeableExpenseRow key={e.id} e={e} allCategories={allCategories} allMembers={allMembers} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} isPersonal={isPersonal} currentUser={currentUser} />
         ))}
+        {/* Settlements del mes */}
+        {!isPersonal && monthSettlements.map(s => {
+          const debtor   = allMembers?.find(m => m.uid === s.debtorUid);
+          const creditor = allMembers?.find(m => m.uid === s.creditorUid);
+          return (
+            <div key={s.id} style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 22 }}>✅</span>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>
+                    {debtor?.name || "?"} saldó con {creditor?.name || "?"}
+                  </p>
+                  <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(s.date)}</p>
+                  <Tag color="#2ecc71">{s.full ? "Saldo total" : "Saldo parcial"}</Tag>
+                </div>
+              </div>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: "#2ecc71", fontFamily: FONT, flexShrink: 0, marginLeft: 8 }}>{fmt(s.amount)}</p>
+            </div>
+          );
+        })}
         <div style={{ height: 120 }} />
       </div>
 
@@ -924,26 +984,14 @@ function PassDebtModal({ debts, members, nextMonth, fmt, colors, onConfirm, onCl
 }
 
 // ── SALDOS SCREEN ──
-function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth, currentUser, onAddExpense }) {
+function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth, currentUser, onAddExpense, settlements }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
 
-  // Incluir TODOS los tipos de gasto en el cálculo de saldos
-  const monthExp = expenses.filter(e => e.month === currentMonth);
+  const monthExp = expenses.filter(e => e.month === currentMonth && !e.deleted);
   const visibleFixed = (fixedExpenses || []).filter(f => f.shared || f.createdBy === currentUser.uid);
-
-  // Historial de pagos parciales del mes
-  const [settlements, setSettlements] = useState([]);
-  useEffect(() => {
-    if (!account?.id) return;
-    return onSnapshot(
-      query(collection(db, "accounts", account.id, "settlements"), orderBy("date", "desc")),
-      snap => setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    );
-  }, [account?.id]);
-
-  const monthSettlements = settlements.filter(s => s.month === currentMonth);
+  const monthSettlements = (settlements || []).filter(s => s.month === currentMonth);
 
   // Calcular saldos con todos los datos
   const saldos = calcSaldos(monthExp, visibleFixed, members, account?.divisionSystem, currentMonth, monthSettlements);
@@ -1227,6 +1275,7 @@ function AppInner() {
   const [expenses, setExpenses]       = useState([]);
   const [customCategories, setCustomCategories] = useState([]);
   const [fixedExpenses, setFixedExpenses]       = useState([]);
+  const [settlements, setSettlements]           = useState([]);
   const [tab, setTab]                 = useState("home");
   const [showAdd, setShowAdd]         = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -1329,14 +1378,14 @@ function AppInner() {
 
   useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "categories"), snap => { setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
   useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "fixedExpenses"), snap => { setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
+  useEffect(() => { if (!account?.id) return; return onSnapshot(query(collection(db, "accounts", account.id, "settlements"), orderBy("date", "desc")), snap => { setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
 
   const { sendNotification } = useNotif();
 
-  // Excluir gastos marcados como eliminados (soft-delete)
+  // Incluye gastos normales + eliminados (soft-delete) para mostrarlos tachados
   const accountExpenses = expenses.filter(e =>
-    !e.deleted &&
-    (e.accountId === account?.id ||
-    (!e.accountId && account?.memberIds?.includes(e.createdBy)))
+    e.accountId === account?.id ||
+    (!e.accountId && account?.memberIds?.includes(e.createdBy))
   );
 
   const memberLabels = account?.memberLabels || [];
@@ -1388,17 +1437,14 @@ function AppInner() {
   const deleteExpense = async (expenseId) => {
     const expense = accountExpenses.find(e => e.id === expenseId);
     if (!expense) return;
-
     // Verificar si hay settlements activos este mes
+    let hasSettlements = false;
     if (account?.id) {
       const settSnap = await getDocs(query(collection(db, "accounts", account.id, "settlements")));
-      const monthSettlements = settSnap.docs.map(d => d.data()).filter(s => s.month === currentMonth);
-      if (monthSettlements.length > 0) {
-        setDeleteWarning({ expense });
-        return;
-      }
+      hasSettlements = settSnap.docs.some(d => d.data().month === currentMonth);
     }
-    await doDeleteExpense(expense, false);
+    // Siempre ajusta settlements automáticamente si los hay
+    await doDeleteExpense(expense, hasSettlements);
   };
 
   const doDeleteExpense = async (expense, addCorrectiveSettlement) => {
@@ -1521,8 +1567,8 @@ function AppInner() {
       <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
-        {tab === "home"     && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} />}
-        {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={members} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} />}
+        {tab === "home"     && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} />}
+        {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={members} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} />}
         {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} />}
         {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
       </div>

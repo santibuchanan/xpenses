@@ -136,20 +136,27 @@ function NotifToast({ notif, onClose }) {
 // ── Fila de notificación con swipe para eliminar (estilo iOS) ──
 function SwipeableNotifRow({ n, onMarkRead, onDelete, colors }) {
   const [offsetX, setOffsetX] = useState(0);
-  const startX = useRef(null);
-  const THRESHOLD = 72;
+  const startX    = useRef(null);
+  const isDragging = useRef(false);
+  const PEEK = 72;
+  const FULL = 200; // swipe total → eliminar directo
 
-  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; };
+  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; isDragging.current = false; };
   const onTouchMove = (e) => {
     if (startX.current === null) return;
     const dx = startX.current - e.touches[0].clientX;
-    if (dx > 0) setOffsetX(Math.min(dx, THRESHOLD + 20));
+    if (Math.abs(dx) > 6) isDragging.current = true;
+    if (dx > 0) setOffsetX(Math.min(dx, FULL + 20));
+    else if (offsetX > 0) setOffsetX(Math.max(0, offsetX + dx)); // deslizar derecha cierra
   };
   const onTouchEnd = () => {
-    if (offsetX > THRESHOLD / 2) setOffsetX(THRESHOLD);
+    if (offsetX >= FULL) { setOffsetX(0); onDelete(n.id); } // swipe total → eliminar directo
+    else if (offsetX > PEEK / 2) setOffsetX(PEEK);
     else setOffsetX(0);
     startX.current = null;
   };
+
+  const peekProgress = Math.min(1, offsetX / FULL);
 
   const timeAgo = (ts) => {
     if (!ts?.toMillis) return "";
@@ -164,16 +171,12 @@ function SwipeableNotifRow({ n, onMarkRead, onDelete, colors }) {
 
   return (
     <div style={{ position: "relative", overflow: "hidden", borderBottom: `1px solid ${colors.divider}` }}>
-      {/* Fondo rojo de eliminar */}
-      <div style={{
-        position: "absolute", right: 0, top: 0, bottom: 0, width: THRESHOLD,
-        background: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        <button onClick={() => onDelete(n.id)}
-          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+      {/* Fondo rojo animado */}
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK, background: `rgba(231,76,60,${0.2 + peekProgress * 0.8})`, display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.1s" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
           <span style={{ fontSize: 18 }}>🗑️</span>
           <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
-        </button>
+        </div>
       </div>
 
       {/* Contenido deslizable */}
@@ -181,7 +184,7 @@ function SwipeableNotifRow({ n, onMarkRead, onDelete, colors }) {
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        onClick={() => { if (offsetX > 0) setOffsetX(0); else onMarkRead(n.id); }}
+        onClick={() => { if (isDragging.current) return; if (offsetX > 0) { setOffsetX(0); return; } onMarkRead(n.id); }}
         style={{
           display: "flex", gap: 12, padding: "14px 0",
           transform: `translateX(-${offsetX}px)`,
@@ -199,15 +202,7 @@ function SwipeableNotifRow({ n, onMarkRead, onDelete, colors }) {
           </div>
           <p style={{ margin: "3px 0 0", fontSize: 13, color: colors.textMuted, fontFamily: FONT }}>{n.body}</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {/* Botón X individual */}
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(n.id); }}
-            style={{ background: colors.pill, border: "none", borderRadius: 50, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14, color: colors.textMuted, flexShrink: 0 }}>
-            ×
-          </button>
-          {!n.read && <div style={{ width: 8, height: 8, borderRadius: 4, background: "#4F7FFA", flexShrink: 0 }} />}
-        </div>
+        {!n.read && <div style={{ width: 8, height: 8, borderRadius: 4, background: "#4F7FFA", flexShrink: 0, alignSelf: "center" }} />}
       </div>
     </div>
   );
@@ -249,9 +244,6 @@ export function NotifCenter({ onClose }) {
       onClick={onClose}>
       <div
         onClick={e => e.stopPropagation()}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
         style={{
           background: colors.card, borderRadius: "24px 24px 0 0", width: "100%",
           maxHeight: "78vh", display: "flex", flexDirection: "column", fontFamily: FONT,
@@ -259,8 +251,9 @@ export function NotifCenter({ onClose }) {
           transition: isDragging.current ? "none" : "transform 0.3s ease",
         }}>
 
-        {/* Handle */}
-        <div style={{ padding: "20px 20px 0" }}>
+        {/* Handle — swipe down aquí para cerrar */}
+        <div style={{ padding: "16px 20px 0", touchAction: "none" }}
+          onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
           <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
