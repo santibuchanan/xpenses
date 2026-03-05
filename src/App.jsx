@@ -1450,6 +1450,7 @@ function AppInner() {
   };
 
   const doDeleteExpense = async (expense, addCorrectiveSettlement) => {
+    console.log("doDeleteExpense llamado, expense:", expense?.id, "deleted actual:", expense?.deleted);
     // 1. Soft-delete: marcar como eliminado en lugar de borrar
     try {
       await updateDoc(doc(db, "expenses", expense.id), {
@@ -1457,9 +1458,9 @@ function AppInner() {
         deletedAt: new Date().toISOString(),
         deletedBy: authUser.uid,
       });
+      console.log("updateDoc OK — gasto marcado como deleted");
     } catch (err) {
       console.error("Error soft-delete:", err, "expenseId:", expense.id);
-      // Fallback: eliminar físicamente si el update falla
       await deleteDoc(doc(db, "expenses", expense.id));
     }
 
