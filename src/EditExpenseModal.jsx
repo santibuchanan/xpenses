@@ -28,7 +28,7 @@ function getPerspectiveType(expense, currentUserUid) {
   return iAmDest ? "mio" : "personal";
 }
 
-export default function EditExpenseModal({ expense, members, customCategories, currentUser, onClose }) {
+export default function EditExpenseModal({ expense, members, customCategories, currentUser, onClose, onSave }) {
   const { colors } = useTheme();
   const profiles = members?.filter(m => !m._isLabel) || [];
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
@@ -88,7 +88,8 @@ export default function EditExpenseModal({ expense, members, customCategories, c
       month: data.date?.slice(0, 7) || data.month,
     });
     setSaving(false);
-    onClose();
+    if (onSave) await onSave({ ...data, amount: parseFloat(data.amount) });
+    else onClose();
   };
 
   const inputStyle = {

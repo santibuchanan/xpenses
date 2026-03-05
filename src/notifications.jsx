@@ -9,6 +9,7 @@ const NotifContext = createContext({});
 export const NOTIF_TYPES = {
   EXPENSE_ADDED: "expense_added",
   EXPENSE_EDITED: "expense_edited",
+  EXPENSE_DELETED: "expense_deleted",
   FIXED_PAID: "fixed_paid",
   ACCOUNT_SETTLED: "account_settled",
   MEMBER_JOINED: "member_joined",
@@ -18,6 +19,7 @@ export const NOTIF_TYPES = {
 export const NOTIF_LABELS = {
   expense_added: "Nuevo gasto agregado",
   expense_edited: "Gasto editado",
+  expense_deleted: "Gasto eliminado",
   fixed_paid: "Gasto fijo pagado",
   account_settled: "Cuenta saldada",
   member_joined: "Nuevo miembro",

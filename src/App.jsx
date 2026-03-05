@@ -1332,9 +1332,11 @@ function AppInner() {
 
   const { sendNotification } = useNotif();
 
+  // Excluir gastos marcados como eliminados (soft-delete)
   const accountExpenses = expenses.filter(e =>
-    e.accountId === account?.id ||
-    (!e.accountId && account?.memberIds?.includes(e.createdBy))
+    !e.deleted &&
+    (e.accountId === account?.id ||
+    (!e.accountId && account?.memberIds?.includes(e.createdBy)))
   );
 
   const memberLabels = account?.memberLabels || [];
@@ -1362,31 +1364,114 @@ function AppInner() {
     }
   };
 
-  const [deleteWarning, setDeleteWarning] = useState(null); // { expenseId }
+  const handleEditSave = async (updatedExpense) => {
+    const otherMembers = members?.filter(m => !m._isLabel && m.uid !== authUser.uid) || [];
+    const myName = members?.find(m => m.uid === authUser.uid)?.name || "Alguien";
+    if (otherMembers.length > 0) {
+      await sendNotification({
+        type: NOTIF_TYPES.EXPENSE_EDITED,
+        title: `Gasto editado: ${updatedExpense.concept}`,
+        body: `${myName} modificó "${updatedExpense.concept}" (${formatAmount(updatedExpense.amount, account?.currency || "ARS")}) en ${account?.name}`,
+        fromName: myName,
+        toUids: otherMembers.map(m => m.uid),
+        accountId: account?.id,
+        accountName: account?.name,
+      });
+    }
+    setEditingExpense(null);
+  };
 
-  const deleteExpense = async (id) => {
-    // Verificar si hay settlements este mes antes de eliminar
+  // Soft-delete: marca el gasto como deleted, agrega settlement negativo si corresponde,
+  // y notifica a los demás miembros
+  const deleteExpense = async (expenseId) => {
+    const expense = accountExpenses.find(e => e.id === expenseId);
+    if (!expense) return;
+
+    // Verificar si hay settlements activos este mes
     if (account?.id) {
       const settSnap = await getDocs(query(collection(db, "accounts", account.id, "settlements")));
-      const monthSettlements = settSnap.docs
-        .map(d => d.data())
-        .filter(s => s.month === currentMonth);
+      const monthSettlements = settSnap.docs.map(d => d.data()).filter(s => s.month === currentMonth);
       if (monthSettlements.length > 0) {
-        setDeleteWarning({ expenseId: id });
+        setDeleteWarning({ expense });
         return;
       }
     }
-    await deleteDoc(doc(db, "expenses", id));
+    await doDeleteExpense(expense, false);
   };
 
-  const confirmDeleteExpense = async (expenseId, clearSettlements) => {
-    await deleteDoc(doc(db, "expenses", expenseId));
-    if (clearSettlements && account?.id) {
-      const settSnap = await getDocs(query(collection(db, "accounts", account.id, "settlements")));
-      settSnap.docs
-        .filter(d => d.data().month === currentMonth)
-        .forEach(d => deleteDoc(doc(db, "accounts", account.id, "settlements", d.id)));
+  const doDeleteExpense = async (expense, addCorrectiveSettlement) => {
+    // 1. Soft-delete: marcar como eliminado en lugar de borrar
+    await updateDoc(doc(db, "expenses", expense.id), {
+      deleted: true,
+      deletedAt: new Date().toISOString(),
+      deletedBy: authUser.uid,
+    });
+
+    // 2. Si hay settlements activos, agregar settlement correctivo negativo
+    if (addCorrectiveSettlement && account?.id) {
+      // Recalcular el impacto del gasto eliminado en cada par deudor→acreedor
+      const realMembers = members.filter(m => !m._isLabel);
+      const totalSalary = realMembers.reduce((s, m) => s + (m.salary || 0), 0);
+
+      // Delta de balance por miembro causado por este gasto
+      const delta = {};
+      realMembers.forEach(m => { delta[m.uid] = 0; });
+
+      if (expense.type === "hogar") {
+        if (delta[expense.paidBy] !== undefined) delta[expense.paidBy] += expense.amount;
+        realMembers.forEach(m => {
+          const share = account?.divisionSystem === "proportional" && totalSalary > 0
+            ? expense.amount * ((m.salary || 0) / totalSalary)
+            : expense.amount / realMembers.length;
+          if (delta[m.uid] !== undefined) delta[m.uid] -= share;
+        });
+      } else if (expense.type === "personal") {
+        if (delta[expense.paidBy] !== undefined) delta[expense.paidBy] += expense.amount;
+        const targets = (Array.isArray(expense.forWhom) ? expense.forWhom : [expense.forWhom])
+          .filter(uid => delta[uid] !== undefined);
+        targets.forEach(uid => { delta[uid] -= expense.amount / (targets.length || 1); });
+      } else if (expense.type === "mio") {
+        if (delta[expense.paidBy] !== undefined) delta[expense.paidBy] += expense.amount;
+        if (expense.owner && delta[expense.owner] !== undefined) delta[expense.owner] -= expense.amount;
+      }
+
+      // Para cada par donde el delta introduce un cambio, agregar settlement negativo
+      realMembers.forEach(debtor => {
+        if (delta[debtor.uid] >= 0) return;
+        realMembers.forEach(creditor => {
+          if (delta[creditor.uid] <= 0) return;
+          const correction = Math.min(Math.abs(delta[debtor.uid]), delta[creditor.uid]);
+          if (correction > 0) {
+            addDoc(collection(db, "accounts", account.id, "settlements"), {
+              debtorUid: debtor.uid,
+              creditorUid: creditor.uid,
+              amount: -correction, // negativo = corrección por eliminación
+              date: new Date().toISOString().slice(0, 10),
+              month: currentMonth,
+              full: false,
+              isCorrection: true,
+              correctionReason: `Gasto eliminado: ${expense.concept} ($${expense.amount?.toLocaleString("es-AR")})`,
+            });
+          }
+        });
+      });
     }
+
+    // 3. Notificar a los demás miembros
+    const otherMembers = members.filter(m => !m._isLabel && m.uid !== authUser.uid);
+    if (otherMembers.length > 0) {
+      const deleter = members.find(m => m.uid === authUser.uid);
+      await sendNotification({
+        type: NOTIF_TYPES.EXPENSE_DELETED,
+        title: "Gasto eliminado 🗑️",
+        body: `${deleter?.name || "Un miembro"} eliminó "${expense.concept}" (${formatAmount(expense.amount, account?.currency || "ARS")})`,
+        fromName: deleter?.name || "Un miembro",
+        toUids: otherMembers.map(m => m.uid),
+        accountId: account?.id,
+        accountName: account?.name,
+      });
+    }
+
     setDeleteWarning(null);
   };
 
@@ -1462,7 +1547,7 @@ function AppInner() {
       </div>
 
       {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={customCategories} isPersonal={isPersonal} />}
-      {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={customCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} />}
+      {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={customCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
       {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
       {deleteWarning && (
@@ -1470,16 +1555,21 @@ function AppInner() {
           <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
             <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
             <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>⚠️ Hay settlements registrados</p>
-            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT, lineHeight: 1.5 }}>
-              Eliminaste gastos con settlements del mes. ¿Querés limpiar también los settlements para que los saldos sean correctos?
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 6px", fontFamily: FONT, lineHeight: 1.5 }}>
+              Este gasto afecta saldos que ya fueron saldados parcialmente este mes.
             </p>
-            <button onClick={() => confirmDeleteExpense(deleteWarning.expenseId, true)}
+            <div style={{ background: colors.pill, borderRadius: 12, padding: "10px 14px", marginBottom: 20 }}>
+              <p style={{ margin: 0, fontSize: 13, color: colors.text, fontFamily: FONT, fontWeight: 600 }}>
+                🗑️ {deleteWarning.expense.concept} — {formatAmount(deleteWarning.expense.amount, account?.currency || "ARS")}
+              </p>
+            </div>
+            <button onClick={() => doDeleteExpense(deleteWarning.expense, true)}
               style={{ width: "100%", padding: 15, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
-              🗑️ Eliminar gasto y limpiar settlements
+              🗑️ Eliminar y ajustar saldos automáticamente
             </button>
-            <button onClick={() => confirmDeleteExpense(deleteWarning.expenseId, false)}
+            <button onClick={() => doDeleteExpense(deleteWarning.expense, false)}
               style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.text, border: "none", fontSize: 14, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
-              Eliminar solo el gasto
+              Eliminar sin ajustar settlements
             </button>
             <button onClick={() => setDeleteWarning(null)}
               style={{ width: "100%", padding: 14, borderRadius: 14, background: "none", color: colors.textMuted, border: "none", fontSize: 14, cursor: "pointer", fontFamily: FONT }}>
