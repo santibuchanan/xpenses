@@ -110,9 +110,9 @@ function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMon
     const payment = f.payments?.[currentMonth];
     const isPaid = payment?.paid === true;
     if (isPaid) {
-      // Si está pagado: el que pagó suma a "paid", todos suman a "owes"
       const paidByUid = payment.paidBy;
       if (f.shared) {
+        // Hogar pagado: quien pagó suma a "paid", todos suman a "owes" según %
         if (result[paidByUid] !== undefined) result[paidByUid].paid += f.amount;
         members.forEach(m => {
           const share = divisionSystem === "proportional" && totalSalary > 0
@@ -121,14 +121,13 @@ function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMon
           if (result[m.uid] !== undefined) result[m.uid].owes += share;
         });
       } else {
-        // Personal: solo imputa al creador
-        if (result[f.createdBy] !== undefined) {
-          result[f.createdBy].paid += f.amount;
-          result[f.createdBy].owes += f.amount;
-        }
+        // Personal pagado: quien pagó suma a "paid", el creador (dueño) suma a "owes"
+        // Si B pagó el gimnasio de A → B queda a favor, A queda en deuda
+        if (result[paidByUid] !== undefined) result[paidByUid].paid += f.amount;
+        if (result[f.createdBy] !== undefined) result[f.createdBy].owes += f.amount;
       }
     } else {
-      // No pagado: imputa como deuda pendiente (owes sin paid)
+      // No pagado: imputa como deuda pendiente
       if (f.shared) {
         members.forEach(m => {
           const share = divisionSystem === "proportional" && totalSalary > 0
@@ -137,6 +136,7 @@ function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMon
           if (result[m.uid] !== undefined) result[m.uid].owes += share;
         });
       } else {
+        // Personal no pagado: solo el creador debe
         if (result[f.createdBy] !== undefined) result[f.createdBy].owes += f.amount;
       }
     }
@@ -744,43 +744,211 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
   );
 }
 
+// ── MODAL SALDO PARCIAL ──
+function PartialSettleModal({ debtor, creditor, totalDebt, fmt, colors, onConfirm, onClose }) {
+  const [amount, setAmount] = useState(totalDebt.toString());
+  const [date, setDate]     = useState(new Date().toISOString().slice(0, 10));
+  const [loading, setLoading] = useState(false);
+  const parsed = parseFloat(amount) || 0;
+  const valid  = parsed > 0 && parsed <= totalDebt;
+
+  const handleConfirm = async () => {
+    if (!valid) return;
+    setLoading(true);
+    await onConfirm({ debtorUid: debtor.uid, creditorUid: creditor.uid, amount: parsed, date });
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+        <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 4px", fontFamily: FONT }}>Saldar parcialmente</p>
+        <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>
+          {debtor.name} le debe {fmt(totalDebt)} a {creditor.name}
+        </p>
+
+        <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, fontFamily: FONT }}>Monto a saldar</p>
+        <div style={{ position: "relative", marginBottom: 14 }}>
+          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontFamily: FONT }}>$</span>
+          <input
+            type="number" inputMode="decimal"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            style={{ width: "100%", padding: "13px 14px 13px 30px", borderRadius: 14, border: `2px solid ${valid || !amount ? colors.inputBorder : "#e74c3c"}`, fontSize: 15, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+          />
+        </div>
+        {parsed > totalDebt && <p style={{ fontSize: 12, color: "#e74c3c", margin: "-10px 0 12px", fontFamily: FONT }}>No puede superar la deuda total ({fmt(totalDebt)})</p>}
+
+        <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, fontFamily: FONT }}>Fecha del pago</p>
+        <DateInput value={date} onChange={setDate} />
+
+        <button onClick={handleConfirm} disabled={!valid || loading}
+          style={{ width: "100%", padding: 15, borderRadius: 14, background: !valid || loading ? "#aaa" : "linear-gradient(135deg,#2ecc71,#27ae60)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: !valid || loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
+          {loading ? "Guardando..." : `Registrar pago de ${fmt(parsed)}`}
+        </button>
+        <button onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL PASAR SALDO AL MES SIGUIENTE ──
+function PassDebtModal({ debts, members, nextMonth, fmt, colors, onConfirm, onClose }) {
+  const [loading, setLoading] = useState(false);
+  const monthName = new Date(nextMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
+  const currentMonthName = new Date(new Date().toISOString().slice(0, 7) + "-02").toLocaleString("es-AR", { month: "long" });
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    await onConfirm(debts);
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+        <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 4px", fontFamily: FONT }}>Pasar saldo al mes siguiente</p>
+        <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>
+          Se generarán gastos en {monthName} imputados al deudor
+        </p>
+        {debts.map(d => {
+          const debtor   = members.find(m => m.uid === d.debtorUid);
+          const creditor = members.find(m => m.uid === d.creditorUid);
+          return (
+            <div key={d.debtorUid} style={{ background: colors.pill, borderRadius: 14, padding: "12px 16px", marginBottom: 10 }}>
+              <p style={{ margin: "0 0 2px", fontWeight: 700, fontSize: 14, color: colors.text, fontFamily: FONT }}>
+                {debtor?.name} → {creditor?.name}
+              </p>
+              <p style={{ margin: 0, fontSize: 13, color: colors.textMuted, fontFamily: FONT }}>
+                {fmt(d.amount)} · "Saldo pendiente del mes de {currentMonthName}"
+              </p>
+            </div>
+          );
+        })}
+        <button onClick={handleConfirm} disabled={loading}
+          style={{ width: "100%", padding: 15, borderRadius: 14, background: loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 8, marginTop: 8 }}>
+          {loading ? "Generando..." : "Confirmar y generar gastos →"}
+        </button>
+        <button onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 // ── SALDOS SCREEN ──
-function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth, currentUser }) {
+function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth, currentUser, onAddExpense }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const monthExp = expenses.filter(e => e.month === currentMonth && e.type !== "mio");
-  // Gastos fijos visibles para este usuario
   const visibleFixed = (fixedExpenses || []).filter(f => f.shared || f.createdBy === currentUser.uid);
   const saldos = calcSaldos(monthExp, visibleFixed, members, account?.divisionSystem, currentMonth);
-  const [settled, setSettled] = useState(false);
-  const handleSettle = async () => {
-    setSettled(true);
-    const otherMembers = members?.filter(m => m.uid !== members[0]?.uid) || [];
+
+  // Calcular pares deudor→acreedor
+  const balances = (members || []).map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
+  const debtPairs = []; // [{ debtorUid, creditorUid, amount }]
+  balances.forEach(debtor => {
+    if (debtor.balance >= 0) return;
+    balances.forEach(creditor => {
+      if (creditor.balance <= 0) return;
+      const amount = Math.min(Math.abs(debtor.balance), creditor.balance);
+      if (amount > 0) debtPairs.push({ debtorUid: debtor.uid, creditorUid: creditor.uid, amount });
+    });
+  });
+
+  const [partialModal, setPartialModal] = useState(null); // { debtorUid, creditorUid, amount }
+  const [showPassDebt, setShowPassDebt] = useState(false);
+  const [settledPairs, setSettledPairs]  = useState({}); // { debtorUid: true }
+
+  // Historial de pagos parciales del mes (guardado en Firestore como subcolección)
+  const [settlements, setSettlements] = useState([]);
+  useEffect(() => {
+    if (!account?.id) return;
+    return onSnapshot(
+      query(collection(db, "accounts", account.id, "settlements"), orderBy("date", "desc")),
+      snap => setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+  }, [account?.id]);
+
+  const monthSettlements = settlements.filter(s => s.month === currentMonth);
+
+  const handleFullSettle = async (debtorUid, creditorUid, amount) => {
+    const debtor   = members.find(m => m.uid === debtorUid);
+    const creditor = members.find(m => m.uid === creditorUid);
+    await addDoc(collection(db, "accounts", account.id, "settlements"), {
+      debtorUid, creditorUid, amount,
+      date: new Date().toISOString().slice(0, 10),
+      month: currentMonth, full: true,
+    });
+    setSettledPairs(p => ({ ...p, [debtorUid]: true }));
     await sendNotification({
       type: NOTIF_TYPES.ACCOUNT_SETTLED,
       title: "¡Cuentas saldadas! 🎉",
-      body: `Las cuentas de ${new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long" })} fueron saldadas.`,
-      fromName: members[0]?.name || "Un miembro",
-      toUids: otherMembers.map(m => m.uid),
-      accountId: account?.id,
-      accountName: account?.name,
+      body: `${debtor?.name} saldó ${fmt(amount)} con ${creditor?.name}`,
+      fromName: debtor?.name || "Un miembro",
+      toUids: members.filter(m => m.uid !== debtorUid).map(m => m.uid),
+      accountId: account?.id, accountName: account?.name,
     });
   };
-  const debtSummary = () => {
-    if (!members || members.length < 2) return "Configurá los miembros para ver saldos";
-    const balances = members.map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
-    const creditor = balances.find(m => m.balance > 0);
-    const debtor   = balances.find(m => m.balance < 0);
-    if (!creditor || !debtor) return "¡Están al día! 🎉";
-    return `${debtor.name} le debe ${fmt(Math.abs(debtor.balance))} a ${creditor.name}`;
+
+  const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => {
+    await addDoc(collection(db, "accounts", account.id, "settlements"), {
+      debtorUid, creditorUid, amount, date, month: currentMonth, full: false,
+    });
+    setPartialModal(null);
   };
+
+  // Calcular deuda remanente considerando pagos parciales del mes
+  const getRemainingDebt = (debtorUid, creditorUid, originalAmount) => {
+    const paid = monthSettlements
+      .filter(s => s.debtorUid === debtorUid && s.creditorUid === creditorUid)
+      .reduce((s, p) => s + p.amount, 0);
+    return Math.max(0, originalAmount - paid);
+  };
+
+  // Siguiente mes para "pasar saldo"
+  const nextMonth = (() => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    const next = new Date(y, m, 1); // mes siguiente (m es 1-based pero Date usa 0-based, así que m sin -1 ya es el siguiente)
+    return next.toISOString().slice(0, 7);
+  })();
+
+  const handlePassDebt = async (debts) => {
+    const currentMonthName = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long" });
+    for (const d of debts) {
+      await onAddExpense({
+        concept: `Saldo pendiente del mes de ${currentMonthName}`,
+        amount: d.amount,
+        type: "personal",
+        category: "otros",
+        date: nextMonth + "-01",
+        month: nextMonth,
+        paidBy: d.creditorUid,
+        forWhom: [d.debtorUid],
+        createdBy: currentUser.uid,
+        accountId: account?.id,
+        isDebtCarryover: true,
+      });
+    }
+    setShowPassDebt(false);
+  };
+
+  // Deudas pendientes (restando pagos parciales)
+  const pendingDebts = debtPairs
+    .map(d => ({ ...d, remaining: getRemainingDebt(d.debtorUid, d.creditorUid, d.amount) }))
+    .filter(d => d.remaining > 0);
+
+  const totalSalary = (members || []).reduce((acc, mb) => acc + (mb.salary || 0), 0);
+
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
       <SectionTitle>Saldos del mes</SectionTitle>
+
+      {/* Tarjeta por miembro */}
       {members?.map(m => {
         const s = saldos[m.uid] || { paid: 0, owes: 0, balance: 0 };
-        const totalSalary = members.reduce((acc, mb) => acc + (mb.salary || 0), 0);
         const showPct = account?.divisionSystem === "proportional" && totalSalary > 0;
         const pct = showPct ? ((m.salary || 0) / totalSalary * 100).toFixed(0) : null;
         return (
@@ -803,14 +971,94 @@ function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth,
           </Card>
         );
       })}
-      <Card style={{ background: colors.headerBg, border: "none" }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: "#ffffff55", textTransform: "uppercase", marginBottom: 8, fontFamily: FONT }}>Conclusión</p>
-        <p style={{ color: "#fff", fontSize: 15, fontWeight: 600, margin: 0, fontFamily: FONT }}>{debtSummary()}</p>
-        {!settled
-          ? <button onClick={handleSettle} style={{ marginTop: 16, width: "100%", padding: 14, borderRadius: 14, background: "#4F7FFA", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>✅ Saldar cuentas</button>
-          : <div style={{ marginTop: 14, background: "#2ecc7122", borderRadius: 12, padding: 14, textAlign: "center" }}><p style={{ color: "#2ecc71", fontWeight: 700, margin: 0, fontFamily: FONT }}>¡Cuentas saldadas! 🎉</p></div>}
+
+      {/* ── SALDADO DE CUENTAS ── */}
+      <Card style={{ background: colors.headerBg, border: "none", marginTop: 8 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: "#ffffff55", textTransform: "uppercase", marginBottom: 12, fontFamily: FONT }}>Saldado de cuentas</p>
+
+        {debtPairs.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+            <p style={{ fontSize: 28, margin: "0 0 6px" }}>🎉</p>
+            <p style={{ color: "#fff", fontWeight: 700, margin: 0, fontFamily: FONT }}>¡Están al día!</p>
+          </div>
+        ) : (
+          debtPairs.map(pair => {
+            const debtor   = members.find(m => m.uid === pair.debtorUid);
+            const creditor = members.find(m => m.uid === pair.creditorUid);
+            const remaining = getRemainingDebt(pair.debtorUid, pair.creditorUid, pair.amount);
+            const isSettled = remaining === 0 || settledPairs[pair.debtorUid];
+            const pairSettlements = monthSettlements.filter(s => s.debtorUid === pair.debtorUid && s.creditorUid === pair.creditorUid);
+
+            return (
+              <div key={pair.debtorUid} style={{ marginBottom: 16 }}>
+                {/* Resumen deuda */}
+                <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 14, padding: "12px 14px", marginBottom: 8 }}>
+                  <p style={{ margin: "0 0 2px", fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT }}>
+                    {debtor?.name} le debe a {creditor?.name}
+                  </p>
+                  <p style={{ margin: 0, fontSize: 13, color: isSettled ? "#2ecc71" : "#FA4F7F", fontWeight: 600, fontFamily: FONT }}>
+                    {isSettled ? "✅ Saldado" : fmt(remaining) + " pendiente"}
+                  </p>
+                  {/* Historial de pagos parciales */}
+                  {pairSettlements.map(s => (
+                    <p key={s.id} style={{ margin: "4px 0 0", fontSize: 11, color: "#ffffff88", fontFamily: FONT }}>
+                      ✓ {fmt(s.amount)} pagado el {fmtDate(s.date)}
+                    </p>
+                  ))}
+                </div>
+
+                {/* Botones de acción */}
+                {!isSettled && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => handleFullSettle(pair.debtorUid, pair.creditorUid, remaining)}
+                      style={{ flex: 1, padding: "11px 0", borderRadius: 12, background: "#2ecc71", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
+                      ✅ Saldar
+                    </button>
+                    <button onClick={() => setPartialModal({ debtorUid: pair.debtorUid, creditorUid: pair.creditorUid, amount: remaining })}
+                      style={{ flex: 1, padding: "11px 0", borderRadius: 12, background: "rgba(255,255,255,0.12)", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
+                      💸 Saldar parcial
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+
+        {/* Pasar saldo al mes siguiente */}
+        {pendingDebts.length > 0 && (
+          <button onClick={() => setShowPassDebt(true)}
+            style={{ width: "100%", marginTop: 8, padding: 13, borderRadius: 14, background: "rgba(255,255,255,0.1)", color: "#ffffffcc", border: "1px solid rgba(255,255,255,0.2)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>
+            📅 Pasar saldo al mes siguiente
+          </button>
+        )}
       </Card>
+
       <div style={{ height: 120 }} />
+
+      {/* Modales */}
+      {partialModal && (
+        <PartialSettleModal
+          debtor={members.find(m => m.uid === partialModal.debtorUid)}
+          creditor={members.find(m => m.uid === partialModal.creditorUid)}
+          totalDebt={partialModal.amount}
+          fmt={fmt}
+          colors={colors}
+          onConfirm={handlePartialSettle}
+          onClose={() => setPartialModal(null)}
+        />
+      )}
+      {showPassDebt && (
+        <PassDebtModal
+          debts={pendingDebts}
+          members={members}
+          nextMonth={nextMonth}
+          fmt={fmt}
+          colors={colors}
+          onConfirm={handlePassDebt}
+          onClose={() => setShowPassDebt(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1075,7 +1323,7 @@ function AppInner() {
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
         {tab === "home"     && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} />}
-        {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={members} account={account} currentMonth={currentMonth} currentUser={authUser} />}
+        {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={members} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} />}
         {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} />}
         {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
       </div>

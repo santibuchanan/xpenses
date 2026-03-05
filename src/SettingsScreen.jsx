@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
+import DateInput from "./DateInput";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 const CURRENCIES = ["ARS", "USD", "EUR"];
@@ -96,7 +97,7 @@ function EditCategoryModal({ category, onSave, onClose, onDelete, isDefault, col
 // createdBy: uid del usuario que lo crea (para visibilidad de personales)
 function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount }) {
   const [form, setForm] = useState(
-    expense || { name: "", amount: "", dueDay: "", shared: true }
+    expense || { name: "", amount: "", dueDay: "", shared: true, startDate: new Date().toISOString().slice(0, 10) }
   );
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -142,6 +143,9 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
             </div>
           </>
         )}
+
+        <p style={labelStyle}>Fecha de inicio</p>
+        <DateInput value={form.startDate || new Date().toISOString().slice(0, 10)} onChange={v => set("startDate", v)} />
 
         <p style={labelStyle}>Día de vencimiento (opcional)</p>
         <input
