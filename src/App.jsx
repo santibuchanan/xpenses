@@ -427,11 +427,19 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
 // ── POPUP CONFIRMAR ELIMINACIÓN ──
 function DeleteConfirmPopup({ expense, fmt, allCategories, colors, onConfirm, onCancel }) {
   const cat = allCategories?.find(c => c.id === expense.category);
+  const [loading, setLoading] = useState(false);
   const startY = useRef(null);
   const [dragY, setDragY] = useState(0);
   const onTouchStart = (ev) => { startY.current = ev.touches[0].clientY; };
   const onTouchMove  = (ev) => { const dy = ev.touches[0].clientY - startY.current; if (dy > 0) setDragY(dy); };
   const onTouchEnd   = () => { if (dragY > 100) onCancel(); else setDragY(0); startY.current = null; };
+
+  const handleConfirm = async () => {
+    if (loading) return;
+    setLoading(true);
+    await onConfirm();
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }} onClick={onCancel}>
       <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onClick={e => e.stopPropagation()}
@@ -447,8 +455,10 @@ function DeleteConfirmPopup({ expense, fmt, allCategories, colors, onConfirm, on
           </div>
         </div>
         <p style={{ fontSize: 15, color: colors.text, margin: "0 0 20px", fontFamily: FONT, lineHeight: 1.5 }}>¿Eliminás este gasto? Esta acción no se puede deshacer.</p>
-        <button onClick={onConfirm} style={{ width: "100%", padding: 15, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>🗑️ Eliminar</button>
-        <button onClick={onCancel} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+        <button onClick={handleConfirm} disabled={loading} style={{ width: "100%", padding: 15, borderRadius: 14, background: loading ? "#aaa" : "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10 }}>
+          {loading ? "Eliminando..." : "🗑️ Eliminar"}
+        </button>
+        <button onClick={onCancel} disabled={loading} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
       </div>
     </div>
   );
@@ -554,7 +564,7 @@ function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, on
       </div>
       {showDelete && (
         <DeleteConfirmPopup expense={e} fmt={fmt} allCategories={allCategories} colors={colors}
-          onConfirm={() => { setShowDelete(false); onDelete(e.id); }}
+          onConfirm={async () => { await onDelete(e.id); setShowDelete(false); }}
           onCancel={() => setShowDelete(false)} />
       )}
     </>
@@ -1373,7 +1383,11 @@ function AppInner() {
   useEffect(() => {
     if (!authUser) return;
     const q = query(collection(db, "expenses"), orderBy("date", "desc"));
-    return onSnapshot(q, snap => { setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    return onSnapshot(q, snap => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      console.log("snapshot expenses — deleted count:", data.filter(e => e.deleted).length);
+      setExpenses(data);
+    });
   }, [authUser]);
 
   useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "categories"), snap => { setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
