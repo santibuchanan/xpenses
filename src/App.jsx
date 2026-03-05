@@ -74,15 +74,15 @@ function NavIcon({ id, active, color }) {
   return null;
 }
 
-// ── calcSaldos: incluye gastos fijos no pagados en el mes ──
-function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMonth) {
+// ── calcSaldos: todos los tipos de gasto + gastos fijos + settlements ──
+function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMonth, settlements) {
   if (!members || members.length < 2) return {};
   const result = {};
   members.forEach(m => { result[m.uid] = { paid: 0, owes: 0 }; });
   const totalSalary = members.reduce((s, m) => s + (m.salary || 0), 0);
 
-  // Gastos normales
   expenses.forEach(e => {
+    // HOGAR: se divide entre todos
     if (e.type === "hogar") {
       if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
       members.forEach(m => {
@@ -92,33 +92,46 @@ function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMon
         if (result[m.uid] !== undefined) result[m.uid].owes += share;
       });
     }
+    // PERSONAL / PARA OTRO: pagador a favor, destinatarios en contra
     if (e.type === "personal") {
       if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
       const targets = (Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []))
-        .filter(uid => result[uid] !== undefined); // solo uids que existen en members
+        .filter(uid => result[uid] !== undefined);
       if (targets.length > 0) {
         targets.forEach(uid => { result[uid].owes += e.amount / targets.length; });
       } else if (result[e.paidBy] !== undefined) {
-        // fallback: si no hay destinatario válido, imputar al pagador para no romper el balance
-        result[e.paidBy].owes += e.amount;
+        result[e.paidBy].owes += e.amount; // fallback neto 0
       }
     }
+    // MIO / PARA MÍ: pagador a favor, owner en contra
+    if (e.type === "mio") {
+      if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
+      const ownerUid = e.owner;
+      if (ownerUid && result[ownerUid] !== undefined) {
+        result[ownerUid].owes += e.amount;
+      } else if (result[e.paidBy] !== undefined) {
+        result[e.paidBy].owes += e.amount; // fallback neto 0 si owner inválido
+      }
+    }
+    // EXTRAORDINARIO
     if (e.type === "extraordinary") {
       members.forEach(m => {
         const paid = e[`paid_${m.uid}`] || 0;
-        if (result[m.uid] !== undefined) { result[m.uid].paid += paid; result[m.uid].owes += e.amount / members.length; }
+        if (result[m.uid] !== undefined) {
+          result[m.uid].paid += paid;
+          result[m.uid].owes += e.amount / members.length;
+        }
       });
     }
   });
 
-  // Gastos fijos no pagados en el mes actual → imputan como deuda
+  // Gastos fijos
   (fixedExpenses || []).forEach(f => {
     const payment = f.payments?.[currentMonth];
     const isPaid = payment?.paid === true;
     if (isPaid) {
       const paidByUid = payment.paidBy;
       if (f.shared) {
-        // Hogar pagado: quien pagó suma a "paid", todos suman a "owes" según %
         if (result[paidByUid] !== undefined) result[paidByUid].paid += f.amount;
         members.forEach(m => {
           const share = divisionSystem === "proportional" && totalSalary > 0
@@ -127,13 +140,10 @@ function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMon
           if (result[m.uid] !== undefined) result[m.uid].owes += share;
         });
       } else {
-        // Personal pagado: quien pagó suma a "paid", el creador (dueño) suma a "owes"
-        // Si B pagó el gimnasio de A → B queda a favor, A queda en deuda
         if (result[paidByUid] !== undefined) result[paidByUid].paid += f.amount;
         if (result[f.createdBy] !== undefined) result[f.createdBy].owes += f.amount;
       }
     } else {
-      // No pagado: imputa como deuda pendiente
       if (f.shared) {
         members.forEach(m => {
           const share = divisionSystem === "proportional" && totalSalary > 0
@@ -142,10 +152,15 @@ function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMon
           if (result[m.uid] !== undefined) result[m.uid].owes += share;
         });
       } else {
-        // Personal no pagado: solo el creador debe
         if (result[f.createdBy] !== undefined) result[f.createdBy].owes += f.amount;
       }
     }
+  });
+
+  // Settlements: el deudor pagó → suma a su paid, el acreedor recibió → suma a su owes
+  (settlements || []).forEach(s => {
+    if (result[s.debtorUid] !== undefined) result[s.debtorUid].paid += s.amount;
+    if (result[s.creditorUid] !== undefined) result[s.creditorUid].owes += s.amount;
   });
 
   Object.keys(result).forEach(uid => { result[uid].balance = result[uid].paid - result[uid].owes; });
@@ -888,27 +903,12 @@ function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth,
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
-  const monthExp = expenses.filter(e => e.month === currentMonth && e.type !== "mio");
+
+  // Incluir TODOS los tipos de gasto en el cálculo de saldos
+  const monthExp = expenses.filter(e => e.month === currentMonth);
   const visibleFixed = (fixedExpenses || []).filter(f => f.shared || f.createdBy === currentUser.uid);
-  const saldos = calcSaldos(monthExp, visibleFixed, members, account?.divisionSystem, currentMonth);
 
-  // Calcular pares deudor→acreedor
-  const balances = (members || []).map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
-  const debtPairs = []; // [{ debtorUid, creditorUid, amount }]
-  balances.forEach(debtor => {
-    if (debtor.balance >= 0) return;
-    balances.forEach(creditor => {
-      if (creditor.balance <= 0) return;
-      const amount = Math.min(Math.abs(debtor.balance), creditor.balance);
-      if (amount > 0) debtPairs.push({ debtorUid: debtor.uid, creditorUid: creditor.uid, amount });
-    });
-  });
-
-  const [partialModal, setPartialModal] = useState(null); // { debtorUid, creditorUid, amount }
-  const [showPassDebt, setShowPassDebt] = useState(false);
-  const [settledPairs, setSettledPairs]  = useState({}); // { debtorUid: true }
-
-  // Historial de pagos parciales del mes (guardado en Firestore como subcolección)
+  // Historial de pagos parciales del mes
   const [settlements, setSettlements] = useState([]);
   useEffect(() => {
     if (!account?.id) return;
@@ -919,6 +919,25 @@ function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth,
   }, [account?.id]);
 
   const monthSettlements = settlements.filter(s => s.month === currentMonth);
+
+  // Calcular saldos con todos los datos
+  const saldos = calcSaldos(monthExp, visibleFixed, members, account?.divisionSystem, currentMonth, monthSettlements);
+
+  // Pares deudor→acreedor (usando balances ya con settlements descontados)
+  const balances = (members || []).map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
+  const debtPairs = [];
+  balances.forEach(debtor => {
+    if (debtor.balance >= 0) return;
+    balances.forEach(creditor => {
+      if (creditor.balance <= 0) return;
+      const amount = Math.min(Math.abs(debtor.balance), creditor.balance);
+      if (amount > 0) debtPairs.push({ debtorUid: debtor.uid, creditorUid: creditor.uid, amount });
+    });
+  });
+
+  const [partialModal, setPartialModal] = useState(null);
+  const [showPassDebt, setShowPassDebt] = useState(false);
+  const [settledPairs, setSettledPairs] = useState({});
 
   const handleFullSettle = async (debtorUid, creditorUid, amount) => {
     const debtor   = members.find(m => m.uid === debtorUid);
@@ -946,13 +965,9 @@ function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth,
     setPartialModal(null);
   };
 
-  // Calcular deuda remanente considerando pagos parciales del mes
-  const getRemainingDebt = (debtorUid, creditorUid, originalAmount) => {
-    const paid = monthSettlements
-      .filter(s => s.debtorUid === debtorUid && s.creditorUid === creditorUid)
-      .reduce((s, p) => s + p.amount, 0);
-    return Math.max(0, originalAmount - paid);
-  };
+  // Como calcSaldos ya descuenta los settlements, los debtPairs ya tienen la deuda real
+  // getRemainingDebt retorna directamente el monto del par (que ya es el remanente)
+  const getRemainingDebt = (debtorUid, creditorUid, originalAmount) => originalAmount;
 
   // Siguiente mes para "pasar saldo"
   const nextMonth = (() => {
