@@ -1364,6 +1364,8 @@ function AppInner() {
     }
   };
 
+  const [deleteWarning, setDeleteWarning] = useState(null); // { expense }
+
   const handleEditSave = async (updatedExpense) => {
     const otherMembers = members?.filter(m => !m._isLabel && m.uid !== authUser.uid) || [];
     const myName = members?.find(m => m.uid === authUser.uid)?.name || "Alguien";
