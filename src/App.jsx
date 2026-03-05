@@ -18,19 +18,18 @@ const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sa
 const NAV_HEIGHT = 72;
 
 const DEFAULT_CATEGORIES = [
-  { id: "super",     label: "Supermercado",          icon: "🛒" },
-  { id: "salidas",   label: "Salidas",                icon: "🍕" },
-  { id: "servicios", label: "Impuestos y Servicios",  icon: "💡" },
-  { id: "transporte",label: "Transporte",             icon: "🚗" },
-  { id: "salud",     label: "Salud",                  icon: "💊" },
-  { id: "ropa",      label: "Ropa y Calzado",         icon: "👗" },
-  { id: "hogar",     label: "Hogar",                  icon: "🏠" },
-  { id: "otros",     label: "Otros",                  icon: "📦" },
+  { id: "super",      label: "Supermercado",          icon: "🛒" },
+  { id: "salidas",    label: "Salidas",                icon: "🍕" },
+  { id: "servicios",  label: "Impuestos y Servicios",  icon: "💡" },
+  { id: "transporte", label: "Transporte",             icon: "🚗" },
+  { id: "salud",      label: "Salud",                  icon: "💊" },
+  { id: "ropa",       label: "Ropa y Calzado",         icon: "👗" },
+  { id: "hogar",      label: "Hogar",                  icon: "🏠" },
+  { id: "otros",      label: "Otros",                  icon: "📦" },
 ];
 const CAT_COLORS = ["#4F7FFA","#FA4F7F","#f39c12","#2ecc71","#9b59b6","#1abc9c","#e74c3c","#95a5a6"];
 const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
-// yyyy-mm-dd → dd-mm-yyyy
 const fmtDate = (iso) => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
@@ -75,11 +74,14 @@ function NavIcon({ id, active, color }) {
   return null;
 }
 
-function calcSaldos(expenses, members, divisionSystem) {
+// ── calcSaldos: incluye gastos fijos no pagados en el mes ──
+function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMonth) {
   if (!members || members.length < 2) return {};
   const result = {};
   members.forEach(m => { result[m.uid] = { paid: 0, owes: 0 }; });
   const totalSalary = members.reduce((s, m) => s + (m.salary || 0), 0);
+
+  // Gastos normales
   expenses.forEach(e => {
     if (e.type === "hogar") {
       if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
@@ -102,6 +104,44 @@ function calcSaldos(expenses, members, divisionSystem) {
       });
     }
   });
+
+  // Gastos fijos no pagados en el mes actual → imputan como deuda
+  (fixedExpenses || []).forEach(f => {
+    const payment = f.payments?.[currentMonth];
+    const isPaid = payment?.paid === true;
+    if (isPaid) {
+      // Si está pagado: el que pagó suma a "paid", todos suman a "owes"
+      const paidByUid = payment.paidBy;
+      if (f.shared) {
+        if (result[paidByUid] !== undefined) result[paidByUid].paid += f.amount;
+        members.forEach(m => {
+          const share = divisionSystem === "proportional" && totalSalary > 0
+            ? f.amount * ((m.salary || 0) / totalSalary)
+            : f.amount / members.length;
+          if (result[m.uid] !== undefined) result[m.uid].owes += share;
+        });
+      } else {
+        // Personal: solo imputa al creador
+        if (result[f.createdBy] !== undefined) {
+          result[f.createdBy].paid += f.amount;
+          result[f.createdBy].owes += f.amount;
+        }
+      }
+    } else {
+      // No pagado: imputa como deuda pendiente (owes sin paid)
+      if (f.shared) {
+        members.forEach(m => {
+          const share = divisionSystem === "proportional" && totalSalary > 0
+            ? f.amount * ((m.salary || 0) / totalSalary)
+            : f.amount / members.length;
+          if (result[m.uid] !== undefined) result[m.uid].owes += share;
+        });
+      } else {
+        if (result[f.createdBy] !== undefined) result[f.createdBy].owes += f.amount;
+      }
+    }
+  });
+
   Object.keys(result).forEach(uid => { result[uid].balance = result[uid].paid - result[uid].owes; });
   return result;
 }
@@ -134,31 +174,15 @@ function Spinner({ text = "Cargando..." }) {
 // ── HEADER ──
 function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
   return (
-    <div style={{
-      position: "fixed", top: 0, left: 0, right: 0, zIndex: 60,
-      maxWidth: 500, margin: "0 auto",
-      background: colors.headerBg,
-      paddingTop: "calc(env(safe-area-inset-top) + 12px)",
-      paddingBottom: 14, paddingLeft: 20, paddingRight: 20,
-    }}>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 60, maxWidth: 500, margin: "0 auto", background: colors.headerBg, paddingTop: "calc(env(safe-area-inset-top) + 12px)", paddingBottom: 14, paddingLeft: 20, paddingRight: 20 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <button onClick={onMenuOpen} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}>
-          <MenuIcon />
-        </button>
+        <button onClick={onMenuOpen} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}><MenuIcon /></button>
         <div style={{ flex: 1 }}>
           <p style={{ color: "#ffffff55", fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", margin: "0 0 1px", fontFamily: FONT }}>X-penses</p>
           <p style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: -0.3, fontFamily: FONT }}>{account?.name || "Mis cuentas"}</p>
         </div>
-        <button onClick={onNotifsOpen} style={{
-          position: "relative", background: "rgba(255,255,255,0.12)",
-          border: "none", borderRadius: 50,
-          width: 38, height: 38, display: "flex", alignItems: "center",
-          justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0,
-        }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffffcc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a2 2 0 01-3.46 0"/>
-          </svg>
+        <button onClick={onNotifsOpen} style={{ position: "relative", background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 50, width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffffcc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
           {unreadCount > 0 && (
             <div style={{ position: "absolute", top: 5, right: 5, width: 14, height: 14, borderRadius: 7, background: "#FA4F7F", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <span style={{ fontSize: 8, color: "#fff", fontWeight: 700, fontFamily: FONT }}>{unreadCount > 9 ? "9+" : unreadCount}</span>
@@ -234,76 +258,39 @@ function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, cu
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const defaultType = isPersonal ? "mio" : "hogar";
   const memberList = allMembers || [];
-
   const [form, setForm] = useState({
-    type: defaultType,
-    concept: "", amount: "", category: "super",
+    type: defaultType, concept: "", amount: "", category: "super",
     date: new Date().toISOString().slice(0, 10),
-    paidBy: currentUser.uid,
-    forWhom: memberList.map(m => m.uid), // todos seleccionados por default
-    owner: currentUser.uid,
+    paidBy: currentUser.uid, forWhom: memberList.map(m => m.uid), owner: currentUser.uid,
   });
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const currSymbol = CURRENCIES[currency]?.symbol || "$";
-
-  // Al cambiar tipo, resetear forWhom
-  const setType = (t) => {
-    setForm(f => ({
-      ...f, type: t,
-      forWhom: (t === "hogar" || t === "extraordinary") ? memberList.map(m => m.uid) : [],
-    }));
-  };
-
-  const toggleForWhom = (uid) => {
-    setForm(f => {
-      const cur = f.forWhom || [];
-      return { ...f, forWhom: cur.includes(uid) ? cur.filter(u => u !== uid) : [...cur, uid] };
-    });
-  };
-
-  // Swipe to close
+  const setType = (t) => { setForm(f => ({ ...f, type: t, forWhom: (t === "hogar" || t === "extraordinary") ? memberList.map(m => m.uid) : [] })); };
+  const toggleForWhom = (uid) => { setForm(f => { const cur = f.forWhom || []; return { ...f, forWhom: cur.includes(uid) ? cur.filter(u => u !== uid) : [...cur, uid] }; }); };
   const sheetRef = useRef(null);
   const startY = useRef(null);
   const dragY = useRef(0);
   const [translateY, setTranslateY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const onTouchStart = (e) => {
-    const handle = sheetRef.current?.querySelector("[data-handle]");
-    if (handle && handle.contains(e.target)) { startY.current = e.touches[0].clientY; setIsDragging(true); }
-  };
-  const onTouchMove = (e) => {
-    if (!isDragging || startY.current === null) return;
-    e.stopPropagation();
-    const dy = e.touches[0].clientY - startY.current;
-    if (dy > 0) { dragY.current = dy; setTranslateY(dy); }
-  };
-  const onTouchEnd = () => {
-    if (dragY.current > 120) onClose(); else setTranslateY(0);
-    dragY.current = 0; startY.current = null; setIsDragging(false);
-  };
-
+  const onTouchStart = (e) => { const handle = sheetRef.current?.querySelector("[data-handle]"); if (handle && handle.contains(e.target)) { startY.current = e.touches[0].clientY; setIsDragging(true); } };
+  const onTouchMove = (e) => { if (!isDragging || startY.current === null) return; e.stopPropagation(); const dy = e.touches[0].clientY - startY.current; if (dy > 0) { dragY.current = dy; setTranslateY(dy); } };
+  const onTouchEnd = () => { if (dragY.current > 120) onClose(); else setTranslateY(0); dragY.current = 0; startY.current = null; setIsDragging(false); };
   const labelStyle = { fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT };
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
-
   const handleAdd = async () => {
     if (!form.concept || !form.amount) return;
     setLoading(true);
     const amount = parseFloat(form.amount);
     const extra = {};
-    if (form.type === "extraordinary" && memberList.length > 0) {
-      memberList.forEach(m => { extra[`paid_${m.uid}`] = m.uid === form.paidBy ? amount : 0; });
-    }
+    if (form.type === "extraordinary" && memberList.length > 0) memberList.forEach(m => { extra[`paid_${m.uid}`] = m.uid === form.paidBy ? amount : 0; });
     await onAdd({ ...form, ...extra, amount, month: form.date.slice(0, 7) });
-    setLoading(false);
-    onClose();
+    setLoading(false); onClose();
   };
-
   const types = [["hogar","🏠 Hogar"],["personal","🎁 Para otro"],["extraordinary","✈️ Extraordinario"],["mio","👤 Para mí"]];
   const showPaidBy  = !isPersonal && form.type !== "mio" && memberList.length > 0;
   const showForWhom = !isPersonal && (form.type === "personal" || form.type === "extraordinary" || form.type === "hogar") && memberList.length > 0;
   const showOwner   = !isPersonal && form.type === "mio" && memberList.length > 0;
-
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
       <div ref={sheetRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
@@ -315,8 +302,6 @@ function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, cu
           <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Nuevo Gasto</span>
           <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
         </div>
-
-        {/* Tipo: solo en cuentas compartidas */}
         {!isPersonal && (
           <>
             <p style={labelStyle}>Tipo</p>
@@ -327,83 +312,52 @@ function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, cu
             </div>
           </>
         )}
-
         <p style={labelStyle}>Concepto</p>
         <input value={form.concept} onChange={e => set("concept", e.target.value)} placeholder="Ej: Supermercado" style={inputStyle} />
-
         <p style={labelStyle}>Monto ({currSymbol})</p>
         <div style={{ position: "relative", marginBottom: 14 }}>
           <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
           <input type="number" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0" style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36 }} />
         </div>
-
         <p style={labelStyle}>Categoría</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
           {allCategories.map(c => (
             <button key={c.id} onClick={() => set("category", c.id)} style={{ padding: "7px 12px", borderRadius: 12, border: "2px solid", fontSize: 12, cursor: "pointer", fontFamily: FONT, borderColor: form.category === c.id ? "#4F7FFA" : colors.inputBorder, background: form.category === c.id ? "#4F7FFA11" : colors.input, color: form.category === c.id ? "#4F7FFA" : colors.text }}>{c.icon} {c.label}</button>
           ))}
         </div>
-
         <p style={labelStyle}>Fecha</p>
         <DateInput value={form.date} onChange={v => set("date", v)} />
-
-        {/* Pagó */}
         {showPaidBy && (
           <>
             <p style={labelStyle}>Pagó</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
               {memberList.map(m => (
-                <button key={m.uid} onClick={() => set("paidBy", m.uid)}
-                  style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                    borderColor: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder,
-                    background: form.paidBy === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input,
-                    color: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>
-                  {m.name}
-                </button>
+                <button key={m.uid} onClick={() => set("paidBy", m.uid)} style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder, background: form.paidBy === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input, color: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>{m.name}</button>
               ))}
             </div>
           </>
         )}
-
-        {/* Para quién/es */}
         {showForWhom && (
           <>
             <p style={labelStyle}>Para quién/es</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
               {memberList.map(m => {
                 const sel = form.forWhom?.includes(m.uid);
-                return (
-                  <button key={m.uid} onClick={() => toggleForWhom(m.uid)}
-                    style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                      borderColor: sel ? (m.color || "#4F7FFA") : colors.inputBorder,
-                      background: sel ? (m.color || "#4F7FFA") + "18" : colors.input,
-                      color: sel ? (m.color || "#4F7FFA") : colors.textMuted }}>
-                    {m.name}
-                  </button>
-                );
+                return <button key={m.uid} onClick={() => toggleForWhom(m.uid)} style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: sel ? (m.color || "#4F7FFA") : colors.inputBorder, background: sel ? (m.color || "#4F7FFA") + "18" : colors.input, color: sel ? (m.color || "#4F7FFA") : colors.textMuted }}>{m.name}</button>;
               })}
             </div>
           </>
         )}
-
-        {/* ¿De quién? — para mí en cuentas compartidas */}
         {showOwner && (
           <>
             <p style={labelStyle}>¿De quién?</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
               {memberList.map(m => (
-                <button key={m.uid} onClick={() => set("owner", m.uid)}
-                  style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                    borderColor: form.owner === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder,
-                    background: form.owner === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input,
-                    color: form.owner === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>
-                  {m.name}
-                </button>
+                <button key={m.uid} onClick={() => set("owner", m.uid)} style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.owner === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder, background: form.owner === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input, color: form.owner === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>{m.name}</button>
               ))}
             </div>
           </>
         )}
-
         <button onClick={handleAdd} disabled={loading} style={{ width: "100%", padding: 16, borderRadius: 16, background: loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 600, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginTop: 4 }}>
           {loading ? "Guardando..." : "Agregar ✓"}
         </button>
@@ -442,13 +396,10 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
             </button>
           ))}
         </div>
-        <button onClick={handleClaim} disabled={!selected || loading}
-          style={{ width: "100%", padding: 16, borderRadius: 16, border: "none", background: !selected || loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", fontSize: 16, fontWeight: 700, cursor: !selected || loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10 }}>
+        <button onClick={handleClaim} disabled={!selected || loading} style={{ width: "100%", padding: 16, borderRadius: 16, border: "none", background: !selected || loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", fontSize: 16, fontWeight: 700, cursor: !selected || loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10 }}>
           {loading ? "Uniéndome..." : "¡Soy yo, unirme! →"}
         </button>
-        <button onClick={onSkip} style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", background: colors.pill, color: colors.textMuted, fontSize: 14, cursor: "pointer", fontFamily: FONT }}>
-          Mi nombre no está en la lista
-        </button>
+        <button onClick={onSkip} style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", background: colors.pill, color: colors.textMuted, fontSize: 14, cursor: "pointer", fontFamily: FONT }}>Mi nombre no está en la lista</button>
       </div>
     </div>
   );
@@ -459,41 +410,24 @@ function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, on
   const [offsetX, setOffsetX] = useState(0);
   const startX = useRef(null);
   const EDIT_W = 64, DEL_W = 64, TOTAL = EDIT_W + DEL_W + 8;
-
   const onTouchStart = (ev) => { startX.current = ev.touches[0].clientX; };
-  const onTouchMove = (ev) => {
-    if (startX.current === null) return;
-    const dx = startX.current - ev.touches[0].clientX;
-    if (dx > 0) setOffsetX(Math.min(dx, TOTAL + 16));
-  };
-  const onTouchEnd = () => {
-    if (offsetX > TOTAL / 2) setOffsetX(TOTAL); else setOffsetX(0);
-    startX.current = null;
-  };
-
+  const onTouchMove = (ev) => { if (startX.current === null) return; const dx = startX.current - ev.touches[0].clientX; if (dx > 0) setOffsetX(Math.min(dx, TOTAL + 16)); };
+  const onTouchEnd = () => { if (offsetX > TOTAL / 2) setOffsetX(TOTAL); else setOffsetX(0); startX.current = null; };
   const cat = allCategories.find(c => c.id === e.category);
-  const who = e.type === "mio"
-    ? allMembers?.find(m => m.uid === e.owner)
-    : allMembers?.find(m => m.uid === e.paidBy);
+  const who = e.type === "mio" ? allMembers?.find(m => m.uid === e.owner) : allMembers?.find(m => m.uid === e.paidBy);
   const typeColor = e.type === "hogar" ? "#4F7FFA" : e.type === "personal" ? "#FA4F7F" : e.type === "extraordinary" ? "#f39c12" : "#2ecc71";
   const typeLabel = e.type === "hogar" ? "Hogar" : e.type === "personal" ? "Para otro" : e.type === "extraordinary" ? "Extraordinario" : "Para mí";
-
   return (
     <div style={{ position: "relative", marginBottom: 10, borderRadius: 20, overflow: "hidden" }}>
       <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, display: "flex", gap: 8, padding: "0 4px", alignItems: "center" }}>
-        <button onClick={() => { setOffsetX(0); onEdit(e); }}
-          style={{ width: EDIT_W, height: "calc(100% - 8px)", borderRadius: 16, background: "#4F7FFA", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3 }}>
-          <span style={{ fontSize: 18 }}>✏️</span>
-          <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Editar</span>
+        <button onClick={() => { setOffsetX(0); onEdit(e); }} style={{ width: EDIT_W, height: "calc(100% - 8px)", borderRadius: 16, background: "#4F7FFA", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3 }}>
+          <span style={{ fontSize: 18 }}>✏️</span><span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Editar</span>
         </button>
-        <button onClick={() => { setOffsetX(0); onDelete(e.id); }}
-          style={{ width: DEL_W, height: "calc(100% - 8px)", borderRadius: 16, background: "#e74c3c", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3 }}>
-          <span style={{ fontSize: 18 }}>🗑️</span>
-          <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+        <button onClick={() => { setOffsetX(0); onDelete(e.id); }} style={{ width: DEL_W, height: "calc(100% - 8px)", borderRadius: 16, background: "#e74c3c", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3 }}>
+          <span style={{ fontSize: 18 }}>🗑️</span><span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
         </button>
       </div>
-      <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-        onClick={() => offsetX > 0 && setOffsetX(0)}
+      <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onClick={() => offsetX > 0 && setOffsetX(0)}
         style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, transform: `translateX(-${offsetX}px)`, transition: startX.current === null ? "transform 0.25s ease" : "none", position: "relative", zIndex: 1 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
@@ -511,36 +445,149 @@ function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, on
   );
 }
 
+// ── FIXED EXPENSE ROW (en Inicio) ──
+// Muestra estado pagado/no pagado y botón para pagar
+function FixedExpenseHomeRow({ f, fmt, fs, colors, currentMonth, allMembers, onMarkPaid, isPersonal }) {
+  const payment = f.payments?.[currentMonth];
+  const isPaid = payment?.paid === true;
+  const paidByMember = isPaid ? allMembers?.find(m => m.uid === payment.paidBy) : null;
+  const today = new Date().getDate();
+  const daysLeft = f.dueDay ? f.dueDay - today : null;
+  const isUrgent = !isPaid && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
+  const isOverdue = !isPaid && daysLeft !== null && daysLeft < 0;
+
+  return (
+    <Card style={{ padding: "12px 16px", marginBottom: 8, opacity: isPaid ? 0.75 : 1 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 12, background: isPaid ? "#2ecc7114" : (f.shared ? "#4F7FFA14" : "#FA4F7F14"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+          {isPaid ? "✅" : (f.shared ? "🏠" : "👤")}
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{f.name}</p>
+          <p style={{ margin: "2px 0 0", fontSize: fs.sub, fontFamily: FONT,
+            color: isPaid ? "#2ecc71" : isOverdue ? "#e74c3c" : isUrgent ? "#f39c12" : colors.textMuted,
+            fontWeight: isPaid || isOverdue || isUrgent ? 600 : 400 }}>
+            {isPaid
+              ? `Pagado${paidByMember ? ` por ${paidByMember.name}` : ""}`
+              : isOverdue ? `⚠️ Venció hace ${Math.abs(daysLeft)}d`
+              : isUrgent ? `⏰ Vence en ${daysLeft}d (día ${f.dueDay})`
+              : f.dueDay ? `Vence día ${f.dueDay}` : "Pendiente"}
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: isPaid ? "#2ecc71" : isUrgent || isOverdue ? "#e74c3c" : colors.text, fontFamily: FONT }}>{fmt(f.amount || 0)}</p>
+          {!isPaid && (
+            <button onClick={() => onMarkPaid(f)} style={{
+              background: "linear-gradient(135deg,#2ecc71,#27ae60)", border: "none", borderRadius: 10,
+              padding: "5px 10px", fontSize: 11, color: "#fff", cursor: "pointer", fontFamily: FONT, fontWeight: 700, whiteSpace: "nowrap",
+            }}>
+              Pagar ✓
+            </button>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// Modal para seleccionar quién pagó un gasto fijo
+function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, onConfirm, onClose, colors }) {
+  const [paidBy, setPaidBy] = useState(currentUser.uid);
+  const [loading, setLoading] = useState(false);
+  const members = allMembers?.filter(m => !m._isLabel) || [];
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    await onConfirm(fixedExpense.id, paidBy);
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+        <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 4px", fontFamily: FONT }}>¿Quién pagó?</p>
+        <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>{fixedExpense.name} · {fixedExpense.amount?.toLocaleString("es-AR")}</p>
+
+        {members.length > 1 ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+            {members.map(m => (
+              <button key={m.uid} onClick={() => setPaidBy(m.uid)}
+                style={{ flex: 1, minWidth: 80, padding: 14, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                  borderColor: paidBy === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder,
+                  background: paidBy === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input,
+                  color: paidBy === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>
+                {m.name}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ background: colors.pill, borderRadius: 14, padding: "12px 16px", marginBottom: 20 }}>
+            <p style={{ margin: 0, fontSize: 14, color: colors.text, fontFamily: FONT }}>
+              Pagado por <strong>{members[0]?.name || "vos"}</strong>
+            </p>
+          </div>
+        )}
+
+        <button onClick={handleConfirm} disabled={loading}
+          style={{ width: "100%", padding: 15, borderRadius: 14, background: loading ? "#aaa" : "linear-gradient(135deg,#2ecc71,#27ae60)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
+          {loading ? "Guardando..." : "Confirmar pago ✓"}
+        </button>
+        <button onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 // ── HOME SCREEN ──
-function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, customCategories, fixedExpenses, onEdit, onDelete }) {
+function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, customCategories, fixedExpenses, onEdit, onDelete, onMarkFixedPaid }) {
   const { colors } = useTheme();
   const fs = useExpenseFontSize();
   const isPersonal = account?.type === "personal";
   const currency = account?.currency || "ARS";
   const fmt = (n) => formatAmount(n, currency);
-  // Para la foto/nombre del usuario logueado usamos allMembers
   const me = allMembers?.find(m => m.uid === currentUser.uid);
   const meColor = me?.color || "#4F7FFA";
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const monthExp = expenses.filter(e => e.month === currentMonth);
   const sharedExp = monthExp.filter(e => e.type !== "mio");
-  // Saldos solo para cuentas compartidas — usamos solo miembros reales (con uid de Firebase)
+
+  // Gastos fijos visibles para este usuario
+  const visibleFixed = (fixedExpenses || []).filter(f =>
+    f.shared || f.createdBy === currentUser.uid
+  );
+  const sharedFixed   = visibleFixed.filter(f => f.shared);
+  const personalFixed = visibleFixed.filter(f => !f.shared);
+
+  // Total de gastos fijos del mes (suma al total general)
+  const fixedTotal = visibleFixed.reduce((s, f) => s + (f.amount || 0), 0);
+
+  // Saldos incluyen gastos fijos no pagados
   const realMembers = allMembers?.filter(m => !m._isLabel) || [];
-  const saldos = calcSaldos(sharedExp, realMembers, account?.divisionSystem);
+  const saldos = calcSaldos(sharedExp, isPersonal ? [] : visibleFixed, realMembers, account?.divisionSystem, currentMonth);
   const myBalance = saldos[currentUser.uid]?.balance || 0;
-  const totalMonthExp = monthExp.reduce((s, e) => s + e.amount, 0);
+
+  // Total del mes = gastos normales + gastos fijos
+  const normalTotal = monthExp.reduce((s, e) => s + e.amount, 0);
+  const totalMonthExp = normalTotal + fixedTotal;
   const myPersonalTotal = monthExp.filter(e => e.type === "mio" && e.owner === currentUser.uid).reduce((s, e) => s + e.amount, 0);
+
   const catTotals = allCategories.map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total).slice(0, 4);
   const monthLabel = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
 
-  // Filtros: personal → por categoría; compartida → por tipo
   const [filterType, setFilterType] = useState("todos");
   const filtered = isPersonal
     ? (filterType === "todos" ? monthExp : monthExp.filter(e => e.category === filterType))
     : (filterType === "todos" ? monthExp : monthExp.filter(e => e.type === filterType));
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
-  const [fixedExpanded, setFixedExpanded] = useState(false);
-  const today = new Date().getDate();
+
+  // Estado de expansión de gastos fijos — 3 niveles
+  const [fixedExpanded,         setFixedExpanded]         = useState(false);
+  const [fixedSharedExpanded,   setFixedSharedExpanded]   = useState(false);
+  const [fixedPersonalExpanded, setFixedPersonalExpanded] = useState(false);
+
+  // Modal pagar gasto fijo
+  const [payingFixed, setPayingFixed] = useState(null);
 
   return (
     <div style={{ fontFamily: FONT }}>
@@ -555,15 +602,9 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
             <p style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, fontFamily: FONT }}>{me?.name || currentUser.displayName}</p>
           </div>
         </div>
-
         <div style={{ background: meColor, borderRadius: 22, padding: 20 }}>
-          <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>
-            Gastos — {monthLabel}
-          </p>
-          <p style={{ color: "#fff", fontSize: 36, fontWeight: 700, margin: "0 0 4px", letterSpacing: -1, fontFamily: FONT }}>
-            {fmt(totalMonthExp)}
-          </p>
-          {/* En cuentas compartidas mostramos el saldo personal */}
+          <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Gastos — {monthLabel}</p>
+          <p style={{ color: "#fff", fontSize: 36, fontWeight: 700, margin: "0 0 4px", letterSpacing: -1, fontFamily: FONT }}>{fmt(totalMonthExp)}</p>
           {!isPersonal && (
             <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>
               {myBalance >= 0 ? `✅ Saldo a favor: ${fmt(myBalance)}` : `⚠️ Debés: ${fmt(Math.abs(myBalance))}`}
@@ -605,32 +646,59 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
           </>
         )}
 
-        {fixedExpenses && fixedExpenses.length > 0 && (
-          <>
+        {/* ── GASTOS FIJOS en Inicio ── */}
+        {visibleFixed.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            {/* Título principal desplegable */}
             <button onClick={() => setFixedExpanded(v => !v)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 0 8px", fontFamily: FONT }}>
               <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>📋 Gastos fijos</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(fixedExpenses.reduce((s, f) => s + (f.amount || 0), 0))}</span>
+                <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(fixedTotal)}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
               </div>
             </button>
-            {fixedExpanded && fixedExpenses.map(f => {
-              const daysLeft = f.dueDay ? f.dueDay - today : null;
-              const isUrgent = daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
-              return (
-                <Card key={f.id} style={{ padding: "12px 16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 12, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{f.shared ? "🏠" : "👤"}</div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{f.name}</p>
-                      {f.dueDay && <p style={{ margin: "2px 0 0", fontSize: fs.sub, color: isUrgent ? "#e74c3c" : colors.textMuted, fontFamily: FONT, fontWeight: isUrgent ? 700 : 400 }}>{daysLeft === 0 ? "⚠️ Vence hoy" : daysLeft < 0 ? `Venció hace ${Math.abs(daysLeft)}d` : `Vence en ${daysLeft}d (día ${f.dueDay})`}</p>}
-                    </div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: isUrgent ? "#e74c3c" : colors.text, fontFamily: FONT }}>{fmt(f.amount || 0)}</p>
-                  </div>
-                </Card>
-              );
-            })}
-          </>
+
+            {fixedExpanded && (
+              <div>
+                {/* Sección Hogar — solo en cuentas compartidas */}
+                {!isPersonal && sharedFixed.length > 0 && (
+                  <>
+                    <button onClick={() => setFixedSharedExpanded(v => !v)} style={{ width: "100%", background: colors.pill, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 14, marginBottom: 6, fontFamily: FONT }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#4F7FFA", fontFamily: FONT }}>🏠 Gastos fijos del Hogar</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(sharedFixed.reduce((s, f) => s + (f.amount || 0), 0))}</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedSharedExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
+                      </div>
+                    </button>
+                    {fixedSharedExpanded && sharedFixed.map(f => (
+                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} colors={colors} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} isPersonal={isPersonal} />
+                    ))}
+                  </>
+                )}
+
+                {/* Sección Personal — en compartidas como subsección, en personales directo */}
+                {!isPersonal && personalFixed.length > 0 && (
+                  <>
+                    <button onClick={() => setFixedPersonalExpanded(v => !v)} style={{ width: "100%", background: colors.pill, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 14, marginBottom: 6, fontFamily: FONT }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#FA4F7F", fontFamily: FONT }}>👤 Gastos fijos Personales</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{fmt(personalFixed.reduce((s, f) => s + (f.amount || 0), 0))}</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: fixedPersonalExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
+                      </div>
+                    </button>
+                    {fixedPersonalExpanded && personalFixed.map(f => (
+                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} colors={colors} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} isPersonal={isPersonal} />
+                    ))}
+                  </>
+                )}
+
+                {/* En cuentas personales: lista directa sin sub-secciones */}
+                {isPersonal && visibleFixed.map(f => (
+                  <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} colors={colors} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} isPersonal={isPersonal} />
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         <SectionTitle>Movimientos</SectionTitle>
@@ -645,7 +713,6 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
             ))
           )}
         </div>
-
         {sorted.length === 0 && (
           <Card style={{ textAlign: "center", color: colors.textMuted, padding: 32 }}>
             <p style={{ fontSize: 32, margin: "0 0 8px" }}>📭</p>
@@ -657,17 +724,35 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
         ))}
         <div style={{ height: 120 }} />
       </div>
+
+      {/* Modal para marcar pago */}
+      {payingFixed && (
+        <MarkPaidModal
+          fixedExpense={payingFixed}
+          allMembers={allMembers}
+          currentUser={currentUser}
+          currentMonth={currentMonth}
+          colors={colors}
+          onConfirm={async (fixedId, paidByUid) => {
+            await onMarkFixedPaid(fixedId, paidByUid, currentMonth);
+            setPayingFixed(null);
+          }}
+          onClose={() => setPayingFixed(null)}
+        />
+      )}
     </div>
   );
 }
 
 // ── SALDOS SCREEN ──
-function SaldosScreen({ expenses, members, account, currentMonth }) {
+function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth, currentUser }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const monthExp = expenses.filter(e => e.month === currentMonth && e.type !== "mio");
-  const saldos = calcSaldos(monthExp, members, account?.divisionSystem);
+  // Gastos fijos visibles para este usuario
+  const visibleFixed = (fixedExpenses || []).filter(f => f.shared || f.createdBy === currentUser.uid);
+  const saldos = calcSaldos(monthExp, visibleFixed, members, account?.divisionSystem, currentMonth);
   const [settled, setSettled] = useState(false);
   const handleSettle = async () => {
     setSettled(true);
@@ -804,8 +889,8 @@ function AppInner() {
   const [authUser, setAuthUser]       = useState(undefined);
   const [userProfile, setUserProfile] = useState(null);
   const [account, setAccount]         = useState(null);
-  const [members, setMembers]         = useState([]);   // usuarios reales con uid de Firebase
-  const [expenses, setExpenses]       = useState([]);   // TODOS los gastos (filtramos en JS)
+  const [members, setMembers]         = useState([]);
+  const [expenses, setExpenses]       = useState([]);
   const [customCategories, setCustomCategories] = useState([]);
   const [fixedExpenses, setFixedExpenses]       = useState([]);
   const [tab, setTab]                 = useState("home");
@@ -874,7 +959,6 @@ function AppInner() {
   useEffect(() => { return onAuthStateChanged(auth, user => setAuthUser(user || null)); }, []);
   useEffect(() => { if (!authUser) return; return onSnapshot(doc(db, "users", authUser.uid), snap => { setUserProfile(snap.exists() ? snap.data() : null); }); }, [authUser]);
 
-  // Cargar lista de cuentas del usuario
   useEffect(() => {
     if (!authUser) return;
     return onSnapshot(doc(db, "users", authUser.uid), snap => {
@@ -887,14 +971,12 @@ function AppInner() {
     });
   }, [authUser]);
 
-  // Cuando cambia la cuenta seleccionada
   useEffect(() => {
     if (!selectedAccountId || userAccounts.length === 0) return;
     const acc = userAccounts.find(a => a.id === selectedAccountId);
     if (acc) { setAccount(acc); setMembers([]); }
   }, [selectedAccountId, userAccounts]);
 
-  // Miembros reales (uid de Firebase)
   useEffect(() => {
     if (!account?.memberIds) return;
     setMembers([]);
@@ -905,7 +987,6 @@ function AppInner() {
     return () => unsubs.forEach(u => u());
   }, [account?.memberIds?.join(",")]);
 
-  // Gastos: query global, filtramos en JS para soportar gastos viejos sin accountId
   useEffect(() => {
     if (!authUser) return;
     const q = query(collection(db, "expenses"), orderBy("date", "desc"));
@@ -917,14 +998,11 @@ function AppInner() {
 
   const { sendNotification } = useNotif();
 
-  // Gastos filtrados para la cuenta actual
-  // Incluye gastos con accountId coincidente Y gastos viejos sin accountId creados por algún miembro
   const accountExpenses = expenses.filter(e =>
     e.accountId === account?.id ||
     (!e.accountId && account?.memberIds?.includes(e.createdBy))
   );
 
-  // allMembers: usuarios reales + memberLabels sin uid vinculado (marcados con _isLabel)
   const memberLabels = account?.memberLabels || [];
   const allMembers = [
     ...members,
@@ -949,7 +1027,21 @@ function AppInner() {
       });
     }
   };
+
   const deleteExpense = async (id) => { await deleteDoc(doc(db, "expenses", id)); };
+
+  // Marcar gasto fijo como pagado en el mes actual
+  const markFixedPaid = async (fixedId, paidByUid, month) => {
+    const fixedRef = doc(db, "accounts", account.id, "fixedExpenses", fixedId);
+    await updateDoc(fixedRef, {
+      [`payments.${month}`]: {
+        paid: true,
+        paidBy: paidByUid,
+        paidAt: new Date().toISOString().slice(0, 10),
+      },
+    });
+  };
+
   const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); setShowWelcome(true); };
 
   if (authUser === undefined) return <Spinner text="Iniciando X-penses..." />;
@@ -982,13 +1074,12 @@ function AppInner() {
       <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
-        {tab === "home"     && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} />}
-        {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} members={members} account={account} currentMonth={currentMonth} />}
+        {tab === "home"     && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} />}
+        {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={members} account={account} currentMonth={currentMonth} currentUser={authUser} />}
         {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} />}
         {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
       </div>
 
-      {/* NAV BAR */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, width: "100%", maxWidth: 500, margin: "0 auto", zIndex: 40 }}>
         <div style={{ position: "absolute", top: -28, left: "50%", transform: "translateX(-50%)", zIndex: 41 }}>
           <button onClick={() => setShowAdd(true)} style={{ width: 64, height: 64, borderRadius: 32, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", border: "4px solid " + colors.navBg, color: "#fff", fontSize: 30, cursor: "pointer", boxShadow: "0 6px 24px #4F7FFA88", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
