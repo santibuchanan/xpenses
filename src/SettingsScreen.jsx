@@ -8,17 +8,8 @@ const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sa
 const CURRENCIES = ["ARS", "USD", "EUR"];
 const CURRENCY_SYMBOLS = { ARS: "$", USD: "U$S", EUR: "€" };
 const MEMBER_COLORS = ["#4F7FFA","#FA4F7F","#2ecc71","#f39c12","#9b59b6","#1abc9c","#e74c3c","#3498db"];
-const DEFAULT_CATEGORIES = [
-  { id: "super",     label: "Supermercado",         icon: "🛒" },
-  { id: "salidas",   label: "Salidas",               icon: "🍕" },
-  { id: "servicios", label: "Impuestos y Servicios", icon: "💡" },
-  { id: "transporte",label: "Transporte",            icon: "🚗" },
-  { id: "salud",     label: "Salud",                 icon: "💊" },
-  { id: "ropa",      label: "Ropa y Calzado",        icon: "👗" },
-  { id: "hogar",     label: "Hogar",                 icon: "🏠" },
-  { id: "otros",     label: "Otros",                 icon: "📦" },
-];
-const EMOJI_OPTIONS = ["🛒","🍕","💡","🚗","💊","👗","🏠","📦","🐶","✈️","🏋️","📚","📱","🎮","🍺","☕","🎁","💈","🎵","🏥","🌮","🧴","🎬","🏖️","🎓","💻","🛵","🧹","🪴","🐱"];
+import { DEFAULT_CATEGORIES } from "./constants/categories.js";
+const EMOJI_OPTIONS = ["🛒","🍕","💡","🚗","💊","👗","🏠","📦","🐶","✈️","🏋️","📚","📱","🎮","🍺","☕","🎁","💈","🎵","🏥","🌮","🧴","🎬","🏖️","🎓","💻","🛵","🧹","🪴","🐱","⚽️","🔥","🍔"];
 const FONT_SIZES = [
   { id: "small",  label: "Chica",   baseSize: 12 },
   { id: "medium", label: "Mediana", baseSize: 14 },
