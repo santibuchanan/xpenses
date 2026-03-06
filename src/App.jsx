@@ -1180,18 +1180,18 @@ function AppInner() {
 
   const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); setShowWelcome(true); };
 
-  if (authUser === undefined) return <Spinner text="Iniciando X-penses..." />;
-  if (showWelcome) return <WelcomeScreen onEnter={() => setShowWelcome(false)} />;
-  if (!authUser) return <AuthScreen />;
-  if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
-  if (!selectedAccountId) return <AccountSelectorScreen user={authUser} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} />;
-
-  // ── Fix: setState durante render causa render infinito — mover a useEffect ──
+  // ── Fix: tab redirect — debe estar antes de los returns condicionales ──
   useEffect(() => {
     if (account?.type === "personal" && tab === "saldos") {
       setTab("home");
     }
   }, [account?.type, tab]);
+
+  if (authUser === undefined) return <Spinner text="Iniciando X-penses..." />;
+  if (showWelcome) return <WelcomeScreen onEnter={() => setShowWelcome(false)} />;
+  if (!authUser) return <AuthScreen />;
+  if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
+  if (!selectedAccountId) return <AccountSelectorScreen user={authUser} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} />;
 
   // Con el query filtrado por accountId, todos los expenses ya son de esta cuenta
   const accountExpenses = expenses;
