@@ -20,9 +20,9 @@ export default function ConfigScreen({ user, onDone }) {
   const [accountType, setAccountType] = useState("shared");
   const [divisionSystem, setDivisionSystem] = useState("proportional");
   const [accountName, setAccountName] = useState("Nuestro Hogar");
-  const [myName, setMyName] = useState(user.displayName?.split(" ")[0] || "");
+  const [myName, setMyName] = useState(user.displayName?.split(" ")[0] || user.isAnonymous ? "" : "");
   const [salary, setSalary] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState(DEFAULT_SELECTED_IDS);
+  const [selectedCategories, setSelectedCategories] = useState(DEFAULT_SELECTED_CATEGORY_IDS);
   const [saving, setSaving] = useState(false);
 
   const toggleCategory = (id) => {
@@ -64,12 +64,13 @@ export default function ConfigScreen({ user, onDone }) {
       batch.set(doc(db, "users", user.uid), {
         uid: user.uid,
         name: myName,
-        email: user.email,
+        email: user.email || null,
         photo: user.photoURL || null,
         salary: parseFloat(salary) || 0,
         color: "#4F7FFA",
         accountId,          // cuenta principal (retrocompatibilidad)
         accountIds: [accountId],
+        isAnonymous: user.isAnonymous || false,
         setupDone: true,
       }, { merge: true });
 

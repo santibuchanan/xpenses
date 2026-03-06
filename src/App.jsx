@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { collection, addDoc, onSnapshot, doc, query, orderBy, where, getDoc, updateDoc, setDoc } from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { collection, addDoc, onSnapshot, doc, query, orderBy, where, getDoc, updateDoc, setDoc, arrayUnion } from "firebase/firestore";
+import { onAuthStateChanged, signOut, linkWithPopup } from "firebase/auth";
 import { db, auth } from "./firebase";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import AuthScreen from "./AuthScreen";
@@ -1075,7 +1075,7 @@ function AppInner() {
   const finishJoinAccount = async ({ inviteId, accountId, accountData, claimedLabelId }) => {
     try {
       const memberIds = accountData.memberIds || [];
-      if (!memberIds.includes(authUser.uid)) await updateDoc(doc(db, "accounts", accountId), { memberIds: [...memberIds, authUser.uid] });
+      if (!memberIds.includes(authUser.uid)) await updateDoc(doc(db, "accounts", accountId), { memberIds: arrayUnion(authUser.uid) });
       if (claimedLabelId) {
         const updatedLabels = (accountData.memberLabels || []).map(l => l.id === claimedLabelId ? { ...l, linkedUid: authUser.uid } : l);
         await updateDoc(doc(db, "accounts", accountId), { memberLabels: updatedLabels });
@@ -1162,8 +1162,10 @@ function AppInner() {
   const memberLabels = account?.memberLabels || [];
   const allMembers = [
     ...members,
+    // Solo incluir labels que: (1) no están vinculados a un uid real, y
+    // (2) ese uid real no está ya en members (evita duplicar al owner u otros miembros reales)
     ...memberLabels
-      .filter(l => !l.linkedUid && !members.some(m => m.uid === l.linkedUid))
+      .filter(l => !l.linkedUid && !members.some(m => m.uid === l.id))
       .map(l => ({ uid: l.id, name: l.name, color: l.color, _isLabel: true })),
   ];
 
@@ -1177,6 +1179,33 @@ function AppInner() {
     setDeleteWarning, sendNotification,
   });
 
+
+  const [upgradeError, setUpgradeError] = useState("");
+  const [upgrading, setUpgrading] = useState(false);
+
+  const upgradeAnonymous = async () => {
+    setUpgrading(true);
+    setUpgradeError("");
+    try {
+      const result = await linkWithPopup(auth.currentUser, googleProvider);
+      // Actualizar el perfil en Firestore con los datos de Google
+      await setDoc(doc(db, "users", result.user.uid), {
+        email: result.user.email,
+        photo: result.user.photoURL || null,
+        isAnonymous: false,
+        // Preservar nombre solo si no tenía uno real aún
+        ...(userProfile?.name ? {} : { name: result.user.displayName?.split(" ")[0] || "" }),
+      }, { merge: true });
+    } catch (err) {
+      if (err.code === "auth/credential-already-in-use") {
+        setUpgradeError("Esta cuenta de Google ya está en uso en otra sesión.");
+      } else {
+        setUpgradeError("No se pudo vincular la cuenta. Intentá de nuevo.");
+      }
+    } finally {
+      setUpgrading(false);
+    }
+  };
 
   const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); setShowWelcome(true); };
 
@@ -1244,6 +1273,20 @@ function AppInner() {
           ))}
         </div>
       </div>
+
+      {authUser?.isAnonymous && (
+        <div style={{ position: "fixed", bottom: NAV_HEIGHT + 12, left: "50%", transform: "translateX(-50%)", width: "calc(100% - 32px)", maxWidth: 460, background: "linear-gradient(135deg,#1a1a2e,#0f3460)", borderRadius: 16, padding: "12px 16px", zIndex: 50, display: "flex", alignItems: "center", gap: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.3)", border: "1px solid rgba(79,127,250,0.3)" }}>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONT }}>Estás como invitado</p>
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#ffffff77", fontFamily: FONT }}>Vinculá tu cuenta de Google para no perder tus datos</p>
+            {upgradeError && <p style={{ margin: "4px 0 0", fontSize: 11, color: "#FA4F7F", fontFamily: FONT }}>{upgradeError}</p>}
+          </div>
+          <button onClick={upgradeAnonymous} disabled={upgrading}
+            style={{ background: "#4F7FFA", border: "none", borderRadius: 10, padding: "8px 14px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: upgrading ? "default" : "pointer", fontFamily: FONT, flexShrink: 0, opacity: upgrading ? 0.7 : 1 }}>
+            {upgrading ? "..." : "Vincular Google"}
+          </button>
+        </div>
+      )}
 
       {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={customCategories} isPersonal={isPersonal} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={customCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}

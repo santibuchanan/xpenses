@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, signInAnonymously } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 
 const SF = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
@@ -66,6 +66,18 @@ export default function WelcomeScreen({ onEnter }) {
       onEnter();
     } catch (e) {
       setError("No se pudo iniciar sesión. Intentá de nuevo.");
+      setLoading(false);
+    }
+  };
+
+  const handleAnonymous = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      await signInAnonymously(auth);
+      onEnter();
+    } catch (e) {
+      setError("No se pudo continuar. Intentá de nuevo.");
       setLoading(false);
     }
   };
@@ -167,8 +179,13 @@ export default function WelcomeScreen({ onEnter }) {
           </div>
 
           <button className="btn-press" onClick={handleShare}
-            style={{ width:"100%", padding:"14px 20px", borderRadius:18, background:"transparent", border:"1px solid #ffffff18", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontFamily:SF, fontWeight:600, fontSize:15, color:"#ffffffbb", marginBottom:20 }}>
+            style={{ width:"100%", padding:"14px 20px", borderRadius:18, background:"transparent", border:"1px solid #ffffff18", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontFamily:SF, fontWeight:600, fontSize:15, color:"#ffffffbb", marginBottom:12 }}>
             Compartir X-penses
+          </button>
+
+          <button className="btn-press" onClick={handleAnonymous} disabled={loading}
+            style={{ width:"100%", padding:"13px 20px", borderRadius:18, background:"transparent", border:"1px solid #ffffff10", cursor:loading?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontFamily:SF, fontWeight:500, fontSize:14, color:"#ffffff55", marginBottom:20, opacity:loading?0.5:1 }}>
+            👤 Continuar como invitado
           </button>
 
           {error && <p style={{ color:"#ff6b6b", fontSize:13, textAlign:"center", margin:"-12px 0 14px" }}>{error}</p>}
