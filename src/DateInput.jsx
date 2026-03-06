@@ -24,6 +24,11 @@ export default function DateInput({ value, onChange, style = {} }) {
   const [display, setDisplay] = useState(toDisplay(value));
   const hiddenRef = useRef(null);
 
+  // Sincronizar display si el padre cambia `value` (ej: al abrir otro gasto en edición)
+  useEffect(() => {
+    setDisplay(toDisplay(value));
+  }, [value]);
+
   // Máscara automática: agrega "-" mientras escribís
   const handleChange = (e) => {
     let raw = e.target.value.replace(/[^0-9]/g, "");

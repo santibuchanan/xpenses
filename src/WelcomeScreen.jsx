@@ -19,11 +19,15 @@ export default function WelcomeScreen({ onEnter }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const intervalRef = useRef(null);
+  const animTimeoutRef = useRef(null); // ref para limpiar el timeout de animación
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 80);
     startInterval();
-    return () => clearInterval(intervalRef.current);
+    return () => {
+      clearInterval(intervalRef.current);
+      clearTimeout(animTimeoutRef.current); // limpiar timeout pendiente al desmontar
+    };
   }, []);
 
   const startInterval = () => {
@@ -32,7 +36,7 @@ export default function WelcomeScreen({ onEnter }) {
 
   const advanceFeature = () => {
     setAnimDir("out");
-    setTimeout(() => {
+    animTimeoutRef.current = setTimeout(() => {
       setDisplayedFeature(prev => {
         const next = (prev + 1) % FEATURES.length;
         setActiveFeature(next);
@@ -44,8 +48,9 @@ export default function WelcomeScreen({ onEnter }) {
 
   const goToFeature = (i) => {
     clearInterval(intervalRef.current);
+    clearTimeout(animTimeoutRef.current);
     setAnimDir("out");
-    setTimeout(() => {
+    animTimeoutRef.current = setTimeout(() => {
       setDisplayedFeature(i);
       setActiveFeature(i);
       setAnimDir("in");

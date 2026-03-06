@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { doc, setDoc, addDoc, collection } from "firebase/firestore";
+import { doc, setDoc, addDoc, collection, writeBatch } from "firebase/firestore";
 import { db } from "./firebase";
 
 const SF_PRO = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
@@ -11,29 +11,7 @@ const DIVISION_SYSTEMS = [
   { id: "by_category", label: "Por categoría", desc: "Cada categoría tiene su propia regla", icon: "🗂️" },
 ];
 
-const ALL_CATEGORIES = [
-  { id: "super", label: "Supermercado", icon: "🛒" },
-  { id: "salidas", label: "Salidas", icon: "🍕" },
-  { id: "servicios", label: "Servicios", icon: "💡" },
-  { id: "transporte", label: "Transporte", icon: "🚗" },
-  { id: "salud", label: "Salud", icon: "💊" },
-  { id: "ropa", label: "Ropa", icon: "👗" },
-  { id: "hogar", label: "Hogar", icon: "🏠" },
-  { id: "otros", label: "Otros", icon: "📦" },
-  { id: "mascotas", label: "Mascotas", icon: "🐶" },
-  { id: "viajes", label: "Viajes", icon: "✈️" },
-  { id: "gimnasio", label: "Gimnasio", icon: "🏋️" },
-  { id: "educacion", label: "Educación", icon: "📚" },
-  { id: "tecnologia", label: "Tecnología", icon: "📱" },
-  { id: "entretenimiento", label: "Entretenimiento", icon: "🎮" },
-  { id: "restaurantes", label: "Restaurantes", icon: "🍺" },
-  { id: "cafe", label: "Café", icon: "☕" },
-  { id: "regalos", label: "Regalos", icon: "🎁" },
-  { id: "belleza", label: "Belleza", icon: "💈" },
-  { id: "suscripciones", label: "Suscripciones", icon: "🎵" },
-];
-
-const DEFAULT_SELECTED = ["super","salidas","servicios","transporte","salud","ropa","hogar","otros"];
+import { ALL_CATEGORIES, DEFAULT_SELECTED_CATEGORY_IDS, DEFAULT_CATEGORIES } from "./constants/categories.js";
 const labelStyle = { fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase" };
 const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: "2px solid #e8e8e8", fontSize: 15, marginBottom: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: "#1a1a2e", background: "#fafafa" };
 function Card({ children, style = {} }) { return <div style={{ background: "#fff", borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.05)", ...style }}>{children}</div>; }
@@ -44,7 +22,7 @@ export default function ConfigScreen({ user, onDone }) {
   const [accountName, setAccountName] = useState("Nuestro Hogar");
   const [myName, setMyName] = useState(user.displayName?.split(" ")[0] || "");
   const [salary, setSalary] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState(DEFAULT_SELECTED);
+  const [selectedCategories, setSelectedCategories] = useState(DEFAULT_SELECTED_IDS);
   const [saving, setSaving] = useState(false);
 
   const toggleCategory = (id) => {
@@ -54,28 +32,65 @@ export default function ConfigScreen({ user, onDone }) {
   const handleSave = async () => {
     if (!myName) return;
     setSaving(true);
-    const accountId = user.uid;
 
-    await setDoc(doc(db, "accounts", accountId), {
-      id: accountId, name: accountName, type: accountType, divisionSystem,
-      ownerId: user.uid, memberIds: [user.uid], currency: "ARS",
-      createdAt: new Date().toISOString(),
-      disabledCategories: DEFAULT_SELECTED.filter(id => !selectedCategories.includes(id)),
-    });
+    try {
+      // 1. Generar accountId desde Firestore (no usar user.uid como ID de cuenta)
+      const accountRef = doc(collection(db, "accounts"));
+      const accountId = accountRef.id;
 
-    await setDoc(doc(db, "users", user.uid), {
-      uid: user.uid, name: myName, email: user.email,
-      photo: user.photoURL || null, salary: parseFloat(salary) || 0,
-      color: "#4F7FFA", accountId, setupDone: true,
-    }, { merge: true });
+      // 2. Categorías extra (las que no están en DEFAULT_CATEGORIES)
+      const defaultIds = DEFAULT_CATEGORIES.map(c => c.id);
+      const extraCats = ALL_CATEGORIES.filter(
+        c => selectedCategories.includes(c.id) && !defaultIds.includes(c.id)
+      );
 
-    const extraCats = ALL_CATEGORIES.filter(c => selectedCategories.includes(c.id) && !DEFAULT_SELECTED.includes(c.id));
-    for (const cat of extraCats) {
-      await addDoc(collection(db, "accounts", accountId, "categories"), cat);
+      // 3. Batch para account + user (operación atómica — si falla una, no queda estado inconsistente)
+      const batch = writeBatch(db);
+
+      batch.set(accountRef, {
+        id: accountId,
+        name: accountName,
+        type: accountType,
+        divisionSystem,
+        ownerId: user.uid,
+        memberIds: [user.uid],
+        currency: "ARS",
+        createdAt: new Date().toISOString(),
+        disabledCategories: DEFAULT_CATEGORIES
+          .filter(c => !selectedCategories.includes(c.id))
+          .map(c => c.id),
+      });
+
+      batch.set(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: myName,
+        email: user.email,
+        photo: user.photoURL || null,
+        salary: parseFloat(salary) || 0,
+        color: "#4F7FFA",
+        accountId,          // cuenta principal (retrocompatibilidad)
+        accountIds: [accountId],
+        setupDone: true,
+      }, { merge: true });
+
+      await batch.commit();
+
+      // 4. Categorías extra — addDoc no entra en writeBatch con subcollections fácilmente,
+      //    pero son datos no críticos: si fallan no rompen el estado de cuenta/usuario
+      if (extraCats.length > 0) {
+        await Promise.all(
+          extraCats.map(cat =>
+            addDoc(collection(db, "accounts", accountId, "categories"), cat)
+          )
+        );
+      }
+
+      onDone();
+    } catch (err) {
+      console.error("Error en setup inicial:", err);
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-    onDone();
   };
 
   return (

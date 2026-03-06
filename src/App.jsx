@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, getDoc, getDocs, updateDoc, setDoc } from "firebase/firestore";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { collection, addDoc, onSnapshot, doc, query, orderBy, where, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -12,21 +12,15 @@ import EditExpenseModal from "./EditExpenseModal";
 import DateInput from "./DateInput";
 import { NotifProvider, useNotif, NotifCenter, NOTIF_TYPES } from "./notifications";
 import { useTheme, formatAmount, CURRENCIES } from "./theme.jsx";
+import { useExpenses } from "./hooks/useExpenses.js";
+import AddExpenseModal from "./components/expenses/AddExpenseModal.jsx";
+import { SwipeableExpenseRow } from "./components/expenses/SwipeableExpenseRow.jsx";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');`;
 const NAV_HEIGHT = 72;
 
-const DEFAULT_CATEGORIES = [
-  { id: "super",      label: "Supermercado",          icon: "🛒" },
-  { id: "salidas",    label: "Salidas",                icon: "🍕" },
-  { id: "servicios",  label: "Impuestos y Servicios",  icon: "💡" },
-  { id: "transporte", label: "Transporte",             icon: "🚗" },
-  { id: "salud",      label: "Salud",                  icon: "💊" },
-  { id: "ropa",       label: "Ropa y Calzado",         icon: "👗" },
-  { id: "hogar",      label: "Hogar",                  icon: "🏠" },
-  { id: "otros",      label: "Otros",                  icon: "📦" },
-];
+import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 const CAT_COLORS = ["#4F7FFA","#FA4F7F","#f39c12","#2ecc71","#9b59b6","#1abc9c","#e74c3c","#95a5a6"];
 const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -273,116 +267,6 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
   );
 }
 
-// ── ADD EXPENSE MODAL ──
-function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, customCategories, isPersonal }) {
-  const { colors } = useTheme();
-  const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
-  const defaultType = isPersonal ? "mio" : "hogar";
-  const memberList = allMembers || [];
-  const [form, setForm] = useState({
-    type: defaultType, concept: "", amount: "", category: "super",
-    date: new Date().toISOString().slice(0, 10),
-    paidBy: currentUser.uid, forWhom: memberList.map(m => m.uid), owner: currentUser.uid,
-  });
-  const [loading, setLoading] = useState(false);
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const currSymbol = CURRENCIES[currency]?.symbol || "$";
-  const setType = (t) => {
-    setForm(f => ({
-      ...f, type: t,
-      forWhom: (t === "hogar" || t === "extraordinary") ? memberList.map(m => m.uid) : [],
-      // Si es "Para mí", el owner siempre soy yo
-      owner: t === "mio" ? currentUser.uid : f.owner,
-    }));
-  };
-  const toggleForWhom = (uid) => { setForm(f => { const cur = f.forWhom || []; return { ...f, forWhom: cur.includes(uid) ? cur.filter(u => u !== uid) : [...cur, uid] }; }); };
-  const sheetRef = useRef(null);
-  const startY = useRef(null);
-  const dragY = useRef(0);
-  const [translateY, setTranslateY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const onTouchStart = (e) => { const handle = sheetRef.current?.querySelector("[data-handle]"); if (handle && handle.contains(e.target)) { startY.current = e.touches[0].clientY; setIsDragging(true); } };
-  const onTouchMove = (e) => { if (!isDragging || startY.current === null) return; e.stopPropagation(); const dy = e.touches[0].clientY - startY.current; if (dy > 0) { dragY.current = dy; setTranslateY(dy); } };
-  const onTouchEnd = () => { if (dragY.current > 120) onClose(); else setTranslateY(0); dragY.current = 0; startY.current = null; setIsDragging(false); };
-  const labelStyle = { fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT };
-  const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
-  const handleAdd = async () => {
-    if (!form.concept || !form.amount) return;
-    setLoading(true);
-    const amount = parseFloat(form.amount);
-    const extra = {};
-    if (form.type === "extraordinary" && memberList.length > 0) memberList.forEach(m => { extra[`paid_${m.uid}`] = m.uid === form.paidBy ? amount : 0; });
-    await onAdd({ ...form, ...extra, amount, month: form.date.slice(0, 7) });
-    setLoading(false); onClose();
-  };
-  const types = [["hogar","🏠 Hogar"],["personal","🎁 Para otro"],["extraordinary","✈️ Extraordinario"],["mio","👤 Para mí"]];
-  const showPaidBy  = !isPersonal && form.type !== "mio" && memberList.length > 0;
-  const showForWhom = !isPersonal && (form.type === "personal" || form.type === "extraordinary" || form.type === "hogar") && memberList.length > 0;
-  // "Para mí" → owner = currentUser automático, no se muestra selector
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
-      <div ref={sheetRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px 44px", maxHeight: "90vh", overflowY: "auto", fontFamily: FONT, transform: `translateY(${translateY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
-        <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
-          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, paddingTop: 12 }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Nuevo Gasto</span>
-          <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
-        </div>
-        {!isPersonal && (
-          <>
-            <p style={labelStyle}>Tipo</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-              {types.map(([val, lbl]) => (
-                <button key={val} onClick={() => setType(val)} style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.type === val ? "#4F7FFA" : colors.inputBorder, background: form.type === val ? "#4F7FFA11" : colors.input, color: form.type === val ? "#4F7FFA" : colors.textMuted }}>{lbl}</button>
-              ))}
-            </div>
-          </>
-        )}
-        <p style={labelStyle}>Concepto</p>
-        <input value={form.concept} onChange={e => set("concept", e.target.value)} placeholder="Ej: Supermercado" style={inputStyle} />
-        <p style={labelStyle}>Monto ({currSymbol})</p>
-        <div style={{ position: "relative", marginBottom: 14 }}>
-          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
-          <input type="number" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0" style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36 }} />
-        </div>
-        <p style={labelStyle}>Categoría</p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
-          {allCategories.map(c => (
-            <button key={c.id} onClick={() => set("category", c.id)} style={{ padding: "7px 12px", borderRadius: 12, border: "2px solid", fontSize: 12, cursor: "pointer", fontFamily: FONT, borderColor: form.category === c.id ? "#4F7FFA" : colors.inputBorder, background: form.category === c.id ? "#4F7FFA11" : colors.input, color: form.category === c.id ? "#4F7FFA" : colors.text }}>{c.icon} {c.label}</button>
-          ))}
-        </div>
-        <p style={labelStyle}>Fecha</p>
-        <DateInput value={form.date} onChange={v => set("date", v)} />
-        {showPaidBy && (
-          <>
-            <p style={labelStyle}>Pagó</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {memberList.map(m => (
-                <button key={m.uid} onClick={() => set("paidBy", m.uid)} style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder, background: form.paidBy === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input, color: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>{m.name}</button>
-              ))}
-            </div>
-          </>
-        )}
-        {showForWhom && (
-          <>
-            <p style={labelStyle}>Para quién/es</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {memberList.map(m => {
-                const sel = form.forWhom?.includes(m.uid);
-                return <button key={m.uid} onClick={() => toggleForWhom(m.uid)} style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT, borderColor: sel ? (m.color || "#4F7FFA") : colors.inputBorder, background: sel ? (m.color || "#4F7FFA") + "18" : colors.input, color: sel ? (m.color || "#4F7FFA") : colors.textMuted }}>{m.name}</button>;
-              })}
-            </div>
-          </>
-        )}
-        <button onClick={handleAdd} disabled={loading} style={{ width: "100%", padding: 16, borderRadius: 16, background: loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 600, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginTop: 4 }}>
-          {loading ? "Guardando..." : "Agregar ✓"}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // ── CLAIM IDENTITY MODAL ──
 function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
@@ -423,153 +307,6 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
   );
 }
 
-// ── SWIPEABLE EXPENSE ROW ──
-// ── POPUP CONFIRMAR ELIMINACIÓN ──
-function DeleteConfirmPopup({ expense, fmt, allCategories, colors, onConfirm, onCancel }) {
-  const cat = allCategories?.find(c => c.id === expense.category);
-  const [loading, setLoading] = useState(false);
-  const startY = useRef(null);
-  const [dragY, setDragY] = useState(0);
-  const onTouchStart = (ev) => { startY.current = ev.touches[0].clientY; };
-  const onTouchMove  = (ev) => { const dy = ev.touches[0].clientY - startY.current; if (dy > 0) setDragY(dy); };
-  const onTouchEnd   = () => { if (dragY > 100) onCancel(); else setDragY(0); startY.current = null; };
-
-  const handleConfirm = async () => {
-    if (loading) return;
-    setLoading(true);
-    await onConfirm();
-  };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }} onClick={onCancel}>
-      <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onClick={e => e.stopPropagation()}
-        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: startY.current ? "none" : "transform 0.3s ease" }}>
-        <div style={{ padding: "16px 0 8px", touchAction: "none" }}>
-          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 14, background: "#e74c3c14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{cat?.icon || "📦"}</div>
-          <div>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{expense.concept}</p>
-            <p style={{ margin: "2px 0 0", fontSize: 13, color: colors.textMuted, fontFamily: FONT }}>{fmt(expense.amount)}</p>
-          </div>
-        </div>
-        <p style={{ fontSize: 15, color: colors.text, margin: "0 0 20px", fontFamily: FONT, lineHeight: 1.5 }}>¿Eliminás este gasto? Esta acción no se puede deshacer.</p>
-        <button onClick={handleConfirm} disabled={loading} style={{ width: "100%", padding: 15, borderRadius: 14, background: loading ? "#aaa" : "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10 }}>
-          {loading ? "Eliminando..." : "🗑️ Eliminar"}
-        </button>
-        <button onClick={onCancel} disabled={loading} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
-      </div>
-    </div>
-  );
-}
-
-// ── SWIPEABLE EXPENSE ROW ──
-// Click → abre edición | Swipe parcial → peek rojo | Swipe total → popup eliminar
-function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, onEdit, onDelete, isPersonal, currentUser }) {
-  const [offsetX, setOffsetX]       = useState(0);
-  const [showDelete, setShowDelete] = useState(false);
-  const startX    = useRef(null);
-  const isDragging = useRef(false);
-  const PEEK = 80;   // distancia para mostrar peek
-  const FULL = 180;  // distancia para disparar popup
-
-  const onTouchStart = (ev) => { startX.current = ev.touches[0].clientX; isDragging.current = false; };
-  const onTouchMove  = (ev) => {
-    if (startX.current === null) return;
-    const dx = startX.current - ev.touches[0].clientX;
-    if (Math.abs(dx) > 6) isDragging.current = true;
-    // Permite deslizar izquierda (positivo) y derecha (negativo para cerrar peek)
-    if (dx > 0) setOffsetX(Math.min(dx, FULL + 20));
-    else if (offsetX > 0) setOffsetX(Math.max(0, offsetX + dx)); // deslizar derecha cierra
-  };
-  const onTouchEnd = () => {
-    if (offsetX >= FULL) { setOffsetX(0); setShowDelete(true); }
-    else if (offsetX > PEEK / 2) setOffsetX(PEEK);
-    else setOffsetX(0);
-    startX.current = null;
-  };
-  const handleClick = () => {
-    if (isDragging.current) return;
-    if (offsetX > 0) { setOffsetX(0); return; }
-    onEdit(e);
-  };
-
-  const cat = allCategories.find(c => c.id === e.category);
-  const payer = allMembers?.find(m => m.uid === e.paidBy);
-  const forWhomUids = Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []);
-
-  const getTypeInfo = () => {
-    if (e.type === "hogar") return { label: "Hogar", color: "#4F7FFA" };
-    if (e.type === "extraordinary") return { label: "Extraordinario", color: "#f39c12" };
-    const destUids = e.type === "mio" ? (e.owner ? [e.owner] : []) : forWhomUids;
-    const iAmDest  = destUids.includes(currentUser?.uid);
-    const destNames = destUids.map(uid => uid === currentUser?.uid ? "mí" : allMembers?.find(m => m.uid === uid)?.name || "?").filter(Boolean);
-    const destStr = destNames.length === 1 && destNames[0] === "mí" ? "mí" : destNames.join(" y ");
-    if (iAmDest) return { label: "Para mí", color: "#2ecc71" };
-    return { label: `Para ${destStr || "?"}`, color: "#FA4F7F" };
-  };
-
-  const { label: typeLabel, color: typeColor } = getTypeInfo();
-  const who = (e.type === "hogar" || e.type === "extraordinary") ? payer : null;
-  const peekProgress = Math.min(1, offsetX / FULL);
-
-  // Gasto eliminado (soft-delete) — mostrar tachado, sin swipe
-  if (e.deleted) {
-    return (
-      <div style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, marginBottom: 10, opacity: 0.5 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-            <span style={{ fontSize: 22, flexShrink: 0, filter: "grayscale(1)" }}>{cat?.icon || "📦"}</span>
-            <div>
-              <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.textMuted, fontFamily: FONT, textDecoration: "line-through" }}>{e.concept}</p>
-              <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(e.date)}</p>
-              <Tag color="#e74c3c">Eliminado</Tag>
-            </div>
-          </div>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.textMuted, fontFamily: FONT, flexShrink: 0, marginLeft: 8, textDecoration: "line-through" }}>{fmt(e.amount)}</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div style={{ position: "relative", marginBottom: 10, borderRadius: 20, overflow: "hidden" }}>
-        {/* Fondo rojo animado */}
-        <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK, borderRadius: "0 20px 20px 0", display: "flex", alignItems: "center", justifyContent: "center", background: `rgba(231,76,60,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
-            <span style={{ fontSize: 20 }}>🗑️</span>
-            <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
-          </div>
-        </div>
-        {/* Card */}
-        <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onClick={handleClick}
-          style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, transform: `translateX(-${offsetX}px)`, transition: startX.current === null ? "transform 0.25s ease" : "none", position: "relative", zIndex: 1, cursor: "pointer" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-              <span style={{ fontSize: 22, flexShrink: 0 }}>{cat?.icon || "📦"}</span>
-              <div>
-                <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{e.concept}</p>
-                <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(e.date)}{who ? ` · ${who.name}` : ""}</p>
-                {!isPersonal && <Tag color={typeColor}>{typeLabel}</Tag>}
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{fmt(e.amount)}</p>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-            </div>
-          </div>
-        </div>
-      </div>
-      {showDelete && (
-        <DeleteConfirmPopup expense={e} fmt={fmt} allCategories={allCategories} colors={colors}
-          onConfirm={async () => { await onDelete(e.id); setShowDelete(false); }}
-          onCancel={() => setShowDelete(false)} />
-      )}
-    </>
-  );
-}
 
 // ── FIXED EXPENSE ROW (en Inicio) ──
 // Muestra estado pagado/no pagado y botón para pagar
@@ -691,7 +428,10 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
 
   // Saldos incluyen gastos fijos no pagados
   const realMembers = allMembers?.filter(m => !m._isLabel) || [];
-  const saldos = calcSaldos(sharedExp, isPersonal ? [] : visibleFixed, realMembers, account?.divisionSystem, currentMonth);
+  const saldos = useMemo(
+    () => calcSaldos(sharedExp, isPersonal ? [] : visibleFixed, realMembers, account?.divisionSystem, currentMonth),
+    [sharedExp, visibleFixed, realMembers, account?.divisionSystem, currentMonth]
+  );
   const myBalance = saldos[currentUser.uid]?.balance || 0;
 
   // Total del mes = gastos normales + gastos fijos
@@ -1002,8 +742,11 @@ function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth,
   const visibleFixed = (fixedExpenses || []).filter(f => f.shared || f.createdBy === currentUser.uid);
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth);
 
-  // Calcular saldos con todos los datos
-  const saldos = calcSaldos(monthExp, visibleFixed, members, account?.divisionSystem, currentMonth, monthSettlements);
+  // Calcular saldos con todos los datos — memoizado para evitar recálculo en cada render
+  const saldos = useMemo(
+    () => calcSaldos(monthExp, visibleFixed, members, account?.divisionSystem, currentMonth, monthSettlements),
+    [monthExp, visibleFixed, members, account?.divisionSystem, currentMonth, monthSettlements]
+  );
 
   // Pares deudor→acreedor (usando balances ya con settlements descontados)
   const balances = (members || []).map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
@@ -1349,19 +1092,34 @@ function AppInner() {
   };
 
   useEffect(() => { return onAuthStateChanged(auth, user => setAuthUser(user || null)); }, []);
-  useEffect(() => { if (!authUser) return; return onSnapshot(doc(db, "users", authUser.uid), snap => { setUserProfile(snap.exists() ? snap.data() : null); }); }, [authUser]);
 
+  // ── Un solo listener sobre users/{uid} — evita el doble-listener anterior ──
+  const [accountIds, setAccountIds] = useState([]);
   useEffect(() => {
     if (!authUser) return;
     return onSnapshot(doc(db, "users", authUser.uid), snap => {
       const data = snap.data();
-      const ids = data?.accountIds || [authUser.uid];
-      const unsubs = ids.map(id => onSnapshot(doc(db, "accounts", id), aSnap => {
-        if (aSnap.exists()) setUserAccounts(prev => { const filtered = prev.filter(a => a.id !== id); return [...filtered, { id: aSnap.id, ...aSnap.data() }]; });
-      }));
-      return () => unsubs.forEach(u => u());
+      setUserProfile(data || null);
+      // Leer accountIds del mismo snapshot — sin segundo listener
+      setAccountIds(data?.accountIds || (data?.accountId ? [data.accountId] : [authUser.uid]));
     });
   }, [authUser]);
+
+  // ── Listeners de cuentas reactivos a accountIds ──
+  useEffect(() => {
+    if (!accountIds.length) return;
+    const unsubs = accountIds.map(id =>
+      onSnapshot(doc(db, "accounts", id), aSnap => {
+        if (aSnap.exists()) {
+          setUserAccounts(prev => {
+            const filtered = prev.filter(a => a.id !== id);
+            return [...filtered, { id: aSnap.id, ...aSnap.data() }];
+          });
+        }
+      })
+    );
+    return () => unsubs.forEach(u => u()); // cleanup correcto — fuera del callback
+  }, [accountIds]);
 
   useEffect(() => {
     if (!selectedAccountId || userAccounts.length === 0) return;
@@ -1379,27 +1137,27 @@ function AppInner() {
     return () => unsubs.forEach(u => u());
   }, [account?.memberIds?.join(",")]);
 
+  // ── Expenses filtrados por cuenta — evita descargar toda la colección ──
   useEffect(() => {
-    if (!authUser) return;
-    const q = query(collection(db, "expenses"), orderBy("date", "desc"));
+    if (!account?.id) return;
+    const q = query(
+      collection(db, "expenses"),
+      where("accountId", "==", account.id),
+      orderBy("date", "desc")
+    );
     return onSnapshot(q, snap => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      console.log("snapshot expenses — deleted count:", data.filter(e => e.deleted).length, "at:", new Date().toISOString().slice(11,19));
       setExpenses(data);
     });
-  }, [authUser]);
+  }, [account?.id]);
 
   useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "categories"), snap => { setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
   useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "fixedExpenses"), snap => { setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
   useEffect(() => { if (!account?.id) return; return onSnapshot(query(collection(db, "accounts", account.id, "settlements"), orderBy("date", "desc")), snap => { setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
 
-  const { sendNotification } = useNotif();
 
-  // Incluye gastos normales + eliminados (soft-delete) para mostrarlos tachados
-  const accountExpenses = expenses.filter(e =>
-    e.accountId === account?.id ||
-    (!e.accountId && account?.memberIds?.includes(e.createdBy))
-  );
+  // El query ya filtra por accountId — no se necesita filtrar en cliente
+  // (retrocompatibilidad: gastos sin accountId ya no deberían existir con el nuevo ConfigScreen)
 
   const memberLabels = account?.memberLabels || [];
   const allMembers = [
@@ -1409,155 +1167,16 @@ function AppInner() {
       .map(l => ({ uid: l.id, name: l.name, color: l.color, _isLabel: true })),
   ];
 
-  const addExpense = async (e) => {
-    await addDoc(collection(db, "expenses"), { ...e, createdBy: authUser.uid, accountId: account?.id });
-    const otherMembers = members?.filter(m => m.uid !== authUser.uid) || [];
-    const myName = members?.find(m => m.uid === authUser.uid)?.name || "Alguien";
-    if (otherMembers.length > 0) {
-      await sendNotification({
-        type: NOTIF_TYPES.EXPENSE_ADDED,
-        title: `Nuevo gasto: ${e.concept}`,
-        body: `${myName} agregó ${formatAmount(e.amount, account?.currency || "ARS")} en ${account?.name}`,
-        fromName: myName,
-        toUids: otherMembers.map(m => m.uid),
-        accountId: account?.id,
-        accountName: account?.name,
-      });
-    }
-  };
+  const [deleteWarning, setDeleteWarning] = useState(null);
 
-  const [deleteWarning, setDeleteWarning] = useState(null); // { expense }
+  const { sendNotification } = useNotif();
 
-  const handleEditSave = async (updatedExpense) => {
-    const otherMembers = members?.filter(m => !m._isLabel && m.uid !== authUser.uid) || [];
-    const myName = members?.find(m => m.uid === authUser.uid)?.name || "Alguien";
-    if (otherMembers.length > 0) {
-      await sendNotification({
-        type: NOTIF_TYPES.EXPENSE_EDITED,
-        title: `Gasto editado: ${updatedExpense.concept}`,
-        body: `${myName} modificó "${updatedExpense.concept}" (${formatAmount(updatedExpense.amount, account?.currency || "ARS")}) en ${account?.name}`,
-        fromName: myName,
-        toUids: otherMembers.map(m => m.uid),
-        accountId: account?.id,
-        accountName: account?.name,
-      });
-    }
-    setEditingExpense(null);
-  };
+  const { addExpense, handleEditSave, deleteExpense, doDeleteExpense, markFixedPaid } = useExpenses({
+    authUser, account, members, expenses,
+    currentMonth, setExpenses, setEditingExpense,
+    setDeleteWarning, sendNotification,
+  });
 
-  // Soft-delete: marca el gasto como deleted, agrega settlement negativo si corresponde,
-  // y notifica a los demás miembros
-  const deleteExpense = async (expenseId) => {
-    console.log("deleteExpense llamado con id:", expenseId);
-    console.log("accountExpenses ids:", accountExpenses.map(e => e.id));
-    const expense = accountExpenses.find(e => e.id === expenseId);
-    if (!expense) return;
-    // Verificar si hay settlements activos este mes
-    let hasSettlements = false;
-    if (account?.id) {
-      const settSnap = await getDocs(query(collection(db, "accounts", account.id, "settlements")));
-      hasSettlements = settSnap.docs.some(d => d.data().month === currentMonth);
-    }
-    // Siempre ajusta settlements automáticamente si los hay
-    await doDeleteExpense(expense, hasSettlements);
-  };
-
-  const doDeleteExpense = async (expense, addCorrectiveSettlement) => {
-    console.log("doDeleteExpense llamado, expense:", expense?.id, "deleted actual:", expense?.deleted);
-    // 1. Soft-delete: marcar como eliminado en lugar de borrar
-    try {
-      await updateDoc(doc(db, "expenses", expense.id), {
-        deleted: true,
-        deletedAt: new Date().toISOString(),
-        deletedBy: authUser.uid,
-      });
-      // Actualizar estado local inmediatamente sin esperar el snapshot
-      setExpenses(prev => prev.map(e => e.id === expense.id ? { ...e, deleted: true } : e));
-      console.log("updateDoc OK — gasto marcado como deleted");
-    } catch (err) {
-      console.error("Error soft-delete:", err, "expenseId:", expense.id);
-      await deleteDoc(doc(db, "expenses", expense.id));
-    }
-
-    // 2. Si hay settlements activos, agregar settlement correctivo negativo
-    if (addCorrectiveSettlement && account?.id) {
-      // Recalcular el impacto del gasto eliminado en cada par deudor→acreedor
-      const realMembers = members.filter(m => !m._isLabel);
-      const totalSalary = realMembers.reduce((s, m) => s + (m.salary || 0), 0);
-
-      // Delta de balance por miembro causado por este gasto
-      const delta = {};
-      realMembers.forEach(m => { delta[m.uid] = 0; });
-
-      if (expense.type === "hogar") {
-        if (delta[expense.paidBy] !== undefined) delta[expense.paidBy] += expense.amount;
-        realMembers.forEach(m => {
-          const share = account?.divisionSystem === "proportional" && totalSalary > 0
-            ? expense.amount * ((m.salary || 0) / totalSalary)
-            : expense.amount / realMembers.length;
-          if (delta[m.uid] !== undefined) delta[m.uid] -= share;
-        });
-      } else if (expense.type === "personal") {
-        if (delta[expense.paidBy] !== undefined) delta[expense.paidBy] += expense.amount;
-        const targets = (Array.isArray(expense.forWhom) ? expense.forWhom : [expense.forWhom])
-          .filter(uid => delta[uid] !== undefined);
-        targets.forEach(uid => { delta[uid] -= expense.amount / (targets.length || 1); });
-      } else if (expense.type === "mio") {
-        if (delta[expense.paidBy] !== undefined) delta[expense.paidBy] += expense.amount;
-        if (expense.owner && delta[expense.owner] !== undefined) delta[expense.owner] -= expense.amount;
-      }
-
-      // Para cada par donde el delta introduce un cambio, agregar settlement negativo
-      realMembers.forEach(debtor => {
-        if (delta[debtor.uid] >= 0) return;
-        realMembers.forEach(creditor => {
-          if (delta[creditor.uid] <= 0) return;
-          const correction = Math.min(Math.abs(delta[debtor.uid]), delta[creditor.uid]);
-          if (correction > 0) {
-            addDoc(collection(db, "accounts", account.id, "settlements"), {
-              debtorUid: debtor.uid,
-              creditorUid: creditor.uid,
-              amount: -correction, // negativo = corrección por eliminación
-              date: new Date().toISOString().slice(0, 10),
-              month: currentMonth,
-              full: false,
-              isCorrection: true,
-              correctionReason: `Gasto eliminado: ${expense.concept} ($${expense.amount?.toLocaleString("es-AR")})`,
-            });
-          }
-        });
-      });
-    }
-
-    // 3. Notificar a los demás miembros
-    const otherMembers = members.filter(m => !m._isLabel && m.uid !== authUser.uid);
-    if (otherMembers.length > 0) {
-      const deleter = members.find(m => m.uid === authUser.uid);
-      await sendNotification({
-        type: NOTIF_TYPES.EXPENSE_DELETED,
-        title: "Gasto eliminado 🗑️",
-        body: `${deleter?.name || "Un miembro"} eliminó "${expense.concept}" (${formatAmount(expense.amount, account?.currency || "ARS")})`,
-        fromName: deleter?.name || "Un miembro",
-        toUids: otherMembers.map(m => m.uid),
-        accountId: account?.id,
-        accountName: account?.name,
-      });
-    }
-
-    setDeleteWarning(null);
-  };
-
-  // Marcar gasto fijo como pagado en el mes actual
-  const markFixedPaid = async (fixedId, paidByUid, month) => {
-    const fixedRef = doc(db, "accounts", account.id, "fixedExpenses", fixedId);
-    await updateDoc(fixedRef, {
-      [`payments.${month}`]: {
-        paid: true,
-        paidBy: paidByUid,
-        paidAt: new Date().toISOString().slice(0, 10),
-      },
-    });
-  };
 
   const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); setShowWelcome(true); };
 
@@ -1567,8 +1186,16 @@ function AppInner() {
   if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
   if (!selectedAccountId) return <AccountSelectorScreen user={authUser} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} />;
 
+  // ── Fix: setState durante render causa render infinito — mover a useEffect ──
+  useEffect(() => {
+    if (account?.type === "personal" && tab === "saldos") {
+      setTab("home");
+    }
+  }, [account?.type, tab]);
+
+  // Con el query filtrado por accountId, todos los expenses ya son de esta cuenta
+  const accountExpenses = expenses;
   const isPersonal = account?.type === "personal";
-  if (isPersonal && tab === "saldos") setTab("home");
 
   const NAV_LEFT = isPersonal
     ? [{ id: "home", label: "Inicio" }, { id: "graficos", label: "Gráficos" }]

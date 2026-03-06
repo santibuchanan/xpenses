@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, query, collection, where, orderBy, limit, getDocs, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
 
@@ -15,15 +15,33 @@ export default function InviteScreen({ account, currentUser, onClose }) {
   }, []);
 
   const generateInvite = async () => {
-    const inviteId = `${account.id}_${Date.now()}`;
-    await setDoc(doc(db, "invites", inviteId), {
-      accountId: account.id,
-      accountName: account.name || "X-penses",
-      createdBy: currentUser.uid,
-      createdByName: currentUser.displayName,
-      createdAt: serverTimestamp(),
-      used: false,
-    });
+    // Primero buscar si ya existe un invite activo y no usado para esta cuenta
+    const existingSnap = await getDocs(
+      query(
+        collection(db, "invites"),
+        where("accountId", "==", account.id),
+        where("used", "==", false),
+        orderBy("createdAt", "desc"),
+        limit(1)
+      )
+    );
+
+    let inviteId;
+    if (!existingSnap.empty) {
+      // Reutilizar el invite existente — evita documentos basura en Firestore
+      inviteId = existingSnap.docs[0].id;
+    } else {
+      inviteId = `${account.id}_${Date.now()}`;
+      await setDoc(doc(db, "invites", inviteId), {
+        accountId: account.id,
+        accountName: account.name || "X-penses",
+        createdBy: currentUser.uid,
+        createdByName: currentUser.displayName,
+        createdAt: serverTimestamp(),
+        used: false,
+      });
+    }
+
     const link = `${window.location.origin}?invite=${inviteId}`;
     setInviteLink(link);
     setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(link)}&color=1a1a2e&bgcolor=f7f8fc`);

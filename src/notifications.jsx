@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { collection, addDoc, onSnapshot, query, where, orderBy, updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, where, orderBy, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
 
@@ -67,13 +67,16 @@ export function NotifProvider({ children, currentUser, accountId }) {
 
   const sendNotification = useCallback(async ({ type, title, body, fromName, toUids, accountId: accId }) => {
     if (!toUids || toUids.length === 0) return;
-    for (const uid of toUids) {
-      await addDoc(collection(db, "notifications"), {
-        type, title, body, fromName,
-        toUid: uid, accountId: accId,
-        read: false, createdAt: serverTimestamp(),
-      });
-    }
+    // Writes en paralelo — evita N round-trips secuenciales
+    await Promise.all(
+      toUids.map(uid =>
+        addDoc(collection(db, "notifications"), {
+          type, title, body, fromName,
+          toUid: uid, accountId: accId,
+          read: false, createdAt: serverTimestamp(),
+        })
+      )
+    );
   }, []);
 
   const markRead = async (id) => {
@@ -81,9 +84,11 @@ export function NotifProvider({ children, currentUser, accountId }) {
   };
 
   const markAllRead = async () => {
-    for (const n of notifications.filter(n => !n.read)) {
-      await updateDoc(doc(db, "notifications", n.id), { read: true });
-    }
+    const unread = notifications.filter(n => !n.read);
+    if (!unread.length) return;
+    const batch = writeBatch(db);
+    unread.forEach(n => batch.update(doc(db, "notifications", n.id), { read: true }));
+    await batch.commit();
   };
 
   const deleteNotif = async (id) => {
@@ -91,9 +96,10 @@ export function NotifProvider({ children, currentUser, accountId }) {
   };
 
   const deleteAllNotifs = async () => {
-    for (const n of notifications) {
-      await deleteDoc(doc(db, "notifications", n.id));
-    }
+    if (!notifications.length) return;
+    const batch = writeBatch(db);
+    notifications.forEach(n => batch.delete(doc(db, "notifications", n.id)));
+    await batch.commit();
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;

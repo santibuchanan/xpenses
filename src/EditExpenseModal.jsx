@@ -119,6 +119,9 @@ export default function EditExpenseModal({ expense, members, customCategories, c
 
   const forWhomArr = Array.isArray(form.forWhom) ? form.forWhom : (form.forWhom ? [form.forWhom] : []);
 
+  // Derivado una sola vez por render — evita llamar canSave() dos veces en el template
+  const isSaveable = !saving && canSave();
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
       <div ref={sheetRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
@@ -212,11 +215,11 @@ export default function EditExpenseModal({ expense, members, customCategories, c
           </>
         )}
 
-        <button onClick={handleSave} disabled={saving || !canSave()}
+        <button onClick={handleSave} disabled={!isSaveable}
           style={{ width: "100%", padding: 16, borderRadius: 16,
-            background: saving || !canSave() ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)",
+            background: isSaveable ? "linear-gradient(135deg,#4F7FFA,#3a6ae8)" : "#aaa",
             color: "#fff", border: "none", fontSize: 16, fontWeight: 700,
-            cursor: saving || !canSave() ? "default" : "pointer", fontFamily: FONT }}>
+            cursor: isSaveable ? "pointer" : "default", fontFamily: FONT }}>
           {saving ? "Guardando..." : "Guardar cambios ✓"}
         </button>
       </div>
