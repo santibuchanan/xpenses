@@ -178,14 +178,15 @@ export default function WelcomeScreen({ onEnter }) {
             <div style={{ flex:1, height:1, background:"#ffffff14" }} />
           </div>
 
-          <button className="btn-press" onClick={handleShare}
-            style={{ width:"100%", padding:"14px 20px", borderRadius:18, background:"transparent", border:"1px solid #ffffff18", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontFamily:SF, fontWeight:600, fontSize:15, color:"#ffffffbb", marginBottom:12 }}>
-            Compartir X-penses
+          <button className="btn-press" onClick={handleAnonymous} disabled={loading}
+            style={{ width:"100%", padding:"15px 20px", borderRadius:18, background:"rgba(79,127,250,0.12)", border:"1.5px solid rgba(79,127,250,0.4)", cursor:loading?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:12, fontFamily:SF, fontWeight:600, fontSize:15, color:"#ffffffcc", marginBottom:12, opacity:loading?0.5:1 }}>
+            <img src="/logo.png" alt="" style={{ width:22, height:22, borderRadius:6, opacity:0.85 }} />
+            {loading ? "Entrando..." : "Continuar sin cuenta"}
           </button>
 
-          <button className="btn-press" onClick={handleAnonymous} disabled={loading}
-            style={{ width:"100%", padding:"13px 20px", borderRadius:18, background:"transparent", border:"1px solid #ffffff10", cursor:loading?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontFamily:SF, fontWeight:500, fontSize:14, color:"#ffffff55", marginBottom:20, opacity:loading?0.5:1 }}>
-            👤 Continuar como invitado
+          <button className="btn-press" onClick={handleShare}
+            style={{ width:"100%", padding:"13px 20px", borderRadius:18, background:"transparent", border:"1px solid #ffffff12", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontFamily:SF, fontWeight:500, fontSize:13, color:"#ffffff44", marginBottom:20 }}>
+            Compartir X-penses
           </button>
 
           {error && <p style={{ color:"#ff6b6b", fontSize:13, textAlign:"center", margin:"-12px 0 14px" }}>{error}</p>}
