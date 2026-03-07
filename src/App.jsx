@@ -1022,6 +1022,7 @@ function AppInner() {
   const { unreadCount } = useNotif();
   const [authUser, setAuthUser]       = useState(undefined);
   const [userProfile, setUserProfile] = useState(null);
+  const [initializing, setInitializing] = useState(true);
   const [account, setAccount]         = useState(null);
   const [members, setMembers]         = useState([]);
   const [expenses, setExpenses]       = useState([]);
@@ -1091,7 +1092,12 @@ function AppInner() {
     } catch (err) { console.error("Error al unirse:", err); }
   };
 
-  useEffect(() => { return onAuthStateChanged(auth, user => setAuthUser(user || null)); }, []);
+  useEffect(() => {
+    return onAuthStateChanged(auth, user => {
+      setAuthUser(user || null);
+      if (!user) setInitializing(false); // no logueado — no hay nada más que esperar
+    });
+  }, []);
 
   // ── Un solo listener sobre users/{uid} — evita el doble-listener anterior ──
   const [accountIds, setAccountIds] = useState([]);
@@ -1102,6 +1108,8 @@ function AppInner() {
       setUserProfile(data || null);
       // Leer accountIds del mismo snapshot — sin segundo listener
       setAccountIds(data?.accountIds || (data?.accountId ? [data.accountId] : [authUser.uid]));
+      // userProfile cargó — si no tiene cuentas aún alcanza para dejar de mostrar el spinner
+      setInitializing(false);
     });
   }, [authUser]);
 
@@ -1216,6 +1224,7 @@ function AppInner() {
     }
   }, [account?.type, tab]);
 
+  if (initializing) return <Spinner text="Cargando..." />;
   if (authUser === undefined) return <Spinner text="Iniciando X-penses..." />;
   if (showWelcome) return <WelcomeScreen onEnter={() => setShowWelcome(false)} />;
   if (!authUser) return <AuthScreen />;
