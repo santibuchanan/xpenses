@@ -1094,8 +1094,25 @@ function AppInner() {
 
   useEffect(() => {
     return onAuthStateChanged(auth, user => {
+      // Resetear TODO el estado antes de cargar el nuevo usuario
+      // Esto evita que se vean datos de una sesión anterior durante la transición
+      setUserProfile(null);
+      setAccount(null);
+      setMembers([]);
+      setUserAccounts([]);
+      setAccountIds([]);
+      setSelectedAccountId(null);
+
       setAuthUser(user || null);
-      if (!user) setInitializing(false); // no logueado — no hay nada más que esperar
+
+      if (!user) {
+        // Sin usuario — nada más que esperar
+        setInitializing(false);
+        setShowWelcome(true);
+      } else {
+        // Hay usuario — volver a initializing hasta que cargue su perfil
+        setInitializing(true);
+      }
     });
   }, []);
 
