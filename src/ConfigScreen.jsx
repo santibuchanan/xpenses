@@ -5,10 +5,9 @@ import { db } from "./firebase";
 const SF_PRO = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
 
 const DIVISION_SYSTEMS = [
-  { id: "proportional", label: "Proporcional al salario", desc: "Cada uno aporta el mismo % de su sueldo", icon: "📊" },
-  { id: "50_50", label: "50/50", desc: "Cada uno paga la mitad exacta", icon: "⚖️" },
-  { id: "fixed", label: "Monto fijo por persona", desc: "Cada uno aporta un monto fijo por mes", icon: "🔒" },
-  { id: "by_category", label: "Por categoría", desc: "Cada categoría tiene su propia regla", icon: "🗂️" },
+  { id: "proportional", label: "Proporcional al ingreso", desc: "Ideal para parejas que conviven. Cada uno aporta según su sueldo.", icon: "📊" },
+  { id: "50_50",        label: "Partes iguales",          desc: "Cada uno paga exactamente la mitad.", icon: "⚖️" },
+  { id: "informativo",  label: "Gastos en común",         desc: "Registrá y gestioná gastos sin calcular quién le debe a quién.", icon: "🤝" },
 ];
 
 import { ALL_CATEGORIES, DEFAULT_SELECTED_CATEGORY_IDS, DEFAULT_CATEGORIES } from "./constants/categories.js";
