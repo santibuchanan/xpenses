@@ -130,18 +130,30 @@ export default function AccountSelectorScreen({ user, accounts, onSelect, onCrea
   const handleCreate = async () => {
     if (!accountName.trim()) return;
     setSaving(true);
-    const validMembers = members.filter(m => m.name.trim());
+
+    // members[0] = owner ("Tu nombre (vos)") → guardar en users/{uid}, NO crear label
+    // members[1+] = otros integrantes → crear labels
+    const ownerName = members[0]?.name?.trim() || user.displayName?.split(" ")[0] || "";
+    const otherMembers = members.slice(1).filter(m => m.name.trim());
+
     const ref = await addDoc(collection(db, "accounts"), {
       name: accountName, type: accountType, divisionSystem,
       ownerId: user.uid, memberIds: [user.uid],
-      memberLabels: validMembers.map((m, i) => ({
+      memberLabels: otherMembers.map((m, i) => ({
         id: `label_${i}`, name: m.name.trim(), color: m.color, linkedUid: null,
       })),
       currency: "ARS", createdAt: new Date().toISOString(),
     });
+
+    // Guardar nombre del owner en su perfil
+    if (ownerName) {
+      await setDoc(doc(db, "users", user.uid), { name: ownerName }, { merge: true });
+    }
+
     await setDoc(doc(db, "users", user.uid), {
       accountIds: [...accounts.map(a => a.id), ref.id],
     }, { merge: true });
+
     setSaving(false);
     onCreated(ref.id);
   };
