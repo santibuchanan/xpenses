@@ -1,8 +1,81 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function isAuth() {
+      return request.auth != null;
     }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    function isMember(accountId) {
+      return isAuth() &&
+        request.auth.uid in get(/databases/$(database)/documents/accounts/$(accountId)).data.memberIds;
+    }
+
+    function isAccountOwner(accountId) {
+      return isAuth() &&
+        request.auth.uid == get(/databases/$(database)/documents/accounts/$(accountId)).data.ownerId;
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if isAuth();
+      allow create: if isAuth() && isOwner(uid);
+      allow update: if isAuth() && isOwner(uid);
+      allow delete: if false;
+    }
+
+    // ── Accounts ──────────────────────────────────────────────────────────────
+    match /accounts/{accountId} {
+      allow read: if isAuth() && isMember(accountId);
+      allow create: if isAuth();
+      allow update: if isAuth() && isMember(accountId);
+      allow delete: if isAuth() && isAccountOwner(accountId);
+
+      match /categories/{categoryId} {
+        allow read: if isAuth() && isMember(accountId);
+        allow write: if isAuth() && isMember(accountId);
+      }
+
+      match /fixedExpenses/{fixedId} {
+        allow read: if isAuth() && isMember(accountId);
+        allow write: if isAuth() && isMember(accountId);
+      }
+
+      match /settlements/{settlementId} {
+        allow read: if isAuth() && isMember(accountId);
+        allow write: if isAuth() && isMember(accountId);
+      }
+    }
+
+    // ── Expenses ──────────────────────────────────────────────────────────────
+    match /expenses/{expenseId} {
+      allow read: if isAuth() && isMember(resource.data.accountId);
+      allow create: if isAuth() && isMember(request.resource.data.accountId);
+      allow update: if isAuth() && isMember(resource.data.accountId);
+      allow delete: if isAuth() && isMember(resource.data.accountId);
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────────────
+    match /notifications/{notifId} {
+      allow read: if isAuth() && resource.data.toUid == request.auth.uid;
+      allow create: if isAuth();
+      allow update: if isAuth() && resource.data.toUid == request.auth.uid;
+      allow delete: if isAuth() && resource.data.toUid == request.auth.uid;
+    }
+
+    // ── Invites ───────────────────────────────────────────────────────────────
+    match /invites/{inviteId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && isMember(request.resource.data.accountId);
+      allow update: if isAuth();
+      allow delete: if isAuth() && isMember(resource.data.accountId);
+    }
+
   }
 }
