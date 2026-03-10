@@ -1,14 +1,22 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useTheme } from "../../theme.jsx";
 import { DEFAULT_CATEGORIES } from "../../constants/categories.js";
 import { CURRENCIES } from "../../theme.jsx";
 import { useSwipeSheet } from "../../hooks/useSwipeSheet.js";
+import { useAmountInput } from "../../hooks/useAmountInput.js";
 import DateInput from "../../DateInput.jsx";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
 export default function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, customCategories, isPersonal }) {
   const { colors } = useTheme();
+
+  // Scroll lock
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const defaultType = isPersonal ? "mio" : "hogar";
   const memberList = allMembers || [];
@@ -38,16 +46,30 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
     });
   };
 
+  // Dirty tracking + discard
+  const [showDiscard, setShowDiscard] = useState(false);
+  const handleClose = () => {
+    const dirty = form.concept.trim() !== "" || (amountInput?.numericValue || 0) > 0;
+    if (dirty) setShowDiscard(true); else onClose();
+  };
+
+  // Amount input con hook
+  const amountInput = useAmountInput("");
+
   // Swipe-to-close — sólo desde el handle
   const sheetRef = useRef(null);
-  const { dragY, isDragging, handlers: swipeHandlers } = useSwipeSheet({ onClose });
+  const { dragY, isDragging, handlers: swipeHandlers } = useSwipeSheet({ onClose: handleClose });
 
   const onTouchStart = (e) => {
     const handle = sheetRef.current?.querySelector("[data-handle]");
     if (handle && handle.contains(e.target)) swipeHandlers.onTouchStart(e);
   };
 
+  const [touched, setTouched] = useState({ concept: false, amount: false });
+  const touchField = (f) => setTouched(t => ({ ...t, [f]: true }));
+
   const handleAdd = async () => {
+    setTouched({ concept: true, amount: true });
     if (!form.concept || !form.amount) return;
     setLoading(true);
     const amount = parseFloat(form.amount);
@@ -87,7 +109,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, paddingTop: 12 }}>
           <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Nuevo Gasto</span>
-          <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
+          <button onClick={handleClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: colors.textMuted, lineHeight: 1 }}>×</button>
         </div>
 
         {!isPersonal && (
@@ -107,14 +129,21 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
           </>
         )}
 
-        <p style={labelStyle}>Concepto</p>
-        <input value={form.concept} onChange={e => set("concept", e.target.value)} placeholder="Ej: Supermercado" style={inputStyle} />
-
         <p style={labelStyle}>Monto ({currSymbol})</p>
         <div style={{ position: "relative", marginBottom: 14 }}>
           <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
-          <input type="number" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0" style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36 }} />
+          <input type="number" inputMode="decimal" autoFocus value={amountInput.displayValue}
+            onChange={(e) => { amountInput.onChange(e); set("amount", parseFloat(e.target.value.replace(",", ".")) || 0); }}
+            placeholder="0" style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36 }} />
         </div>
+        {amountInput.formatted && (
+          <p style={{ fontSize: 12, color: "#4F7FFA", fontWeight: 600, margin: "-10px 0 12px 2px", fontFamily: FONT }}>
+            {currSymbol} {amountInput.formatted}
+          </p>
+        )}
+
+        <p style={labelStyle}>Concepto</p>
+        <input value={form.concept} onChange={e => set("concept", e.target.value)} onFocus={() => touchField("concept")} placeholder="Ej: Supermercado" style={{ ...inputStyle, borderColor: touched.concept && !form.concept ? "#ff6b6b" : colors.inputBorder }} />
 
         <p style={labelStyle}>Categoría</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
@@ -176,6 +205,26 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
           {loading ? "Guardando..." : "Agregar ✓"}
         </button>
       </div>
+
+      {/* Modal descartar */}
+      {showDiscard && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: colors.card, borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, fontFamily: FONT }}>
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>¿Descartar gasto?</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 24px", fontFamily: FONT, lineHeight: 1.5 }}>
+              Lo que escribiste se va a perder.
+            </p>
+            <button onClick={onClose}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+              Descartar
+            </button>
+            <button onClick={() => setShowDiscard(false)}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
+              Seguir cargando
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

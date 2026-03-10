@@ -1,4 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
+import { useAmountInput } from "./hooks/useAmountInput.js";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
@@ -28,9 +30,15 @@ function getPerspectiveType(expense, currentUserUid) {
   return iAmDest ? "mio" : "personal";
 }
 
-export default function EditExpenseModal({ expense, members, customCategories, currentUser, onClose, onSave }) {
+export default function EditExpenseModal({ expense, members, allMembers, customCategories, currentUser, onClose, onSave }) {
   const { colors } = useTheme();
-  const profiles = members?.filter(m => !m._isLabel) || [];
+  const profiles = (allMembers || members || []);
+
+  // Scroll lock
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
 
   const perspectiveType = getPerspectiveType(expense, currentUser?.uid);
@@ -38,14 +46,27 @@ export default function EditExpenseModal({ expense, members, customCategories, c
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Swipe down para cerrar
-  const sheetRef  = useRef(null);
-  const startY    = useRef(null);
-  const [dragY, setDragY]     = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const onTouchStart = (ev) => { const h = sheetRef.current?.querySelector("[data-handle]"); if (h?.contains(ev.target)) { startY.current = ev.touches[0].clientY; setDragging(true); } };
-  const onTouchMove  = (ev) => { if (!dragging || startY.current === null) return; const dy = ev.touches[0].clientY - startY.current; if (dy > 0) setDragY(dy); };
-  const onTouchEnd   = () => { if (dragY > 120) onClose(); else setDragY(0); startY.current = null; setDragging(false); };
+  // Amount input con hook
+  const amountInput = useAmountInput(expense.amount);
+  useEffect(() => { set("amount", amountInput.numericValue || 0); }, [amountInput.numericValue]);
+
+  // Dirty tracking + discard modal
+  const [showDiscard, setShowDiscard] = useState(false);
+  const isDirty = form.concept !== expense.concept
+    || String(form.amount) !== String(expense.amount)
+    || form.category !== expense.category
+    || form.date !== expense.date
+    || form.type !== expense.type
+    || form.paidBy !== expense.paidBy;
+  const handleClose = () => { if (isDirty) setShowDiscard(true); else onClose(); };
+
+  // Swipe-to-close
+  const sheetRef = useRef(null);
+  const { dragY, isDragging, handlers: swipeHandlers } = useSwipeSheet({ onClose: handleClose });
+  const onTouchStart = (e) => {
+    const handle = sheetRef.current?.querySelector("[data-handle]");
+    if (handle && handle.contains(e.target)) swipeHandlers.onTouchStart(e);
+  };
 
   // Al cambiar tipo desde la UI (perspectiva), convertir a tipo real
   const setTypeFromPerspective = (perspType) => {
@@ -125,13 +146,13 @@ export default function EditExpenseModal({ expense, members, customCategories, c
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
       <div ref={sheetRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px 44px", maxHeight: "90vh", overflowY: "auto", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: dragging ? "none" : "transform 0.3s ease" }}>
+        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px 44px", maxHeight: "90vh", overflowY: "auto", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
         <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
           <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, paddingTop: 4 }}>
           <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Editar Gasto</span>
-          <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
+          <button onClick={handleClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: colors.textMuted, lineHeight: 1 }}>×</button>
         </div>
 
         {/* TIPO — muestra perspectiva del usuario */}
@@ -154,7 +175,16 @@ export default function EditExpenseModal({ expense, members, customCategories, c
 
         {/* MONTO */}
         <p style={labelStyle}>Monto</p>
-        <input type="number" value={form.amount} onChange={e => set("amount", e.target.value)} style={inputStyle} />
+        <div style={{ position: "relative", marginBottom: 14 }}>
+          <input type="number" inputMode="decimal" value={amountInput.displayValue}
+            onChange={amountInput.onChange}
+            style={{ ...inputStyle, marginBottom: 0 }} />
+        </div>
+        {amountInput.formatted && (
+          <p style={{ fontSize: 12, color: "#4F7FFA", fontWeight: 600, margin: "-10px 0 12px 2px", fontFamily: FONT }}>
+            {amountInput.formatted}
+          </p>
+        )}
 
         {/* CATEGORÍA */}
         <p style={labelStyle}>Categoría</p>
@@ -223,6 +253,26 @@ export default function EditExpenseModal({ expense, members, customCategories, c
           {saving ? "Guardando..." : "Guardar cambios ✓"}
         </button>
       </div>
+
+      {/* Modal descartar cambios */}
+      {showDiscard && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: colors.card, borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, fontFamily: FONT }}>
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>¿Descartar cambios?</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 24px", fontFamily: FONT, lineHeight: 1.5 }}>
+              Tenés cambios sin guardar. Si salís, se van a perder.
+            </p>
+            <button onClick={onClose}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+              Descartar
+            </button>
+            <button onClick={() => setShowDiscard(false)}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
+              Seguir editando
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

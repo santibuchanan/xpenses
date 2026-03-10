@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { collection, addDoc, onSnapshot, doc, query, orderBy, where, getDoc, updateDoc, setDoc, arrayUnion } from "firebase/firestore";
-import { onAuthStateChanged, signOut, linkWithPopup } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import AuthScreen from "./AuthScreen";
@@ -8,6 +8,7 @@ import ConfigScreen from "./ConfigScreen";
 import SettingsScreen from "./SettingsScreen";
 import AccountSelectorScreen from "./AccountSelectorScreen";
 import WelcomeScreen from "./WelcomeScreen";
+import EmailAuthScreen from "./EmailAuthScreen";
 import EditExpenseModal from "./EditExpenseModal";
 import DateInput from "./DateInput";
 import { NotifProvider, useNotif, NotifCenter, NOTIF_TYPES } from "./notifications";
@@ -444,9 +445,7 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
   const monthLabel = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
 
   const [filterType, setFilterType] = useState("todos");
-  const filtered = isPersonal
-    ? (filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.category === filterType))
-    : (filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.type === filterType));
+  const filtered = filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.category === filterType);
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth && !s.isCorrection && s.amount > 0);
   const sorted = [...filtered].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
@@ -475,8 +474,8 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
           <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Gastos — {monthLabel}</p>
           <p style={{ color: "#fff", fontSize: 36, fontWeight: 700, margin: "0 0 4px", letterSpacing: -1, fontFamily: FONT }}>{fmt(totalMonthExp)}</p>
           {!isPersonal && (
-            <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>
-              {myBalance >= 0 ? `✅ Saldo a favor: ${fmt(myBalance)}` : `⚠️ Debés: ${fmt(Math.abs(myBalance))}`}
+            <p style={{ fontSize: 12, margin: 0, fontFamily: FONT, color: myBalance > 0 ? "#2ecc71" : myBalance < 0 ? "#ff6b6b" : "#ffffff88" }}>
+              {myBalance > 0 ? `✅ Saldo: +${fmt(myBalance)}` : myBalance < 0 ? `⚠️ Saldo: -${fmt(Math.abs(myBalance))}` : "Saldo: $0"}
             </p>
           )}
         </div>
@@ -579,12 +578,8 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
 
         <SectionTitle>Movimientos</SectionTitle>
         <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-          {/* Filtro por tipo (solo cuentas compartidas) */}
-          {!isPersonal && [["todos","Todos"],["hogar","🏠"],["personal","🎁"],["extraordinary","✈️"],["mio","👤"]].map(([val, lbl]) => (
-            <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
-          ))}
-          {/* Filtro por categoría (ambos tipos de cuenta) */}
-          {isPersonal && [["todos", "Todos"], ...allCategories.filter(c => monthExp.some(e => e.category === c.id)).map(c => [c.id, c.icon])].map(([val, lbl]) => (
+          {/* Filtro por categoría — aplica en cuentas personales Y compartidas */}
+          {[["todos", "Todas"], ...allCategories.filter(c => monthExp.some(e => e.category === c.id)).map(c => [c.id, `${c.icon} ${c.label}`])].map(([val, lbl]) => (
             <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
           ))}
         </div>
@@ -955,20 +950,34 @@ function GraficosScreen({ expenses, account, customCategories }) {
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const allMonths = [...new Set(expenses.map(e => e.month))].sort();
-  const last3 = allMonths.slice(-3);
+  const last6 = allMonths.slice(-6);
   const monthLabel = (m) => new Date(m + "-02").toLocaleString("es-AR", { month: "short" });
-  const barData = last3.map(m => ({
+
+  // 6.1 — Selector de vista: "por mes" o "por tipo"
+  const [barView, setBarView] = useState("total"); // "total" | "por_tipo"
+
+  // 6.2 — Selector de mes para torta
+  const [pieMonthIdx, setPieMonthIdx] = useState(last6.length - 1);
+  const pieMonth = last6[pieMonthIdx] || last6[last6.length - 1];
+
+  const barDataTotal = last6.map(m => ({
+    mes: monthLabel(m),
+    Total: expenses.filter(e => e.month === m).reduce((s, e) => s + e.amount, 0),
+  }));
+
+  const barDataTipo = last6.map(m => ({
     mes: monthLabel(m),
     Hogar:    expenses.filter(e => e.month === m && e.type === "hogar").reduce((s, e) => s + e.amount, 0),
     Personal: expenses.filter(e => e.month === m && e.type === "mio").reduce((s, e) => s + e.amount, 0),
     Extra:    expenses.filter(e => e.month === m && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0),
   }));
-  const lastMonth = last3[last3.length - 1];
+
   const pieData = allCategories.map((c, i) => ({
     name: c.label,
-    value: expenses.filter(e => e.month === lastMonth && e.category === c.id).reduce((s, e) => s + e.amount, 0),
+    value: expenses.filter(e => e.month === pieMonth && e.category === c.id).reduce((s, e) => s + e.amount, 0),
     color: CAT_COLORS[i % CAT_COLORS.length],
   })).filter(c => c.value > 0);
+
   const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     if (percent < 0.07) return null;
     const RADIAN = Math.PI / 180;
@@ -977,28 +986,69 @@ function GraficosScreen({ expenses, account, customCategories }) {
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
     return <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={700} fontFamily={FONT}>{`${(percent * 100).toFixed(0)}%`}</text>;
   };
+
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
       <SectionTitle>Comparación mensual</SectionTitle>
+
+      {/* Toggle vista */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        {[["total","Por mes"],["por_tipo","Por tipo"]].map(([val, lbl]) => (
+          <button key={val} onClick={() => setBarView(val)}
+            style={{ padding: "7px 16px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600,
+              borderColor: barView === val ? "#4F7FFA" : colors.inputBorder,
+              background: barView === val ? "#4F7FFA" : colors.card,
+              color: barView === val ? "#fff" : colors.textMuted }}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+
       <Card>
-        {barData.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p> :
+        {last6.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p> :
           <ResponsiveContainer width="100%" height={210}>
-            <BarChart data={barData} barCategoryGap="30%">
+            <BarChart data={barView === "total" ? barDataTotal : barDataTipo} barCategoryGap="30%">
               <XAxis dataKey="mes" tick={{ fontSize: 12, fill: colors.textMuted, fontFamily: FONT }} />
               <YAxis tick={{ fontSize: 10, fill: colors.textMuted, fontFamily: FONT }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
-              <Bar dataKey="Hogar"    fill="#4F7FFA" radius={[6,6,0,0]} />
-              <Bar dataKey="Personal" fill="#2ecc71" radius={[6,6,0,0]} />
-              <Bar dataKey="Extra"    fill="#f39c12" radius={[6,6,0,0]} />
+              {barView === "total"
+                ? <Bar dataKey="Total" fill="#4F7FFA" radius={[6,6,0,0]} />
+                : <>
+                    <Bar dataKey="Hogar"    fill="#4F7FFA" radius={[6,6,0,0]} />
+                    <Bar dataKey="Personal" fill="#2ecc71" radius={[6,6,0,0]} />
+                    <Bar dataKey="Extra"    fill="#f39c12" radius={[6,6,0,0]} />
+                  </>
+              }
             </BarChart>
           </ResponsiveContainer>}
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>
-          {[["#4F7FFA","Hogar"],["#2ecc71","Personal"],["#f39c12","Extra"]].map(([col, lbl]) => <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: col }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span></div>)}
-        </div>
+        {barView === "por_tipo" && (
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>
+            {[["#4F7FFA","Hogar"],["#2ecc71","Personal"],["#f39c12","Extra"]].map(([col, lbl]) => (
+              <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 3, background: col }} />
+                <span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
-      <SectionTitle>Por categoría — último mes</SectionTitle>
+
+      {/* Selector de mes para torta */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, marginTop: 4 }}>
+        <SectionTitle style={{ margin: 0 }}>Por categoría</SectionTitle>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => setPieMonthIdx(i => Math.max(0, i - 1))} disabled={pieMonthIdx === 0}
+            style={{ background: "none", border: "none", cursor: pieMonthIdx === 0 ? "default" : "pointer", color: pieMonthIdx === 0 ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>←</button>
+          <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, minWidth: 60, textAlign: "center" }}>
+            {pieMonth ? new Date(pieMonth + "-02").toLocaleString("es-AR", { month: "short", year: "2-digit" }) : "-"}
+          </span>
+          <button onClick={() => setPieMonthIdx(i => Math.min(last6.length - 1, i + 1))} disabled={pieMonthIdx === last6.length - 1}
+            style={{ background: "none", border: "none", cursor: pieMonthIdx === last6.length - 1 ? "default" : "pointer", color: pieMonthIdx === last6.length - 1 ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>→</button>
+        </div>
+      </div>
+
       <Card>
-        {pieData.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p> :
+        {pieData.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos para este mes</p> :
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" labelLine={false} label={renderCustomLabel}>
@@ -1008,7 +1058,12 @@ function GraficosScreen({ expenses, account, customCategories }) {
             </PieChart>
           </ResponsiveContainer>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6, justifyContent: "center" }}>
-          {pieData.map(p => <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} /><span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{p.name}</span></div>)}
+          {pieData.map(p => (
+            <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} />
+              <span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{p.name}</span>
+            </div>
+          ))}
         </div>
       </Card>
       <div style={{ height: 120 }} />
@@ -1036,7 +1091,8 @@ function AppInner() {
   const [showMenu, setShowMenu]       = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [userAccounts, setUserAccounts] = useState([]);
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showEmailAuth, setShowEmailAuth] = useState(false);
   const [pendingInviteId, setPendingInviteId] = useState(null);
   const [claimData, setClaimData]     = useState(null);
   const currentMonth = getCurrentMonth();
@@ -1109,6 +1165,7 @@ function AppInner() {
         // Sin usuario — nada más que esperar
         setInitializing(false);
         setShowWelcome(true);
+        setShowEmailAuth(false);
       } else {
         // Hay usuario — volver a initializing hasta que cargue su perfil
         setInitializing(true);
@@ -1149,7 +1206,14 @@ function AppInner() {
   useEffect(() => {
     if (!selectedAccountId || userAccounts.length === 0) return;
     const acc = userAccounts.find(a => a.id === selectedAccountId);
-    if (acc) { setAccount(acc); setMembers([]); }
+    if (acc) {
+      setAccount(acc);
+      setMembers([]);
+      // Sincronizar fontSize de la cuenta → global
+      const fs = acc.fontSize || "medium";
+      localStorage.setItem("expenseFontSize", fs);
+      window.dispatchEvent(new CustomEvent("expenseFontSizeChange", { detail: fs }));
+    }
   }, [selectedAccountId, userAccounts]);
 
   useEffect(() => {
@@ -1205,32 +1269,7 @@ function AppInner() {
   });
 
 
-  const [upgradeError, setUpgradeError] = useState("");
-  const [upgrading, setUpgrading] = useState(false);
 
-  const upgradeAnonymous = async () => {
-    setUpgrading(true);
-    setUpgradeError("");
-    try {
-      const result = await linkWithPopup(auth.currentUser, googleProvider);
-      // Actualizar el perfil en Firestore con los datos de Google
-      await setDoc(doc(db, "users", result.user.uid), {
-        email: result.user.email,
-        photo: result.user.photoURL || null,
-        isAnonymous: false,
-        // Preservar nombre solo si no tenía uno real aún
-        ...(userProfile?.name ? {} : { name: result.user.displayName?.split(" ")[0] || "" }),
-      }, { merge: true });
-    } catch (err) {
-      if (err.code === "auth/credential-already-in-use") {
-        setUpgradeError("Esta cuenta de Google ya está en uso en otra sesión.");
-      } else {
-        setUpgradeError("No se pudo vincular la cuenta. Intentá de nuevo.");
-      }
-    } finally {
-      setUpgrading(false);
-    }
-  };
 
   const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); setShowWelcome(true); };
 
@@ -1243,10 +1282,11 @@ function AppInner() {
 
   if (initializing) return <Spinner text="Cargando..." />;
   if (authUser === undefined) return <Spinner text="Iniciando X-penses..." />;
-  if (showWelcome) return <WelcomeScreen onEnter={() => setShowWelcome(false)} />;
+  if (showWelcome && showEmailAuth) return <EmailAuthScreen onBack={() => setShowEmailAuth(false)} onEnter={() => { setShowEmailAuth(false); setShowWelcome(false); }} />;
+  if (showWelcome) return <WelcomeScreen onEnter={() => setShowWelcome(false)} onEmailClick={() => setShowEmailAuth(true)} />;
   if (!authUser) return <AuthScreen />;
   if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
-  if (!selectedAccountId) return <AccountSelectorScreen user={authUser} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} />;
+  if (!selectedAccountId) return <AccountSelectorScreen user={authUser} userProfile={userProfile} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} onSignOut={handleSignOut} />;
 
   // Con el query filtrado por accountId, todos los expenses ya son de esta cuenta
   const accountExpenses = expenses;
@@ -1274,7 +1314,7 @@ function AppInner() {
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
         {tab === "home"     && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} />}
-        {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={members} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} />}
+        {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={allMembers} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} />}
         {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} />}
         {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
       </div>
@@ -1300,19 +1340,7 @@ function AppInner() {
         </div>
       </div>
 
-      {authUser?.isAnonymous && (
-        <div style={{ position: "fixed", bottom: NAV_HEIGHT + 12, left: "50%", transform: "translateX(-50%)", width: "calc(100% - 32px)", maxWidth: 460, background: "linear-gradient(135deg,#1a1a2e,#0f3460)", borderRadius: 16, padding: "12px 16px", zIndex: 50, display: "flex", alignItems: "center", gap: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.3)", border: "1px solid rgba(79,127,250,0.3)" }}>
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONT }}>Estás como invitado</p>
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#ffffff77", fontFamily: FONT }}>Vinculá tu cuenta de Google para no perder tus datos</p>
-            {upgradeError && <p style={{ margin: "4px 0 0", fontSize: 11, color: "#FA4F7F", fontFamily: FONT }}>{upgradeError}</p>}
-          </div>
-          <button onClick={upgradeAnonymous} disabled={upgrading}
-            style={{ background: "#4F7FFA", border: "none", borderRadius: 10, padding: "8px 14px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: upgrading ? "default" : "pointer", fontFamily: FONT, flexShrink: 0, opacity: upgrading ? 0.7 : 1 }}>
-            {upgrading ? "..." : "Vincular Google"}
-          </button>
-        </div>
-      )}
+
 
       {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={customCategories} isPersonal={isPersonal} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={customCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}

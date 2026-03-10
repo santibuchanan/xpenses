@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { signInWithPopup, signInAnonymously } from "firebase/auth";
+import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 
 const SF = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
@@ -11,7 +11,7 @@ const FEATURES = [
   { icon: "🔔", title: "Notificaciones al instante", desc: "Tu pareja carga un gasto y vos lo ves en segundos.", color: "#FA4F7F" },
 ];
 
-export default function WelcomeScreen({ onEnter }) {
+export default function WelcomeScreen({ onEnter, onEmailClick }) {
   const [visible, setVisible] = useState(false);
   const [activeFeature, setActiveFeature] = useState(0);
   const [animDir, setAnimDir] = useState("in");
@@ -66,18 +66,6 @@ export default function WelcomeScreen({ onEnter }) {
       onEnter();
     } catch (e) {
       setError("No se pudo iniciar sesión. Intentá de nuevo.");
-      setLoading(false);
-    }
-  };
-
-  const handleAnonymous = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      await signInAnonymously(auth);
-      onEnter();
-    } catch (e) {
-      setError("No se pudo continuar. Intentá de nuevo.");
       setLoading(false);
     }
   };
@@ -178,10 +166,10 @@ export default function WelcomeScreen({ onEnter }) {
             <div style={{ flex:1, height:1, background:"#ffffff14" }} />
           </div>
 
-          <button className="btn-press" onClick={handleAnonymous} disabled={loading}
+          <button className="btn-press" onClick={onEmailClick} disabled={loading}
             style={{ width:"100%", padding:"15px 20px", borderRadius:18, background:"rgba(79,127,250,0.12)", border:"1.5px solid rgba(79,127,250,0.4)", cursor:loading?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:12, fontFamily:SF, fontWeight:600, fontSize:15, color:"#ffffffcc", marginBottom:12, opacity:loading?0.5:1 }}>
-            <img src="/logo.png" alt="" style={{ width:22, height:22, borderRadius:6, opacity:0.85 }} />
-            {loading ? "Entrando..." : "Continuar sin cuenta"}
+            <span style={{ fontSize:20 }}>✉️</span>
+            Continuar con email
           </button>
 
           <button className="btn-press" onClick={handleShare}

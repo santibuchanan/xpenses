@@ -140,7 +140,7 @@ function NotifToast({ notif, onClose }) {
 }
 
 // ── Fila de notificación con swipe para eliminar (estilo iOS) ──
-function SwipeableNotifRow({ n, onMarkRead, onDelete, colors }) {
+export function SwipeableNotifRow({ n, onMarkRead, onDelete, colors }) {
   const [offsetX, setOffsetX] = useState(0);
   const startX    = useRef(null);
   const isDragging = useRef(false);
@@ -229,6 +229,12 @@ export function NotifCenter({ onClose }) {
   const { colors } = useTheme();
   const [showConfirmClear, setShowConfirmClear] = useState(false);
 
+  // Scroll lock
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   // Swipe-to-close
   const startY = useRef(null);
   const [dragY, setDragY] = useState(0);
@@ -279,7 +285,7 @@ export function NotifCenter({ onClose }) {
                   Borrar todas
                 </button>
               )}
-              <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
+
             </div>
           </div>
         </div>

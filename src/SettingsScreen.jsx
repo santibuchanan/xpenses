@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
@@ -9,6 +9,7 @@ const CURRENCIES = ["ARS", "USD", "EUR"];
 const CURRENCY_SYMBOLS = { ARS: "$", USD: "U$S", EUR: "€" };
 const MEMBER_COLORS = ["#4F7FFA","#FA4F7F","#2ecc71","#f39c12","#9b59b6","#1abc9c","#e74c3c","#3498db"];
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
+import { removeMember } from "./hooks/removeMember.js";
 const EMOJI_OPTIONS = ["🛒","🍕","💡","🚗","💊","👗","🏠","📦","🐶","✈️","🏋️","📚","📱","🎮","🍺","☕","🎁","💈","🎵","🏥","🌮","🧴","🎬","🏖️","🎓","💻","🛵","🧹","🪴","🐱","⚽️","🔥","🍔"];
 const FONT_SIZES = [
   { id: "small",  label: "Chica",   baseSize: 12 },
@@ -215,6 +216,81 @@ function FixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
   );
 }
 
+
+function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, colors }) {
+  const [swipeX,     setSwipeX]   = useState(0);
+  const [swiped,     setSwiped]   = useState(false);
+  const startX                    = useRef(null);
+  const isDragging                = useRef(false);
+  const DELETE_THRESHOLD          = 80;
+
+  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; isDragging.current = true; };
+  const onTouchMove  = (e) => {
+    if (!isDragging.current || startX.current === null) return;
+    const diff = startX.current - e.touches[0].clientX;
+    if (diff > 0) setSwipeX(Math.min(diff, DELETE_THRESHOLD + 20));
+    else if (diff < -10) { setSwipeX(0); setSwiped(false); }
+  };
+  const onTouchEnd = () => {
+    isDragging.current = false;
+    if (swipeX > DELETE_THRESHOLD / 2) { setSwipeX(DELETE_THRESHOLD); setSwiped(true); }
+    else { setSwipeX(0); setSwiped(false); }
+    startX.current = null;
+  };
+
+  return (
+    <div style={{ position: "relative", marginBottom: 8, borderRadius: 16, overflow: "hidden" }}>
+      {/* Botón eliminar detrás — solo si no es el usuario actual */}
+      {!isCurrentUser && (
+        <div style={{
+          position: "absolute", right: 0, top: 0, bottom: 0, width: DELETE_THRESHOLD,
+          background: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center",
+          borderRadius: "0 16px 16px 0",
+        }}>
+          <button onClick={(e) => { e.stopPropagation(); onRemoveRequest(member); }}
+            style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 0 }}>
+            <span style={{ fontSize: 20 }}>🗑️</span>
+            <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+          </button>
+        </div>
+      )}
+
+      {/* Fila deslizable */}
+      <div
+        onTouchStart={!isCurrentUser ? onTouchStart : undefined}
+        onTouchMove={!isCurrentUser ? onTouchMove : undefined}
+        onTouchEnd={!isCurrentUser ? onTouchEnd : undefined}
+        onClick={() => { if (swiped) { setSwipeX(0); setSwiped(false); } else if (onEdit) { onEdit(member); } }}
+        style={{
+          transform: `translateX(-${swipeX}px)`,
+          transition: isDragging.current ? "none" : "transform 0.3s ease",
+          background: colors.card, borderRadius: 16, padding: "14px 16px",
+          border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow,
+          display: "flex", alignItems: "center", gap: 12,
+          cursor: "pointer", position: "relative", zIndex: 1,
+        }}>
+        {member.photo
+          ? <img src={member.photo} style={{ width: 40, height: 40, borderRadius: 20 }} alt="" />
+          : member.linkedUid === undefined
+            ? <div style={{ width: 40, height: 40, borderRadius: 20, background: (member.color || "#4F7FFA") + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>👤</div>
+            : <div style={{ width: 40, height: 40, borderRadius: 20, background: (member.color || "#4F7FFA") + "33", border: `2px solid ${member.color || "#4F7FFA"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: member.color || "#4F7FFA", fontFamily: FONT }}>{member.name?.[0]?.toUpperCase()}</span>
+              </div>}
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>
+            {member.name}
+            {isCurrentUser && <span style={{ fontSize: 11, color: colors.textMuted }}> (vos)</span>}
+          </p>
+          <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
+            {member.salary ? `$${(member.salary || 0).toLocaleString("es-AR")}/mes` : "Sin sueldo cargado"}
+            {" · "}{member.linkedUid !== undefined ? "Sin vincular" : "Vinculado ✓"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsScreen({ currentUser, userProfile, account, members, allMembers, onSignOut, onSwitchAccount }) {
   const { colors } = useTheme();
   const isPersonal = account?.type === "personal";
@@ -233,6 +309,8 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const [showInvite,        setShowInvite]        = useState(false);
   const [inviteLink,        setInviteLink]        = useState("");
   const [editingMember,     setEditingMember]     = useState(null);
+  const [removingMember,    setRemovingMember]    = useState(null);
+  const [removeLoading,     setRemoveLoading]     = useState(false);
 
   const [expenseFontSize, setExpenseFontSize] = useState(() => localStorage.getItem("expenseFontSize") || "medium");
   const handleFontSizeChange = (sizeId) => {
@@ -339,6 +417,18 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     setEditingMember(null);
   };
 
+  const handleRemoveMember = async (memberToRemove) => {
+    setRemoveLoading(true);
+    try {
+      await removeMember({ account, memberToRemove, currentUser, allMembers });
+    } catch (e) {
+      console.error("Error removing member:", e);
+    }
+    setRemoveLoading(false);
+    setRemovingMember(null);
+    setEditingMember(null);
+  };
+
   const memberLabels = account?.memberLabels || [];
 
   // Gastos fijos visibles para este usuario:
@@ -426,32 +516,26 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
 
       {/* MIEMBROS */}
       <SectionHeader title="Miembros" colors={colors} />
+      <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: FONT }}>Deslizá a la izquierda para eliminar</p>
       {members?.map(m => (
-        <div key={m.uid} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
-          {m.photo
-            ? <img src={m.photo} style={{ width: 40, height: 40, borderRadius: 20 }} alt="" />
-            : <div style={{ width: 40, height: 40, borderRadius: 20, background: (m.color || "#4F7FFA") + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>👤</div>}
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>
-              {m.name} {m.uid === currentUser.uid && <span style={{ fontSize: 11, color: colors.textMuted }}>(vos)</span>}
-            </p>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
-              {m.salary ? `$${(m.salary || 0).toLocaleString("es-AR")}/mes` : "Sin sueldo cargado"} · Vinculado ✓
-            </p>
-          </div>
-        </div>
+        <SwipeableMemberRow
+          key={m.uid}
+          member={{ ...m, linkedUid: undefined }}
+          isCurrentUser={m.uid === currentUser.uid}
+          onEdit={setEditingMember}
+          onRemoveRequest={setRemovingMember}
+          colors={colors}
+        />
       ))}
-      {!isPersonal && memberLabels.filter(l => !l.linkedUid).map(l => (
-        <div key={l.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 20, background: (l.color || "#4F7FFA") + "33", border: `2px solid ${l.color || "#4F7FFA"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <span style={{ fontSize: 16, fontWeight: 700, color: l.color || "#4F7FFA", fontFamily: FONT }}>{l.name[0]?.toUpperCase()}</span>
-          </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>{l.name}</p>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>Sin vincular · Pendiente de invitacion</p>
-          </div>
-          <button onClick={() => setEditingMember(l)} style={{ background: "#4F7FFA11", border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: "#4F7FFA", cursor: "pointer", fontFamily: FONT }}>✏️</button>
-        </div>
+      {!isPersonal && memberLabels.map(l => (
+        <SwipeableMemberRow
+          key={l.id}
+          member={l}
+          isCurrentUser={false}
+          onEdit={setEditingMember}
+          onRemoveRequest={setRemovingMember}
+          colors={colors}
+        />
       ))}
       {!isPersonal && (
         <>
@@ -558,6 +642,26 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
               Compartir link
             </button>
             <button onClick={() => setShowInvite(false)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cerrar</button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIRMAR ELIMINAR MIEMBRO */}
+      {removingMember && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+            <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+            <p style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>¿Eliminar integrante?</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 24px", fontFamily: FONT }}>
+              Se eliminará <strong style={{ color: colors.text }}>{removingMember.name}</strong> de la cuenta. Sus gastos quedarán sin asignar o se reasignarán a vos.
+            </p>
+            <button onClick={() => handleRemoveMember(removingMember)} disabled={removeLoading}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: "#ff6b6b", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: removeLoading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10, opacity: removeLoading ? 0.7 : 1 }}>
+              {removeLoading ? "Eliminando..." : "Sí, eliminar"}
+            </button>
+            <button onClick={() => setRemovingMember(null)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
+              Cancelar
+            </button>
           </div>
         </div>
       )}
