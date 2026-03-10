@@ -70,9 +70,10 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
 
   const handleAdd = async () => {
     setTouched({ concept: true, amount: true });
-    if (!form.concept || !form.amount) return;
+    // amountInput.numericValue es la fuente de verdad — evita desfase con form.amount
+    const amount = amountInput.numericValue || 0;
+    if (!form.concept || amount <= 0) return;
     setLoading(true);
-    const amount = parseFloat(form.amount);
     const extra = {};
     if (form.type === "extraordinary" && memberList.length > 0) {
       memberList.forEach(m => { extra[`paid_${m.uid}`] = m.uid === form.paidBy ? amount : 0; });
@@ -133,7 +134,8 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
         <div style={{ position: "relative", marginBottom: 14 }}>
           <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
           <input type="number" inputMode="decimal" autoFocus value={amountInput.displayValue}
-            onChange={(e) => { amountInput.onChange(e); set("amount", parseFloat(e.target.value.replace(",", ".")) || 0); }}
+            onChange={amountInput.onChange}
+            onFocus={() => touchField("amount")}
             placeholder="0" style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36 }} />
         </div>
         {amountInput.formatted && (

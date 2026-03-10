@@ -6,10 +6,8 @@ import { NOTIF_TYPES } from "../notifications.jsx";
 
 /**
  * useExpenses
- * Encapsula toda la lógica de negocio de gastos:
+ * Encapsula toda la logica de negocio de gastos:
  * addExpense, deleteExpense, doDeleteExpense, handleEditSave, markFixedPaid
- *
- * Esto saca ~150 líneas de lógica de AppInner y las hace testeables por separado.
  */
 export function useExpenses({
   authUser,
@@ -70,7 +68,6 @@ export function useExpenses({
         deletedAt: new Date().toISOString(),
         deletedBy: authUser.uid,
       });
-      // Actualizar estado local sin esperar el snapshot
       setExpenses(prev => prev.map(e => e.id === expense.id ? { ...e, deleted: true } : e));
     } catch (err) {
       console.error("Error soft-delete:", err);
@@ -139,17 +136,33 @@ export function useExpenses({
     setDeleteWarning(null);
   }, [authUser, account, members, currentMonth, sendNotification, setExpenses, setDeleteWarning]);
 
+  /**
+   * deleteExpense — punto de entrada desde la UI.
+   * Si hay settlements activos en el mes actual, muestra el modal de advertencia
+   * (setDeleteWarning) para que el usuario decida si quiere ajustar los saldos.
+   * Si no hay settlements, elimina directamente sin preguntar.
+   */
   const deleteExpense = useCallback(async (expenseId) => {
     const expense = expenses.find(e => e.id === expenseId);
     if (!expense) return;
 
-    let hasSettlements = false;
     if (account?.id) {
       const settSnap = await getDocs(query(collection(db, "accounts", account.id, "settlements")));
-      hasSettlements = settSnap.docs.some(d => d.data().month === currentMonth);
+      const hasSettlements = settSnap.docs.some(d => {
+        const data = d.data();
+        return data.month === currentMonth && !data.isCorrection;
+      });
+
+      if (hasSettlements) {
+        // Mostrar modal de advertencia — el usuario elige si ajusta o no
+        setDeleteWarning({ expense });
+        return;
+      }
     }
-    await doDeleteExpense(expense, hasSettlements);
-  }, [expenses, account, currentMonth, doDeleteExpense]);
+
+    // Sin settlements: eliminar directo, sin modal
+    await doDeleteExpense(expense, false);
+  }, [expenses, account, currentMonth, doDeleteExpense, setDeleteWarning]);
 
   const markFixedPaid = useCallback(async (fixedId, paidByUid, month) => {
     const fixedRef = doc(db, "accounts", account.id, "fixedExpenses", fixedId);

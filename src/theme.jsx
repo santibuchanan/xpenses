@@ -11,7 +11,6 @@ export function ThemeProvider({ children }) {
     setSystemDark(mq.matches);
     const handler = (e) => setSystemDark(e.matches);
     mq.addEventListener("change", handler);
-    // Recuperar preferencia guardada
     const saved = localStorage.getItem("xpenses-theme");
     if (saved) setManualTheme(saved);
     return () => mq.removeEventListener("change", handler);
@@ -72,7 +71,7 @@ export function ThemeProvider({ children }) {
   };
 
   return (
-    <ThemeContext.Provider value={{ isDark, colors, toggleTheme }}>
+    <ThemeContext.Provider value={{ isDark, colors, toggleTheme, setManualTheme }}>
       <div style={{ background: colors.bg, minHeight: "100vh" }}>
         {children}
       </div>
@@ -84,15 +83,25 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
+// 9 monedas — fuente unica de verdad para toda la app.
+// AccountSelectorScreen y SettingsScreen importan de aca (no definen la lista localmente).
 export const CURRENCIES = {
-  ARS: { symbol: "$", name: "Peso argentino", locale: "es-AR", code: "ARS" },
-  USD: { symbol: "US$", name: "Dólar estadounidense", locale: "en-US", code: "USD" },
-  EUR: { symbol: "€", name: "Euro", locale: "de-DE", code: "EUR" },
+  ARS: { symbol: "$",   name: "Peso argentino",       locale: "es-AR", code: "ARS" },
+  USD: { symbol: "US$", name: "Dolar estadounidense", locale: "en-US", code: "USD" },
+  EUR: { symbol: "€",   name: "Euro",                 locale: "de-DE", code: "EUR" },
+  BRL: { symbol: "R$",  name: "Real brasileño",       locale: "pt-BR", code: "BRL" },
+  CLP: { symbol: "$",   name: "Peso chileno",         locale: "es-CL", code: "CLP" },
+  UYU: { symbol: "$U",  name: "Peso uruguayo",        locale: "es-UY", code: "UYU" },
+  MXN: { symbol: "$",   name: "Peso mexicano",        locale: "es-MX", code: "MXN" },
+  GBP: { symbol: "£",   name: "Libra esterlina",      locale: "en-GB", code: "GBP" },
+  JPY: { symbol: "¥",   name: "Yen japones",          locale: "ja-JP", code: "JPY" },
 };
 
 export function formatAmount(n, currencyCode = "ARS") {
   const cur = CURRENCIES[currencyCode] || CURRENCIES.ARS;
   return new Intl.NumberFormat(cur.locale, {
-    style: "currency", currency: cur.code, maximumFractionDigits: 0
+    style: "currency",
+    currency: cur.code,
+    maximumFractionDigits: 0,
   }).format(n || 0);
 }

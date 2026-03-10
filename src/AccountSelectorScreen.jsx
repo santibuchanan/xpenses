@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { collection, addDoc, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
-import { useTheme } from "./theme.jsx";
+import { useTheme, CURRENCIES as CURRENCIES_MAP } from "./theme.jsx";
 import { useNotif, SwipeableNotifRow } from "./notifications.jsx";
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 
@@ -15,17 +15,11 @@ const DIVISION_SYSTEMS = [
 
 const MEMBER_COLORS = ["#4F7FFA","#FA4F7F","#2ecc71","#f39c12","#9b59b6","#1abc9c"];
 
-const CURRENCIES = [
-  { code: "ARS", label: "Peso argentino",       symbol: "$"   },
-  { code: "USD", label: "Dólar estadounidense", symbol: "US$" },
-  { code: "EUR", label: "Euro",                 symbol: "€"   },
-  { code: "BRL", label: "Real brasileño",       symbol: "R$"  },
-  { code: "CLP", label: "Peso chileno",         symbol: "$"   },
-  { code: "UYU", label: "Peso uruguayo",        symbol: "$U"  },
-  { code: "MXN", label: "Peso mexicano",        symbol: "$"   },
-  { code: "GBP", label: "Libra esterlina",      symbol: "£"   },
-  { code: "JPY", label: "Yen japonés",          symbol: "¥"   },
-];
+// Derivado de CURRENCIES_MAP (fuente única en theme.jsx) para mantener el formato de array
+// que usa el selector de divisa en el formulario de nueva cuenta
+const CURRENCIES = Object.values(CURRENCIES_MAP).map(c => ({
+  code: c.code, label: c.name, symbol: c.symbol,
+}));
 
 const FONT_SIZES = [
   { id: "small",  label: "Pequeño"           },
@@ -103,7 +97,7 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
           background: acc.type === "shared" ? "#4F7FFA18" : "#2ecc7118",
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0,
         }}>
-          {acc.type === "shared" ? "👥" : "👤"}
+          {acc.emoji || (acc.type === "shared" ? "👥" : "👤")}
         </div>
         <div style={{ flex: 1 }}>
           <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{acc.name}</p>
@@ -261,7 +255,7 @@ function ProfileTab({ user, userProfile, onSignOut, colors }) {
 
 export default function AccountSelectorScreen({ user, userProfile, accounts, onSelect, onCreated, onSignOut }) {
   const { colors } = useTheme();
-  const { notifications, unreadCount, markRead, deleteNotif } = useNotif();
+  const { notifications, unreadCount, markRead, markAllRead, deleteNotif } = useNotif();
 
   const [step,           setStep]          = useState("list");
   const [activeTab,      setActiveTab]     = useState("cuentas"); // "cuentas" | "perfil"
@@ -439,7 +433,7 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
                   )}
                 </div>
                 {unreadCount > 0 && (
-                  <button onClick={() => notifications.filter(n => !n.read).forEach(n => markRead(n.id))}
+                  <button onClick={markAllRead}
                     style={{ background: "none", border: "none", fontSize: 12, color: "#4F7FFA", fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>
                     Marcar todo leído
                   </button>

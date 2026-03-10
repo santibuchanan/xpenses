@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
-import { useTheme } from "./theme.jsx";
+import { useTheme, CURRENCIES as CURRENCIES_MAP } from "./theme.jsx";
 import DateInput from "./DateInput";
+import InviteScreen from "./InviteScreen.jsx";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
-const CURRENCIES = ["ARS", "USD", "EUR"];
-const CURRENCY_SYMBOLS = { ARS: "$", USD: "U$S", EUR: "€" };
+// Lista de monedas derivada de la fuente única en theme.jsx
+const CURRENCY_LIST = Object.values(CURRENCIES_MAP);
+const CURRENCY_SYMBOLS = Object.fromEntries(CURRENCY_LIST.map(c => [c.code, c.symbol]));
 const MEMBER_COLORS = ["#4F7FFA","#FA4F7F","#2ecc71","#f39c12","#9b59b6","#1abc9c","#e74c3c","#3498db"];
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 import { removeMember } from "./hooks/removeMember.js";
@@ -283,7 +285,7 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
           </p>
           <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
             {member.salary ? `$${(member.salary || 0).toLocaleString("es-AR")}/mes` : "Sin sueldo cargado"}
-            {" · "}{member.linkedUid !== undefined ? "Sin vincular" : "Vinculado ✓"}
+            {" · "}{member.linkedUid ? "Vinculado ✓" : "Sin vincular"}
           </p>
         </div>
       </div>
@@ -296,6 +298,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const isPersonal = account?.type === "personal";
 
   const [showShareApp,      setShowShareApp]      = useState(false);
+  const [showCurrencySheet, setShowCurrencySheet] = useState(false);
   const [editingCategory,   setEditingCategory]   = useState(null);
   const [customCategories,  setCustomCategories]  = useState([]);
   const [fixedExpenses,     setFixedExpenses]     = useState([]);
@@ -307,16 +310,19 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const [selectedCurrency,  setSelectedCurrency]  = useState(account?.currency || "ARS");
   const [editingProfile,    setEditingProfile]    = useState(false);
   const [showInvite,        setShowInvite]        = useState(false);
-  const [inviteLink,        setInviteLink]        = useState("");
   const [editingMember,     setEditingMember]     = useState(null);
   const [removingMember,    setRemovingMember]    = useState(null);
   const [removeLoading,     setRemoveLoading]     = useState(false);
 
-  const [expenseFontSize, setExpenseFontSize] = useState(() => localStorage.getItem("expenseFontSize") || "medium");
-  const handleFontSizeChange = (sizeId) => {
+  const [expenseFontSize, setExpenseFontSize] = useState(() => account?.fontSize || localStorage.getItem("expenseFontSize") || "medium");
+  const handleFontSizeChange = async (sizeId) => {
     setExpenseFontSize(sizeId);
     localStorage.setItem("expenseFontSize", sizeId);
     window.dispatchEvent(new CustomEvent("expenseFontSizeChange", { detail: sizeId }));
+    // Persistir a Firestore para sincronizar entre dispositivos
+    if (account?.id) {
+      await updateDoc(doc(db, "accounts", account.id), { fontSize: sizeId });
+    }
   };
 
   const cardStyle = { background: colors.card, borderRadius: 16, padding: "14px 16px", marginBottom: 8, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` };
@@ -385,14 +391,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     await deleteDoc(doc(db, "accounts", account.id, "fixedExpenses", id));
   };
 
-  const generateInvite = async () => {
-    const ref = await addDoc(collection(db, "invites"), {
-      accountId: account?.id, accountName: account?.name,
-      createdBy: currentUser.uid, createdByName: userProfile?.name,
-      createdAt: new Date().toISOString(), used: false,
-    });
-    const link = `${window.location.origin}?invite=${ref.id}`;
-    setInviteLink(link);
+  const generateInvite = () => {
     setShowInvite(true);
   };
 
@@ -420,7 +419,18 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const handleRemoveMember = async (memberToRemove) => {
     setRemoveLoading(true);
     try {
-      await removeMember({ account, memberToRemove, currentUser, allMembers });
+      // memberUid: uid real si está vinculado, o el id del label si no lo está
+      const memberUid = memberToRemove.linkedUid || memberToRemove.uid || memberToRemove.id;
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const result = await removeMember({
+        accountId:    account.id,
+        memberUid,
+        ownerUid:     account.ownerId,
+        currentMonth,
+      });
+      if (!result.success) {
+        console.error("removeMember error:", result.error);
+      }
     } catch (e) {
       console.error("Error removing member:", e);
     }
@@ -481,13 +491,13 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT }}>{account?.name || "Sin cuenta"}</p>
         <p style={{ margin: "0 0 14px", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{isPersonal ? "Personal" : "Compartida"} · {account?.memberIds?.length || 1} miembro{(account?.memberIds?.length || 1) !== 1 ? "s" : ""}</p>
         <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 8, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Moneda</p>
-        <div style={{ display: "flex", gap: 8 }}>
-          {CURRENCIES.map(c => (
-            <button key={c} onClick={() => saveCurrency(c)} style={{ flex: 1, padding: "10px 0", borderRadius: 12, border: "2px solid", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, borderColor: selectedCurrency === c ? "#4F7FFA" : colors.inputBorder, background: selectedCurrency === c ? "#4F7FFA" : colors.input, color: selectedCurrency === c ? "#fff" : colors.textMuted }}>
-              {CURRENCY_SYMBOLS[c]} {c}
-            </button>
-          ))}
-        </div>
+        <button onClick={() => setShowCurrencySheet(true)}
+          style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, background: colors.input, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: FONT }}>
+          <span style={{ fontSize: 14, color: colors.text, fontWeight: 600 }}>
+            {CURRENCY_SYMBOLS[selectedCurrency] || "$"} {selectedCurrency} — {CURRENCIES_MAP[selectedCurrency]?.name || selectedCurrency}
+          </span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
       </div>
 
       {/* APARIENCIA */}
@@ -627,23 +637,31 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       {/* MODALES */}
       {showShareApp && <ShareAppModal onClose={() => setShowShareApp(false)} colors={colors} />}
 
-      {showInvite && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT }}>
+      {/* Currency bottom sheet */}
+      {showCurrencySheet && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
+          onClick={() => setShowCurrencySheet(false)}>
+          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}
+            onClick={e => e.stopPropagation()}>
             <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 6px", fontFamily: FONT }}>Invitar a {account?.name}</p>
-            <p style={{ color: colors.textMuted, fontSize: 13, margin: "0 0 20px", fontFamily: FONT }}>Compartí este link para que se unan a tu cuenta</p>
-            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(inviteLink)}`} style={{ display: "block", margin: "0 auto 16px", borderRadius: 12, width: 160, height: 160 }} alt="QR" />
-            <div style={{ background: colors.pill, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-              <span style={{ fontSize: 12, color: "#4F7FFA", fontWeight: 600, wordBreak: "break-all", fontFamily: FONT }}>{inviteLink}</span>
-            </div>
-            <button onClick={() => { navigator.share ? navigator.share({ title: `Unirte a ${account?.name}`, url: inviteLink }) : navigator.clipboard.writeText(inviteLink); }}
-              style={{ width: "100%", padding: 14, borderRadius: 14, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
-              Compartir link
-            </button>
-            <button onClick={() => setShowInvite(false)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cerrar</button>
+            <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Moneda</p>
+            {CURRENCY_LIST.map(c => (
+              <button key={c.code} onClick={() => { saveCurrency(c.code); setShowCurrencySheet(false); }}
+                style={{ width: "100%", padding: "14px 16px", borderRadius: 14, border: `2px solid ${selectedCurrency === c.code ? "#4F7FFA" : colors.inputBorder}`, background: selectedCurrency === c.code ? "#4F7FFA11" : colors.input, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 12, fontFamily: FONT }}>
+                <span style={{ fontSize: 20, minWidth: 28 }}>{c.symbol}</span>
+                <div style={{ textAlign: "left" }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.code}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{c.name}</p>
+                </div>
+                {selectedCurrency === c.code && <span style={{ marginLeft: "auto", color: "#4F7FFA", fontSize: 18 }}>✓</span>}
+              </button>
+            ))}
           </div>
         </div>
+      )}
+
+      {showInvite && (
+        <InviteScreen account={account} currentUser={currentUser} onClose={() => setShowInvite(false)} />
       )}
 
       {/* MODAL CONFIRMAR ELIMINAR MIEMBRO */}
