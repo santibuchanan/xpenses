@@ -15,17 +15,10 @@ const DIVISION_SYSTEMS = [
 
 const MEMBER_COLORS = ["#4F7FFA","#FA4F7F","#2ecc71","#f39c12","#9b59b6","#1abc9c"];
 
-// Derivado de CURRENCIES_MAP (fuente única en theme.jsx) para mantener el formato de array
-// que usa el selector de divisa en el formulario de nueva cuenta
+// Derivado de CURRENCIES_MAP (fuente única en theme.jsx)
 const CURRENCIES = Object.values(CURRENCIES_MAP).map(c => ({
   code: c.code, label: c.name, symbol: c.symbol,
 }));
-
-const FONT_SIZES = [
-  { id: "small",  label: "Pequeño"           },
-  { id: "medium", label: "Mediano (default)"  },
-  { id: "large",  label: "Grande"             },
-];
 
 function MenuIcon({ color = "#ffffffcc" }) {
   return (
@@ -61,6 +54,11 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
     else { setSwipeX(0); setSwiped(false); }
     startX.current = null;
   };
+
+  // FIX: contador de miembros incluye labels no vinculados
+  const memberLabels = acc.memberLabels || [];
+  const unlinkedCount = memberLabels.filter(l => !l.linkedUid).length;
+  const totalMembers = (acc.memberIds?.length || 1) + unlinkedCount;
 
   return (
     <div style={{ position: "relative", marginBottom: 12, borderRadius: 20, overflow: "hidden" }}>
@@ -102,7 +100,7 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
         <div style={{ flex: 1 }}>
           <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{acc.name}</p>
           <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
-            {acc.type === "shared" ? "Compartida" : "Personal"} · {acc.memberIds?.length || 1} miembro{(acc.memberIds?.length || 1) !== 1 ? "s" : ""}
+            {acc.type === "shared" ? "Compartida" : "Personal"} · {totalMembers} miembro{totalMembers !== 1 ? "s" : ""}
           </p>
         </div>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -115,7 +113,7 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
 
 function ProfileTab({ user, userProfile, onSignOut, colors }) {
   const { setManualTheme } = useTheme();
-  const [editingField, setEditingField] = useState(null); // "name" | "alias" | "theme" | "language"
+  const [editingField, setEditingField] = useState(null);
   const [fieldValue,   setFieldValue]   = useState("");
   const [saving,       setSaving]       = useState(false);
 
@@ -258,29 +256,29 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
   const { notifications, unreadCount, markRead, markAllRead, deleteNotif } = useNotif();
 
   const [step,           setStep]          = useState("list");
-  const [activeTab,      setActiveTab]     = useState("cuentas"); // "cuentas" | "perfil"
+  const [activeTab,      setActiveTab]     = useState("cuentas");
   const [accountName,    setAccountName]   = useState("");
   const [accountType,    setAccountType]   = useState("shared");
   const [divisionSystem, setDivisionSystem]= useState("proportional");
   const [saving,         setSaving]        = useState(false);
   const [confirmDelete,  setConfirmDelete] = useState(null);
-  // Estado local para reflejar eliminaciones inmediatamente sin esperar al padre
   const [deletedIds,     setDeletedIds]    = useState([]);
 
-  // Bloque 3 — nuevos campos de creación
   const [selectedEmoji,      setSelectedEmoji]      = useState("🏠");
   const [selectedCurrency,   setSelectedCurrency]   = useState("ARS");
-  const [selectedFontSize,   setSelectedFontSize]   = useState("medium");
-  const [memberSalaries,     setMemberSalaries]     = useState({ 0: "" }); // idx → salary string
-  const [selectedCategories, setSelectedCategories] = useState(DEFAULT_CATEGORIES.map(c => c.id));
+  const [memberSalaries,     setMemberSalaries]     = useState({ 0: "" });
+  // FIX: ninguna categoría seleccionada por default — mínimo 1 obligatoria
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [catError,           setCatError]           = useState(false);
   const [showCurrencySheet,  setShowCurrencySheet]  = useState(false);
-  const [showFontSheet,      setShowFontSheet]      = useState(false);
+
   const emojiInputRef = useRef(null);
 
   const visibleAccounts = accounts.filter(a => !deletedIds.includes(a.id));
 
-  // Integrantes
-  const [members,       setMembers]       = useState([{ name: "", color: MEMBER_COLORS[0] }]);
+  // FIX: creador autogenerado como integrante 0
+  const ownerDisplayName = userProfile?.alias || userProfile?.name || user.displayName?.split(" ")[0] || "";
+  const [members, setMembers] = useState([{ name: ownerDisplayName, color: MEMBER_COLORS[0] }]);
   const [newMemberName, setNewMemberName] = useState("");
 
   const addMember = () => {
@@ -293,14 +291,19 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
   const removeMember     = (idx) => setMembers(prev => prev.filter((_, i) => i !== idx));
   const updateMemberName = (idx, val) => setMembers(prev => prev.map((m, i) => i === idx ? { ...m, name: val } : m));
 
+  // FIX: todo en una sola página — handleCreate directo sin step "members"
   const handleCreate = async () => {
+    // Validar categoría mínima
+    if (selectedCategories.length === 0) {
+      setCatError(true);
+      return;
+    }
     if (!accountName.trim()) return;
     setSaving(true);
 
-    const ownerName = members[0]?.name?.trim() || user.displayName?.split(" ")[0] || "";
+    const ownerName = members[0]?.name?.trim() || ownerDisplayName;
     const otherMembers = members.slice(1).filter(m => m.name.trim());
 
-    // Salarios: solo si proporcional
     const memberLabels = otherMembers.map((m, i) => ({
       id: `label_${i}`,
       name: m.name.trim(),
@@ -320,12 +323,10 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
       memberIds: [user.uid],
       memberLabels,
       currency: selectedCurrency,
-      fontSize: selectedFontSize,
       disabledCategories: DEFAULT_CATEGORIES.filter(c => !selectedCategories.includes(c.id)).map(c => c.id),
       createdAt: new Date().toISOString(),
     });
 
-    // Guardar nombre + salario del owner en su perfil
     const ownerUpdate = { name: ownerName || undefined };
     if (divisionSystem === "proportional" && memberSalaries[0]) {
       ownerUpdate.salary = parseFloat(memberSalaries[0].replace(/\./g, "").replace(",", ".")) || 0;
@@ -337,16 +338,15 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
     }, { merge: true });
 
     setSaving(false);
-    onCreated(ref.id);
+    // FIX: navegar a tab "home" al crear cuenta
+    onCreated(ref.id, "home");
   };
 
-  // FIX: marcar como eliminada en estado local ANTES de llamar Firestore
-  // Así el row desaparece inmediatamente y no queda colgado
   const handleDeleteConfirmed = async () => {
     if (!confirmDelete) return;
     const idToDelete = confirmDelete;
     setConfirmDelete(null);
-    setDeletedIds(prev => [...prev, idToDelete]);   // ocultar inmediatamente
+    setDeletedIds(prev => [...prev, idToDelete]);
     try {
       await deleteDoc(doc(db, "accounts", idToDelete));
       await setDoc(doc(db, "users", user.uid), {
@@ -354,14 +354,8 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
       }, { merge: true });
     } catch (err) {
       console.error("Error eliminando cuenta:", err);
-      setDeletedIds(prev => prev.filter(id => id !== idToDelete)); // revertir si falla
+      setDeletedIds(prev => prev.filter(id => id !== idToDelete));
     }
-  };
-
-  const goToMembers = () => {
-    if (!accountName.trim()) return;
-    if (accountType === "shared") setStep("members");
-    else handleCreate();
   };
 
   const inputStyle = {
@@ -393,9 +387,7 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
             <button onClick={() => setStep("list")} style={{ background: "none", border: "none", cursor: "pointer", color: "#4F7FFA", fontSize: 15, fontWeight: 600, fontFamily: FONT, padding: 0 }}>
               Cancelar
             </button>
-            <p style={{ flex: 1, textAlign: "center", fontSize: 16, fontWeight: 700, color: "#fff", margin: 0, fontFamily: FONT }}>
-              {step === "create" ? "Nueva cuenta" : "Integrantes"}
-            </p>
+            <p style={{ flex: 1, textAlign: "center", fontSize: 16, fontWeight: 700, color: "#fff", margin: 0, fontFamily: FONT }}>Nueva cuenta</p>
             <div style={{ width: 60 }} />
           </div>
         ) : (
@@ -406,11 +398,10 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
         )}
       </div>
 
-      <div style={{ padding: 20, paddingBottom: step === "list" ? 100 : 20 }}>
+      <div style={{ padding: 20, paddingBottom: step === "list" ? 100 : 40 }}>
 
         {/* ── NOTIFICACIONES TAB ── */}
         {step === "list" && activeTab === "notificaciones" && (() => {
-          // Agrupar por accountId, ordenadas por la más reciente del grupo
           const groups = [];
           const seen = {};
           notifications.forEach(n => {
@@ -449,7 +440,6 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
               ) : (
                 groups.map(group => (
                   <div key={group.accountId} style={{ marginBottom: 20 }}>
-                    {/* Header de cuenta */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, paddingBottom: 8, borderBottom: `2px solid ${colors.divider}` }}>
                       <span style={{ fontSize: 16 }}>{group.accountEmoji}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.4, textTransform: "uppercase", fontFamily: FONT }}>
@@ -461,7 +451,6 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
                         </span>
                       )}
                     </div>
-                    {/* Filas del grupo */}
                     <div style={{ background: colors.card, borderRadius: 16, overflow: "hidden", border: `1px solid ${colors.cardBorder}` }}>
                       {group.items.map(n => (
                         <SwipeableNotifRow key={n.id} n={n} colors={colors} onMarkRead={markRead} onDelete={deleteNotif} />
@@ -500,29 +489,41 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
               />
             ))}
 
-            <button onClick={() => setStep("create")}
-              style={{ width: "100%", padding: 16, borderRadius: 16, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <span style={{ fontSize: 20 }}>+</span> Nueva cuenta
-            </button>
+            {/* FIX: botón flotante siempre visible */}
+            <div style={{ height: 20 }} />
           </>
         )}
 
-        {/* ── CREAR ── */}
+        {/* ── CREAR — todo en una sola página ── */}
         {step === "create" && (
           <>
             {/* Emoji + Nombre */}
             <div style={{ background: colors.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Título</p>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <button onClick={() => emojiInputRef.current?.focus()}
-                  style={{ width: 52, height: 52, borderRadius: 14, background: colors.pill, border: `2px solid ${colors.inputBorder}`, fontSize: 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {selectedEmoji}
-                </button>
-                <input
-                  ref={emojiInputRef}
-                  style={{ position: "absolute", opacity: 0, width: 1, height: 1, pointerEvents: "none" }}
-                  onInput={e => { const val = e.target.value; if (val) { setSelectedEmoji([...val].slice(-1)[0]); e.target.value = ""; } }}
-                />
+                {/* FIX: emoji editable — abre teclado nativo de emojis */}
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <button
+                    onClick={() => emojiInputRef.current?.click()}
+                    style={{ width: 52, height: 52, borderRadius: 14, background: colors.pill, border: `2px solid ${colors.inputBorder}`, fontSize: 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {selectedEmoji}
+                  </button>
+                  <input
+                    ref={emojiInputRef}
+                    type="text"
+                    inputMode="text"
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 26 }}
+                    onInput={e => {
+                      const val = e.target.value;
+                      if (val) {
+                        // Tomar el último carácter (puede ser emoji multi-codepoint)
+                        const chars = [...val];
+                        setSelectedEmoji(chars[chars.length - 1]);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                </div>
                 <input value={accountName} onChange={e => setAccountName(e.target.value)}
                   placeholder="Ej: Casa, Vacaciones..."
                   style={{ ...inputStyle, marginBottom: 0, flex: 1 }} autoFocus />
@@ -558,13 +559,11 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
               )}
             </div>
 
-            {/* Opciones */}
+            {/* Opciones — Divisa */}
             <div style={{ background: colors.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Opciones</p>
-
-              {/* Divisa */}
               <button onClick={() => setShowCurrencySheet(true)}
-                style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, background: colors.input, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, fontFamily: FONT }}>
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, background: colors.input, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: FONT }}>
                 <div style={{ textAlign: "left" }}>
                   <p style={{ margin: 0, fontSize: 11, color: colors.textMuted, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase", fontFamily: FONT }}>Divisa</p>
                   <p style={{ margin: "2px 0 0", fontSize: 14, color: colors.text, fontWeight: 600, fontFamily: FONT }}>
@@ -573,30 +572,23 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
                 </div>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
               </button>
-
-              {/* Tamaño de fuente */}
-              <button onClick={() => setShowFontSheet(true)}
-                style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, background: colors.input, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: FONT }}>
-                <div style={{ textAlign: "left" }}>
-                  <p style={{ margin: 0, fontSize: 11, color: colors.textMuted, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase", fontFamily: FONT }}>Tamaño de letra</p>
-                  <p style={{ margin: "2px 0 0", fontSize: 14, color: colors.text, fontWeight: 600, fontFamily: FONT }}>
-                    {FONT_SIZES.find(f => f.id === selectedFontSize)?.label}
-                  </p>
-                </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-              </button>
             </div>
 
-            {/* Categorías */}
-            <div style={{ background: colors.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Categorías</p>
+            {/* Categorías — FIX: ninguna por default, mínimo 1 */}
+            <div style={{ background: colors.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: colors.shadow, border: `2px solid ${catError && selectedCategories.length === 0 ? "#ff6b6b" : colors.cardBorder}` }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: catError && selectedCategories.length === 0 ? "#ff6b6b" : colors.textMuted, marginBottom: 4, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Categorías</p>
+              {catError && selectedCategories.length === 0 && (
+                <p style={{ fontSize: 12, color: "#ff6b6b", fontFamily: FONT, margin: "0 0 10px" }}>Seleccioná al menos una categoría</p>
+              )}
+              <p style={{ fontSize: 12, color: colors.textMuted, margin: "0 0 12px", fontFamily: FONT }}>Elegí las que vas a usar en esta cuenta</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {DEFAULT_CATEGORIES.map(c => {
                   const selected = selectedCategories.includes(c.id);
                   return (
-                    <button key={c.id} onClick={() => setSelectedCategories(prev =>
-                      selected ? prev.filter(id => id !== c.id) : [...prev, c.id]
-                    )} style={{ padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 13, fontWeight: 600,
+                    <button key={c.id} onClick={() => {
+                      setSelectedCategories(prev => selected ? prev.filter(id => id !== c.id) : [...prev, c.id]);
+                      setCatError(false);
+                    }} style={{ padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 13, fontWeight: 600,
                       borderColor: selected ? "#4F7FFA" : colors.inputBorder,
                       background: selected ? "#4F7FFA" : colors.input,
                       color: selected ? "#fff" : colors.textMuted }}>
@@ -605,79 +597,80 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
                   );
                 })}
               </div>
+              <p style={{ color: colors.textMuted, fontSize: 12, margin: "10px 0 0", fontFamily: FONT }}>
+                {selectedCategories.length} seleccionada{selectedCategories.length !== 1 ? "s" : ""}
+              </p>
             </div>
 
-            {/* Botón crear / siguiente */}
-            <button onClick={goToMembers} disabled={saving || !accountName.trim()}
-              style={{ width: "100%", padding: 16, borderRadius: 16, background: !accountName.trim() ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 600, cursor: !accountName.trim() ? "default" : "pointer", fontFamily: FONT, marginTop: 4, marginBottom: 40 }}>
-              {accountType === "shared" ? "Siguiente → Integrantes" : saving ? "Creando..." : "Crear cuenta →"}
-            </button>
-          </>
-        )}
-
-        {/* ── INTEGRANTES ── */}
-        {step === "members" && (
-          <>
-            <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>
-              Agregá los nombres. Cada uno podrá vincular su cuenta cuando acepte la invitación.
-            </p>
-
-            <div style={{ background: colors.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` }}>
-              {members.map((m, idx) => (
-                <div key={idx} style={{ marginBottom: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 18, background: m.color + "33", border: `2px solid ${m.color}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: FONT }}>{m.name ? m.name[0].toUpperCase() : "?"}</span>
+            {/* FIX: integrantes inline (sin step "members") — creador autogenerado */}
+            {accountType === "shared" && (
+              <div style={{ background: colors.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Integrantes</p>
+                <p style={{ fontSize: 12, color: colors.textMuted, margin: "0 0 14px", fontFamily: FONT }}>
+                  Cada uno podrá vincular su cuenta cuando acepte la invitación.
+                </p>
+                {members.map((m, idx) => (
+                  <div key={idx} style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 18, background: m.color + "33", border: `2px solid ${m.color}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: FONT }}>{m.name ? m.name[0].toUpperCase() : "?"}</span>
+                      </div>
+                      <input value={m.name} onChange={e => updateMemberName(idx, e.target.value)}
+                        placeholder={idx === 0 ? "Tu nombre (vos)" : `Integrante ${idx + 1}`}
+                        style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", color: colors.inputText, background: colors.input, boxSizing: "border-box" }} />
+                      {idx > 0 && (
+                        <button onClick={() => removeMember(idx)} style={{ background: colors.dangerBg, border: "none", borderRadius: 10, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, color: colors.danger, flexShrink: 0 }}>×</button>
+                      )}
                     </div>
-                    <input value={m.name} onChange={e => updateMemberName(idx, e.target.value)}
-                      placeholder={idx === 0 ? "Tu nombre (vos)" : `Integrante ${idx + 1}`}
-                      style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", color: colors.inputText, background: colors.input, boxSizing: "border-box" }} />
-                    {idx > 0 && (
-                      <button onClick={() => removeMember(idx)} style={{ background: colors.dangerBg, border: "none", borderRadius: 10, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, color: colors.danger, flexShrink: 0 }}>×</button>
+                    {/* FIX: salario solo si proporcional */}
+                    {divisionSystem === "proportional" && (
+                      <div style={{ marginLeft: 46, marginTop: 6, position: "relative" }}>
+                        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 13, fontFamily: FONT }}>$</span>
+                        <input
+                          type="number" inputMode="decimal"
+                          value={memberSalaries[idx] || ""}
+                          onChange={e => setMemberSalaries(prev => ({ ...prev, [idx]: e.target.value }))}
+                          placeholder="Ingreso mensual (opcional)"
+                          style={{ width: "100%", padding: "8px 12px 8px 26px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 13, fontFamily: FONT, outline: "none", color: colors.inputText, background: colors.input, boxSizing: "border-box" }} />
+                      </div>
                     )}
                   </div>
-                  {/* Salario — solo si proporcional */}
-                  {divisionSystem === "proportional" && (
-                    <div style={{ marginLeft: 46, marginTop: 6, position: "relative" }}>
-                      <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 13, fontFamily: FONT }}>$</span>
-                      <input
-                        type="number" inputMode="decimal"
-                        value={memberSalaries[idx] || ""}
-                        onChange={e => setMemberSalaries(prev => ({ ...prev, [idx]: e.target.value }))}
-                        placeholder="Ingreso mensual (opcional)"
-                        style={{ width: "100%", padding: "8px 12px 8px 26px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 13, fontFamily: FONT, outline: "none", color: colors.inputText, background: colors.input, boxSizing: "border-box" }} />
-                    </div>
-                  )}
+                ))}
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} onKeyDown={e => e.key === "Enter" && addMember()}
+                    placeholder="Agregar integrante..."
+                    style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: `2px dashed ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", color: colors.inputText, background: colors.input, boxSizing: "border-box" }} />
+                  <button onClick={addMember} style={{ background: "#4F7FFA", border: "none", borderRadius: 12, width: 42, height: 42, fontSize: 22, color: "#fff", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
                 </div>
-              ))}
-              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                <input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} onKeyDown={e => e.key === "Enter" && addMember()}
-                  placeholder="Agregar integrante..."
-                  style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: `2px dashed ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", color: colors.inputText, background: colors.input, boxSizing: "border-box" }} />
-                <button onClick={addMember} style={{ background: "#4F7FFA", border: "none", borderRadius: 12, width: 42, height: 42, fontSize: 22, color: "#fff", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
               </div>
-            </div>
+            )}
 
             <div style={{ background: "#4F7FFA11", borderRadius: 14, padding: "12px 14px", marginBottom: 16, display: "flex", gap: 10 }}>
               <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>
               <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT, lineHeight: 1.5 }}>
-                Después de crear la cuenta podés invitar a cada integrante. Al aceptar, vincularán su cuenta al nombre que les corresponde.
+                Después podés invitar a cada integrante desde Ajustes. Al aceptar, vincularán su cuenta.
               </p>
             </div>
 
-            <button onClick={handleCreate} disabled={saving || members.filter(m => m.name.trim()).length === 0}
-              style={{ width: "100%", padding: 16, borderRadius: 16, background: saving ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 600, cursor: saving ? "default" : "pointer", fontFamily: FONT, marginBottom: 40 }}>
+            <button onClick={handleCreate} disabled={saving || !accountName.trim()}
+              style={{ width: "100%", padding: 16, borderRadius: 16, background: saving || !accountName.trim() ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 600, cursor: saving || !accountName.trim() ? "default" : "pointer", fontFamily: FONT, marginBottom: 40 }}>
               {saving ? "Creando..." : "Crear cuenta →"}
             </button>
           </>
         )}
 
-        {/* ── BOTTOM SHEETS ── */}
+        {/* ── BOTTOM SHEETS — FIX: scroll lock en fondo ── */}
         {showCurrencySheet && (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
-            onClick={() => setShowCurrencySheet(false)}>
-            <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "70vh", overflowY: "auto" }}
-              onClick={e => e.stopPropagation()}>
+          <div
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
+            onClick={() => setShowCurrencySheet(false)}
+            onTouchMove={e => e.preventDefault()}
+          >
+            <div
+              style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "70vh", overflowY: "auto" }}
+              onClick={e => e.stopPropagation()}
+              onTouchMove={e => e.stopPropagation()}
+            >
               <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
               <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Divisa</p>
               {CURRENCIES.map(c => (
@@ -688,24 +681,6 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
                     <span style={{ fontSize: 13, color: colors.textMuted, fontFamily: FONT }}> — {c.label}</span>
                   </div>
                   {selectedCurrency === c.code && <span style={{ color: "#4F7FFA", fontSize: 18 }}>✓</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {showFontSheet && (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
-            onClick={() => setShowFontSheet(false)}>
-            <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}
-              onClick={e => e.stopPropagation()}>
-              <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-              <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Tamaño de letra</p>
-              {FONT_SIZES.map(f => (
-                <button key={f.id} onClick={() => { setSelectedFontSize(f.id); setShowFontSheet(false); }}
-                  style={{ width: "100%", padding: "14px 16px", borderRadius: 14, border: `2px solid ${selectedFontSize === f.id ? "#4F7FFA" : colors.inputBorder}`, background: selectedFontSize === f.id ? "#4F7FFA11" : colors.input, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: FONT }}>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{f.label}</p>
-                  {selectedFontSize === f.id && <span style={{ color: "#4F7FFA", fontSize: 18 }}>✓</span>}
                 </button>
               ))}
             </div>
@@ -746,6 +721,18 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
               <span style={{ fontSize: 10, fontWeight: 600, color: activeTab === tab.id ? "#4F7FFA" : "#ffffff66", fontFamily: FONT, letterSpacing: 0.3 }}>{tab.label}</span>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* FIX: botón flotante "+ Nueva cuenta" siempre visible en lista */}
+      {step === "list" && activeTab === "cuentas" && (
+        <div style={{
+          position: "fixed", bottom: "calc(env(safe-area-inset-bottom) + 72px)", left: 20, right: 20, zIndex: 55,
+        }}>
+          <button onClick={() => setStep("create")}
+            style={{ width: "100%", padding: 16, borderRadius: 16, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 20px rgba(79,127,250,0.5)" }}>
+            <span style={{ fontSize: 20 }}>+</span> Nueva cuenta
+          </button>
         </div>
       )}
 

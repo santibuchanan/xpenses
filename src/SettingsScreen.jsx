@@ -6,18 +6,12 @@ import DateInput from "./DateInput";
 import InviteScreen from "./InviteScreen.jsx";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
-// Lista de monedas derivada de la fuente única en theme.jsx
 const CURRENCY_LIST = Object.values(CURRENCIES_MAP);
 const CURRENCY_SYMBOLS = Object.fromEntries(CURRENCY_LIST.map(c => [c.code, c.symbol]));
 const MEMBER_COLORS = ["#4F7FFA","#FA4F7F","#2ecc71","#f39c12","#9b59b6","#1abc9c","#e74c3c","#3498db"];
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 import { removeMember } from "./hooks/removeMember.js";
 const EMOJI_OPTIONS = ["🛒","🍕","💡","🚗","💊","👗","🏠","📦","🐶","✈️","🏋️","📚","📱","🎮","🍺","☕","🎁","💈","🎵","🏥","🌮","🧴","🎬","🏖️","🎓","💻","🛵","🧹","🪴","🐱","⚽️","🔥","🍔"];
-const FONT_SIZES = [
-  { id: "small",  label: "Chica",   baseSize: 12 },
-  { id: "medium", label: "Mediana", baseSize: 14 },
-  { id: "large",  label: "Grande",  baseSize: 17 },
-];
 
 function SectionHeader({ title, colors }) {
   return <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 1.2, textTransform: "uppercase", margin: "24px 0 8px", fontFamily: FONT }}>{title}</p>;
@@ -86,9 +80,6 @@ function EditCategoryModal({ category, onSave, onClose, onDelete, isDefault, col
   );
 }
 
-// ── MODAL GASTO FIJO ──
-// shared: siempre presente en el form (Hogar o Personal)
-// createdBy: uid del usuario que lo crea (para visibilidad de personales)
 function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount }) {
   const [form, setForm] = useState(
     expense || { name: "", amount: "", dueDay: "", shared: true, startDate: new Date().toISOString().slice(0, 10) }
@@ -120,7 +111,6 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
         <p style={labelStyle}>Monto</p>
         <input type="number" inputMode="decimal" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0" style={inputStyle} />
 
-        {/* Tipo: solo en cuentas compartidas */}
         {!isPersonalAccount && (
           <>
             <p style={labelStyle}>Tipo</p>
@@ -165,7 +155,6 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
   );
 }
 
-// Modal para editar un miembro (label) de la cuenta
 function EditMemberModal({ member, onSave, onClose, onDelete, colors }) {
   const [name, setName]   = useState(member.name || "");
   const [color, setColor] = useState(member.color || MEMBER_COLORS[0]);
@@ -198,9 +187,7 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors }) {
   );
 }
 
-// Fila de gasto fijo en Ajustes (con editar y eliminar)
 function FixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
-  const isPaid = false; // en Ajustes no mostramos estado de pago, solo gestión
   return (
     <div style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
       <div style={{ width: 40, height: 40, borderRadius: 14, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
@@ -217,7 +204,6 @@ function FixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
     </div>
   );
 }
-
 
 function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, colors }) {
   const [swipeX,     setSwipeX]   = useState(0);
@@ -242,7 +228,6 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
 
   return (
     <div style={{ position: "relative", marginBottom: 8, borderRadius: 16, overflow: "hidden" }}>
-      {/* Botón eliminar detrás — solo si no es el usuario actual */}
       {!isCurrentUser && (
         <div style={{
           position: "absolute", right: 0, top: 0, bottom: 0, width: DELETE_THRESHOLD,
@@ -257,7 +242,6 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
         </div>
       )}
 
-      {/* Fila deslizable */}
       <div
         onTouchStart={!isCurrentUser ? onTouchStart : undefined}
         onTouchMove={!isCurrentUser ? onTouchMove : undefined}
@@ -314,17 +298,6 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const [removingMember,    setRemovingMember]    = useState(null);
   const [removeLoading,     setRemoveLoading]     = useState(false);
 
-  const [expenseFontSize, setExpenseFontSize] = useState(() => account?.fontSize || localStorage.getItem("expenseFontSize") || "medium");
-  const handleFontSizeChange = async (sizeId) => {
-    setExpenseFontSize(sizeId);
-    localStorage.setItem("expenseFontSize", sizeId);
-    window.dispatchEvent(new CustomEvent("expenseFontSizeChange", { detail: sizeId }));
-    // Persistir a Firestore para sincronizar entre dispositivos
-    if (account?.id) {
-      await updateDoc(doc(db, "accounts", account.id), { fontSize: sizeId });
-    }
-  };
-
   const cardStyle = { background: colors.card, borderRadius: 16, padding: "14px 16px", marginBottom: 8, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` };
   const inputStyle = { width: "100%", padding: "11px 13px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 12, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
 
@@ -339,7 +312,14 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     return () => { u1(); u2(); };
   }, [account?.id]);
 
-  const allCategories = [...DEFAULT_CATEGORIES.map(c => ({ ...c, isDefault: true })), ...customCategories];
+  // FIX: mostrar solo las categorías activas de la cuenta
+  // Las categorías de la cuenta son: DEFAULT_CATEGORIES no desactivadas + customCategories
+  const disabledCategoryIds = account?.disabledCategories || [];
+  const activeDefaultCategories = DEFAULT_CATEGORIES.filter(c => !disabledCategoryIds.includes(c.id));
+  const allCategories = [
+    ...activeDefaultCategories.map(c => ({ ...c, isDefault: true })),
+    ...customCategories,
+  ];
 
   const saveProfile = async () => {
     setSavingProfile(true);
@@ -370,9 +350,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const handleSaveFixed = async (data) => {
     const toSave = {
       ...data,
-      // En cuentas personales siempre shared=false
       shared: isPersonal ? false : data.shared,
-      // Guardar quién lo creó para filtrar visibilidad en "Personal"
       createdBy: currentUser.uid,
     };
     if (toSave.id) {
@@ -391,9 +369,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     await deleteDoc(doc(db, "accounts", account.id, "fixedExpenses", id));
   };
 
-  const generateInvite = () => {
-    setShowInvite(true);
-  };
+  const generateInvite = () => { setShowInvite(true); };
 
   const handleSaveMember = async (updated) => {
     const currentLabels = account?.memberLabels || [];
@@ -419,7 +395,6 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const handleRemoveMember = async (memberToRemove) => {
     setRemoveLoading(true);
     try {
-      // memberUid: uid real si está vinculado, o el id del label si no lo está
       const memberUid = memberToRemove.linkedUid || memberToRemove.uid || memberToRemove.id;
       const currentMonth = new Date().toISOString().slice(0, 7);
       const result = await removeMember({
@@ -441,9 +416,6 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
 
   const memberLabels = account?.memberLabels || [];
 
-  // Gastos fijos visibles para este usuario:
-  // - Hogar (shared=true): todos los ven
-  // - Personal (shared=false): solo el que lo creó
   const visibleFixed = fixedExpenses.filter(f =>
     f.shared || f.createdBy === currentUser.uid
   );
@@ -500,29 +472,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         </button>
       </div>
 
-      {/* APARIENCIA */}
-      <SectionHeader title="Apariencia" colors={colors} />
-      <div style={cardStyle}>
-        <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 14, color: colors.text, fontFamily: FONT }}>Tamano de letra</p>
-        <div style={{ display: "flex", gap: 8 }}>
-          {FONT_SIZES.map(s => (
-            <button key={s.id} onClick={() => handleFontSizeChange(s.id)} style={{
-              flex: 1, padding: "10px 0", borderRadius: 12, border: "2px solid", cursor: "pointer", fontFamily: FONT,
-              borderColor: expenseFontSize === s.id ? "#4F7FFA" : colors.inputBorder,
-              background: expenseFontSize === s.id ? "#4F7FFA" : colors.input,
-              color: expenseFontSize === s.id ? "#fff" : colors.textMuted,
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-            }}>
-              <span style={{ fontSize: s.baseSize, fontWeight: 700, lineHeight: 1 }}>Aa</span>
-              <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4 }}>{s.label}</span>
-            </button>
-          ))}
-        </div>
-        <div style={{ marginTop: 14, background: colors.pill, borderRadius: 12, padding: "12px 14px" }}>
-          <p style={{ margin: "0 0 2px", fontWeight: 600, fontSize: FONT_SIZES.find(s => s.id === expenseFontSize)?.baseSize || 14, color: colors.text, fontFamily: FONT }}>Supermercado</p>
-          <p style={{ margin: 0, fontSize: (FONT_SIZES.find(s => s.id === expenseFontSize)?.baseSize || 14) - 2, color: colors.textMuted, fontFamily: FONT }}>04-03-2025 · $12.500</p>
-        </div>
-      </div>
+      {/* FIX: APARIENCIA — tamaño de letra ELIMINADO de aquí, se movió al MenuPanel global */}
 
       {/* MIEMBROS */}
       <SectionHeader title="Miembros" colors={colors} />
@@ -557,8 +507,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         </>
       )}
 
-      {/* ── GASTOS FIJOS ── */}
-      {/* En cuentas personales: lista única sin secciones */}
+      {/* GASTOS FIJOS */}
       {isPersonal ? (
         <>
           <SectionHeader title="Mis Gastos Fijos" colors={colors} />
@@ -577,7 +526,6 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           </button>
         </>
       ) : (
-        // En cuentas compartidas: sección única "Gastos Fijos" con lista unificada
         <>
           <SectionHeader title="Gastos Fijos" colors={colors} />
           <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: FONT }}>
@@ -591,7 +539,6 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
             </div>
           )}
 
-          {/* Hogar */}
           {sharedFixed.length > 0 && (
             <>
               <p style={{ fontSize: 11, fontWeight: 700, color: "#4F7FFA", letterSpacing: 0.8, textTransform: "uppercase", margin: "12px 0 6px", fontFamily: FONT }}>🏠 Hogar</p>
@@ -601,7 +548,6 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
             </>
           )}
 
-          {/* Personal */}
           {personalFixed.length > 0 && (
             <>
               <p style={{ fontSize: 11, fontWeight: 700, color: "#FA4F7F", letterSpacing: 0.8, textTransform: "uppercase", margin: "12px 0 6px", fontFamily: FONT }}>👤 Personal</p>
@@ -617,7 +563,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         </>
       )}
 
-      {/* CATEGORÍAS */}
+      {/* CATEGORÍAS — FIX: solo las activas de esta cuenta */}
       <SectionHeader title="Categorias" colors={colors} />
       <div style={{ ...cardStyle, padding: 14 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -637,12 +583,18 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       {/* MODALES */}
       {showShareApp && <ShareAppModal onClose={() => setShowShareApp(false)} colors={colors} />}
 
-      {/* Currency bottom sheet */}
+      {/* Currency bottom sheet — FIX: scroll lock en fondo */}
       {showCurrencySheet && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
-          onClick={() => setShowCurrencySheet(false)}>
-          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}
-            onClick={e => e.stopPropagation()}>
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
+          onClick={() => setShowCurrencySheet(false)}
+          onTouchMove={e => e.preventDefault()}
+        >
+          <div
+            style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "70vh", overflowY: "auto" }}
+            onClick={e => e.stopPropagation()}
+            onTouchMove={e => e.stopPropagation()}
+          >
             <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
             <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Moneda</p>
             {CURRENCY_LIST.map(c => (

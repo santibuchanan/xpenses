@@ -226,6 +226,16 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
     if (navigator.share) navigator.share({ title: "X-penses", text: "Llevá tus gastos compartidos 💸", url });
     else { navigator.clipboard.writeText(url); alert("¡Link copiado!"); }
   };
+
+  // FIX: tamaño de letra como preferencia global del usuario (localStorage)
+  const [fontSize, setFontSizeState] = useState(() => localStorage.getItem("expenseFontSize") || "medium");
+  const handleFontSize = (id) => {
+    setFontSizeState(id);
+    localStorage.setItem("expenseFontSize", id);
+    window.dispatchEvent(new CustomEvent("expenseFontSizeChange", { detail: id }));
+  };
+  const fontSizes = [{ id: "small", label: "Pequeño" }, { id: "medium", label: "Mediano" }, { id: "large", label: "Grande" }];
+
   const rows = [
     { icon: "🔀", label: "Cambiar de cuenta", sub: account?.name || "", action: () => { onClose(); onSwitchAccount(); } },
     { icon: "📤", label: "Compartir X-penses", sub: "Invitá a otros a usar la app", action: () => { onClose(); handleShare(); } },
@@ -253,6 +263,23 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
             <p style={{ margin: 0, fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{account?.type === "shared" ? "Cuenta compartida" : "Cuenta personal"}</p>
           </div>
         </div>
+
+        {/* FIX: Tamaño de letra — preferencia global del usuario */}
+        <div style={{ padding: "12px 16px", background: colors.pill, borderRadius: 14, marginBottom: 8 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.4, textTransform: "uppercase", fontFamily: FONT }}>🔡 Tamaño de letra</p>
+          <div style={{ display: "flex", gap: 6 }}>
+            {fontSizes.map(f => (
+              <button key={f.id} onClick={() => handleFontSize(f.id)}
+                style={{ flex: 1, padding: "8px 4px", borderRadius: 10, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                  borderColor: fontSize === f.id ? "#4F7FFA" : colors.inputBorder,
+                  background: fontSize === f.id ? "#4F7FFA" : colors.input,
+                  color: fontSize === f.id ? "#fff" : colors.textMuted }}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {rows.map((r, i) => (
           <button key={i} onClick={r.action} style={{ width: "100%", background: "none", border: "none", borderRadius: 14, padding: "13px 16px", marginBottom: 4, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", fontFamily: FONT, textAlign: "left" }}>
             <span style={{ fontSize: 22, width: 32 }}>{r.icon}</span>
@@ -358,7 +385,12 @@ function FixedExpenseHomeRow({ f, fmt, fs, colors, currentMonth, allMembers, onM
 function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, onConfirm, onClose, colors }) {
   const [paidBy, setPaidBy] = useState(currentUser.uid);
   const [loading, setLoading] = useState(false);
-  const members = allMembers?.filter(m => !m._isLabel) || [];
+  // FIX: incluir labels no vinculados — misma lógica que AddExpenseModal
+  const members = (allMembers || []).map(m => ({
+    ...m,
+    uid: m.uid || m.id,
+    name: m.name || m.displayName || "Sin nombre",
+  }));
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -582,7 +614,8 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
         <SectionTitle>Movimientos</SectionTitle>
         <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
           {/* Filtro por categoría — aplica en cuentas personales Y compartidas */}
-          {[["todos", "Todas"], ...allCategories.filter(c => monthExp.some(e => e.category === c.id)).map(c => [c.id, `${c.icon} ${c.label}`])].map(([val, lbl]) => (
+          {/* FIX: filtro categorías — solo ícono (sin label) */}
+          {[["todos", "Todas"], ...allCategories.filter(c => monthExp.some(e => e.category === c.id)).map(c => [c.id, c.icon])].map(([val, lbl]) => (
             <button key={val} onClick={() => setFilterType(val)} style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600, borderColor: filterType === val ? "#4F7FFA" : colors.inputBorder, background: filterType === val ? "#4F7FFA" : colors.card, color: filterType === val ? "#fff" : colors.textMuted }}>{lbl}</button>
           ))}
         </div>
@@ -952,7 +985,7 @@ function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth,
 }
 
 // ── GRAFICOS SCREEN ──
-function GraficosScreen({ expenses, account, customCategories }) {
+function GraficosScreen({ expenses, account, customCategories, fixedExpenses }) {
   const { colors } = useTheme();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
@@ -979,6 +1012,12 @@ function GraficosScreen({ expenses, account, customCategories }) {
     Hogar:    activeExpenses.filter(e => e.month === m && e.type === "hogar").reduce((s, e) => s + e.amount, 0),
     Personal: activeExpenses.filter(e => e.month === m && e.type === "mio").reduce((s, e) => s + e.amount, 0),
     Extra:    activeExpenses.filter(e => e.month === m && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0),
+    // FIX: Fijos = suma de todos los gastos fijos activos ese mes (startDate <= mes)
+    // Representa el presupuesto fijo mensual, independientemente de si se pagaron o no
+    Fijos: (fixedExpenses || []).filter(f => {
+      const start = (f.startDate || "2000-01").slice(0, 7);
+      return m >= start;
+    }).reduce((s, f) => s + (f.amount || 0), 0),
   }));
 
   const pieData = allCategories.map((c, i) => ({
@@ -1026,6 +1065,7 @@ function GraficosScreen({ expenses, account, customCategories }) {
                     <Bar dataKey="Hogar"    fill="#4F7FFA" radius={[6,6,0,0]} />
                     <Bar dataKey="Personal" fill="#2ecc71" radius={[6,6,0,0]} />
                     <Bar dataKey="Extra"    fill="#f39c12" radius={[6,6,0,0]} />
+                    <Bar dataKey="Fijos"    fill="#9b59b6" radius={[6,6,0,0]} />
                   </>
               }
             </BarChart>
@@ -1297,7 +1337,7 @@ function AppInner() {
   if (showWelcome) return <WelcomeScreen onEnter={() => setShowWelcome(false)} onEmailClick={() => setShowEmailAuth(true)} />;
   if (!authUser) return <AuthScreen />;
   if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
-  if (!selectedAccountId) return <AccountSelectorScreen user={authUser} userProfile={userProfile} accounts={userAccounts} onSelect={setSelectedAccountId} onCreated={setSelectedAccountId} onSignOut={handleSignOut} />;
+  if (!selectedAccountId) return <AccountSelectorScreen user={authUser} userProfile={userProfile} accounts={userAccounts} onSelect={(id) => { setSelectedAccountId(id); setTab("home"); }} onCreated={(id) => { setSelectedAccountId(id); setTab("home"); }} onSignOut={handleSignOut} />;
 
   // Con el query filtrado por accountId, todos los expenses ya son de esta cuenta
   const accountExpenses = expenses;
@@ -1326,7 +1366,7 @@ function AppInner() {
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
         {tab === "home"     && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} />}
         {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={allMembers} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} />}
-        {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} />}
+        {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} />}
         {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
       </div>
 

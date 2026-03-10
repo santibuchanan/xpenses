@@ -11,16 +11,15 @@ const DIVISION_SYSTEMS = [
   { id: "informativo",  label: "Gastos en común",         desc: "Registrá y gestioná gastos sin calcular quién le debe a quién.", icon: "🤝" },
 ];
 
-const FONT_SIZES = [
-  { id: "small",  label: "Pequeño"          },
-  { id: "medium", label: "Mediano (default)" },
-  { id: "large",  label: "Grande"           },
-];
+// FIX: tamaño de letra ELIMINADO de ConfigScreen — se movió a MenuPanel (localStorage global)
 
-import { ALL_CATEGORIES, DEFAULT_SELECTED_CATEGORY_IDS, DEFAULT_CATEGORIES } from "./constants/categories.js";
+import { ALL_CATEGORIES, DEFAULT_CATEGORIES } from "./constants/categories.js";
+
 const labelStyle = { fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase" };
 const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: "2px solid #e8e8e8", fontSize: 15, marginBottom: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: "#1a1a2e", background: "#fafafa" };
 function Card({ children, style = {} }) { return <div style={{ background: "#fff", borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.05)", ...style }}>{children}</div>; }
+
+const MEMBER_COLORS = ["#4F7FFA","#FA4F7F","#2ecc71","#f39c12","#9b59b6","#1abc9c"];
 
 export default function ConfigScreen({ user, onDone }) {
   const [accountType,         setAccountType]        = useState("shared");
@@ -28,36 +27,59 @@ export default function ConfigScreen({ user, onDone }) {
   const [accountName,         setAccountName]        = useState("Nuestro Hogar");
   const [selectedEmoji,       setSelectedEmoji]      = useState("🏠");
   const [selectedCurrency,    setSelectedCurrency]   = useState("ARS");
-  const [selectedFontSize,    setSelectedFontSize]   = useState("medium");
   const [showCurrencySheet,   setShowCurrencySheet]  = useState(false);
-  const [myName,              setMyName]             = useState(user.displayName?.split(" ")[0] || user.isAnonymous ? "" : "");
+  const [myName,              setMyName]             = useState(user.displayName?.split(" ")[0] || (user.isAnonymous ? "" : ""));
   const [salary,              setSalary]             = useState("");
-  const [selectedCategories,  setSelectedCategories] = useState(DEFAULT_SELECTED_CATEGORY_IDS);
+  // FIX: ninguna categoría seleccionada por default
+  const [selectedCategories,  setSelectedCategories] = useState([]);
+  const [catError,            setCatError]           = useState(false);
   const [saving,              setSaving]             = useState(false);
-  const emojiInputRef = useRef(null);
+  // FIX: campo para agregar categoría nueva
+  const [newCatLabel,         setNewCatLabel]        = useState("");
+  const [customCats,          setCustomCats]         = useState([]); // { id, label, icon }
 
-  const toggleCategory = (id) => {
-    setSelectedCategories(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, c.id]);
-  };
+  const emojiInputRef = useRef(null);
 
   const currencyList = Object.values(CURRENCIES);
 
+  // FIX: toggleCategory usa 'id', no 'c.id' (bug original)
+  const toggleCategory = (id) => {
+    setSelectedCategories(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
+    setCatError(false);
+  };
+
+  const addCustomCat = () => {
+    const label = newCatLabel.trim();
+    if (!label) return;
+    const id = `custom_${Date.now()}`;
+    const newCat = { id, label, icon: "📦" };
+    setCustomCats(prev => [...prev, newCat]);
+    setSelectedCategories(prev => [...prev, id]);
+    setNewCatLabel("");
+    setCatError(false);
+  };
+
   const handleSave = async () => {
+    // FIX: validar mínimo 1 categoría
+    if (selectedCategories.length === 0) {
+      setCatError(true);
+      return;
+    }
     if (!myName) return;
     setSaving(true);
 
     try {
-      // 1. Generar accountId desde Firestore (no usar user.uid como ID de cuenta)
       const accountRef = doc(collection(db, "accounts"));
       const accountId = accountRef.id;
 
-      // 2. Categorías extra (las que no están en DEFAULT_CATEGORIES)
       const defaultIds = DEFAULT_CATEGORIES.map(c => c.id);
-      const extraCats = ALL_CATEGORIES.filter(
+
+      // Categorías extra = custom creadas + ALL_CATEGORIES no default seleccionadas
+      const allCats = [...ALL_CATEGORIES, ...customCats];
+      const extraCats = allCats.filter(
         c => selectedCategories.includes(c.id) && !defaultIds.includes(c.id)
       );
 
-      // 3. Batch para account + user (operación atómica — si falla una, no queda estado inconsistente)
       const batch = writeBatch(db);
 
       batch.set(accountRef, {
@@ -69,7 +91,7 @@ export default function ConfigScreen({ user, onDone }) {
         ownerId: user.uid,
         memberIds: [user.uid],
         currency: selectedCurrency,
-        fontSize: selectedFontSize,
+        // FIX: fontSize NO se guarda en cuenta — es preferencia global en localStorage
         createdAt: new Date().toISOString(),
         disabledCategories: DEFAULT_CATEGORIES
           .filter(c => !selectedCategories.includes(c.id))
@@ -83,7 +105,7 @@ export default function ConfigScreen({ user, onDone }) {
         photo: user.photoURL || null,
         salary: parseFloat(salary) || 0,
         color: "#4F7FFA",
-        accountId,          // cuenta principal (retrocompatibilidad)
+        accountId,
         accountIds: [accountId],
         isAnonymous: user.isAnonymous || false,
         setupDone: true,
@@ -91,12 +113,10 @@ export default function ConfigScreen({ user, onDone }) {
 
       await batch.commit();
 
-      // 4. Categorías extra — addDoc no entra en writeBatch con subcollections fácilmente,
-      //    pero son datos no críticos: si fallan no rompen el estado de cuenta/usuario
       if (extraCats.length > 0) {
         await Promise.all(
           extraCats.map(cat =>
-            addDoc(collection(db, "accounts", accountId, "categories"), cat)
+            addDoc(collection(db, "accounts", accountId, "categories"), { label: cat.label, icon: cat.icon })
           )
         );
       }
@@ -120,6 +140,8 @@ export default function ConfigScreen({ user, onDone }) {
       </div>
 
       <div style={{ padding: "20px" }}>
+
+        {/* Tipo de cuenta */}
         <Card>
           <p style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px", color: "#1a1a2e" }}>¿Qué tipo de cuenta querés?</p>
           <p style={{ color: "#aaa", fontSize: 13, margin: "0 0 16px" }}>Podés cambiarlo después en ajustes</p>
@@ -134,22 +156,38 @@ export default function ConfigScreen({ user, onDone }) {
           </div>
         </Card>
 
+        {/* Nombre + Emoji */}
         <Card>
           <p style={labelStyle}>Nombre de la cuenta</p>
           <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 0 }}>
-            {/* Emoji picker */}
-            <button onClick={() => emojiInputRef.current?.focus()}
-              style={{ width: 52, height: 52, borderRadius: 14, background: "#f0f0f0", border: "2px solid #e8e8e8", fontSize: 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              {selectedEmoji}
-            </button>
-            <input ref={emojiInputRef}
-              style={{ position: "absolute", opacity: 0, width: 1, height: 1, pointerEvents: "none" }}
-              onInput={e => { const val = e.target.value; if (val) { setSelectedEmoji([...val].slice(-1)[0]); e.target.value = ""; } }} />
+            {/* FIX: emoji abre teclado nativo de emojis */}
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <button
+                style={{ width: 52, height: 52, borderRadius: 14, background: "#f0f0f0", border: "2px solid #e8e8e8", fontSize: 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                onClick={() => emojiInputRef.current?.click()}>
+                {selectedEmoji}
+              </button>
+              <input
+                ref={emojiInputRef}
+                type="text"
+                inputMode="text"
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 26 }}
+                onInput={e => {
+                  const val = e.target.value;
+                  if (val) {
+                    const chars = [...val];
+                    setSelectedEmoji(chars[chars.length - 1]);
+                    e.target.value = "";
+                  }
+                }}
+              />
+            </div>
             <input value={accountName} onChange={e => setAccountName(e.target.value)}
               style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="Ej: Nuestro Hogar" />
           </div>
         </Card>
 
+        {/* Perfil — creador */}
         <Card>
           <p style={{ fontSize: 17, fontWeight: 600, margin: "0 0 16px", color: "#1a1a2e" }}>Tu perfil</p>
           {user.photoURL && (
@@ -160,8 +198,13 @@ export default function ConfigScreen({ user, onDone }) {
           )}
           <p style={labelStyle}>¿Cómo te llamamos?</p>
           <input value={myName} onChange={e => setMyName(e.target.value)} style={inputStyle} placeholder="Tu nombre" />
-          <p style={labelStyle}>Salario mensual (ARS $)</p>
-          <input type="number" value={salary} onChange={e => setSalary(e.target.value)} style={{ ...inputStyle, marginBottom: 0 }} placeholder="0" />
+          {/* FIX: salario solo si sistema proporcional */}
+          {divisionSystem === "proportional" && (
+            <>
+              <p style={labelStyle}>Salario mensual (ARS $)</p>
+              <input type="number" value={salary} onChange={e => setSalary(e.target.value)} style={{ ...inputStyle, marginBottom: 0 }} placeholder="0" />
+            </>
+          )}
         </Card>
 
         {/* Divisa */}
@@ -176,22 +219,7 @@ export default function ConfigScreen({ user, onDone }) {
           </button>
         </Card>
 
-        {/* Tamaño de fuente */}
-        <Card>
-          <p style={labelStyle}>Tamaño de letra</p>
-          <div style={{ display: "flex", gap: 8 }}>
-            {FONT_SIZES.map(f => (
-              <button key={f.id} onClick={() => setSelectedFontSize(f.id)}
-                style={{ flex: 1, padding: "10px 8px", borderRadius: 12, border: "2px solid", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-                  borderColor: selectedFontSize === f.id ? "#4F7FFA" : "#e8e8e8",
-                  background: selectedFontSize === f.id ? "#4F7FFA11" : "#fafafa",
-                  color: selectedFontSize === f.id ? "#4F7FFA" : "#888" }}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </Card>
-
+        {/* División (solo shared) */}
         {accountType === "shared" && (
           <Card>
             <p style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px", color: "#1a1a2e" }}>¿Cómo dividir los gastos?</p>
@@ -209,11 +237,15 @@ export default function ConfigScreen({ user, onDone }) {
           </Card>
         )}
 
-        <Card>
-          <p style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px", color: "#1a1a2e" }}>¿Qué categorías usás?</p>
-          <p style={{ color: "#aaa", fontSize: 13, margin: "0 0 16px" }}>Podés agregar más después en Ajustes.</p>
+        {/* Categorías — FIX: ninguna por default, mínimo 1, poder agregar nuevas */}
+        <Card style={{ border: catError && selectedCategories.length === 0 ? "2px solid #ff6b6b" : "none" }}>
+          <p style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px", color: catError && selectedCategories.length === 0 ? "#ff6b6b" : "#1a1a2e" }}>¿Qué categorías usás?</p>
+          {catError && selectedCategories.length === 0 && (
+            <p style={{ fontSize: 12, color: "#ff6b6b", margin: "0 0 8px" }}>Seleccioná al menos una categoría</p>
+          )}
+          <p style={{ color: "#aaa", fontSize: 13, margin: "0 0 16px" }}>Elegí las que vas a usar en tu cuenta.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {ALL_CATEGORIES.map(c => {
+            {[...ALL_CATEGORIES, ...customCats].map(c => {
               const selected = selectedCategories.includes(c.id);
               return (
                 <button key={c.id} onClick={() => toggleCategory(c.id)} style={{ padding: "9px 14px", borderRadius: 20, border: "2px solid", fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, borderColor: selected ? "#4F7FFA" : "#e8e8e8", background: selected ? "#4F7FFA" : "#fafafa", color: selected ? "#fff" : "#555", fontWeight: selected ? 600 : 400 }}>
@@ -222,7 +254,19 @@ export default function ConfigScreen({ user, onDone }) {
               );
             })}
           </div>
-          <p style={{ color: "#aaa", fontSize: 12, margin: "12px 0 0", textAlign: "center" }}>
+          {/* Agregar categoría nueva */}
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <input
+              value={newCatLabel}
+              onChange={e => setNewCatLabel(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addCustomCat()}
+              placeholder="Nueva categoría..."
+              style={{ flex: 1, padding: "9px 12px", borderRadius: 12, border: "2px dashed #4F7FFA", fontSize: 13, fontFamily: "inherit", outline: "none", color: "#1a1a2e", background: "#fafafa", boxSizing: "border-box" }}
+            />
+            <button onClick={addCustomCat}
+              style={{ background: "#4F7FFA", border: "none", borderRadius: 12, width: 40, height: 40, fontSize: 20, color: "#fff", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+          </div>
+          <p style={{ color: "#aaa", fontSize: 12, margin: "10px 0 0", textAlign: "center" }}>
             {selectedCategories.length} seleccionada{selectedCategories.length !== 1 ? "s" : ""}
           </p>
         </Card>
@@ -233,12 +277,18 @@ export default function ConfigScreen({ user, onDone }) {
         <div style={{ height: 40 }} />
       </div>
 
-      {/* Currency bottom sheet */}
+      {/* Currency bottom sheet — FIX: scroll lock en fondo */}
       {showCurrencySheet && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
-          onClick={() => setShowCurrencySheet(false)}>
-          <div style={{ background: "#fff", borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: SF_PRO }}
-            onClick={e => e.stopPropagation()}>
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
+          onClick={() => setShowCurrencySheet(false)}
+          onTouchMove={e => e.preventDefault()}
+        >
+          <div
+            style={{ background: "#fff", borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: SF_PRO, maxHeight: "70vh", overflowY: "auto" }}
+            onClick={e => e.stopPropagation()}
+            onTouchMove={e => e.stopPropagation()}
+          >
             <div style={{ width: 36, height: 4, background: "#e8e8e8", borderRadius: 2, margin: "0 auto 20px" }} />
             <p style={{ fontSize: 17, fontWeight: 700, color: "#1a1a2e", margin: "0 0 16px" }}>Divisa</p>
             {currencyList.map(c => (

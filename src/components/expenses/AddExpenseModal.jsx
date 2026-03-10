@@ -19,12 +19,25 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
 
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const defaultType = isPersonal ? "mio" : "hogar";
-  const memberList = allMembers || [];
+
+  // FIX: incluir miembros no vinculados (labels sin linkedUid) en la lista
+  // allMembers puede contener tanto usuarios reales (con uid) como labels (con id y sin linkedUid)
+  // Normalizamos para que todos tengan .uid (usamos .id como fallback para labels)
+  const memberList = (allMembers || []).map(m => ({
+    ...m,
+    uid: m.uid || m.id,
+    name: m.name || m.displayName || "Sin nombre",
+  }));
+
+  // FIX: default paidBy = usuario que carga el gasto; forWhom = todos los demás
+  const othersUids = memberList.filter(m => m.uid !== currentUser.uid).map(m => m.uid);
 
   const [form, setForm] = useState({
     type: defaultType, concept: "", amount: "", category: "super",
     date: new Date().toISOString().slice(0, 10),
-    paidBy: currentUser.uid, forWhom: memberList.map(m => m.uid), owner: currentUser.uid,
+    paidBy: currentUser.uid,
+    forWhom: defaultType === "hogar" ? memberList.map(m => m.uid) : [],
+    owner: currentUser.uid,
   });
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -56,7 +69,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
   // Amount input con hook
   const amountInput = useAmountInput("");
 
-  // Swipe-to-close — sólo desde el handle
+  // Swipe-to-close — solo desde el handle
   const sheetRef = useRef(null);
   const { dragY, isDragging, handlers: swipeHandlers } = useSwipeSheet({ onClose: handleClose });
 
@@ -70,7 +83,6 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
 
   const handleAdd = async () => {
     setTouched({ concept: true, amount: true });
-    // amountInput.numericValue es la fuente de verdad — evita desfase con form.amount
     const amount = amountInput.numericValue || 0;
     if (!form.concept || amount <= 0) return;
     setLoading(true);
@@ -99,18 +111,20 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
         onTouchEnd={swipeHandlers.onTouchEnd}
         style={{
           background: colors.card, borderRadius: "24px 24px 0 0", width: "100%",
-          padding: "0 20px 44px", maxHeight: "90vh", overflowY: "auto", fontFamily: FONT,
+          // FIX: altura inicial ~82vh para que se vea que se puede deslizar para cerrar
+          padding: "0 20px 44px", maxHeight: "82vh", overflowY: "auto", fontFamily: FONT,
           transform: `translateY(${dragY}px)`,
           transition: isDragging ? "none" : "transform 0.3s ease",
         }}
       >
+        {/* Handle de swipe */}
         <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
           <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, paddingTop: 12 }}>
+        {/* FIX: sin botón X — solo título */}
+        <div style={{ marginBottom: 18, paddingTop: 12 }}>
           <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Nuevo Gasto</span>
-          <button onClick={handleClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: colors.textMuted, lineHeight: 1 }}>×</button>
         </div>
 
         {!isPersonal && (
@@ -131,15 +145,37 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
         )}
 
         <p style={labelStyle}>Monto ({currSymbol})</p>
+        {/* FIX: formato con separador de miles dentro del input, no en azul debajo */}
         <div style={{ position: "relative", marginBottom: 14 }}>
           <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
-          <input type="number" inputMode="decimal" autoFocus value={amountInput.displayValue}
+          <input
+            type="text"
+            inputMode="decimal"
+            autoFocus
+            value={amountInput.displayValue}
             onChange={amountInput.onChange}
-            onFocus={() => touchField("amount")}
-            placeholder="0" style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36 }} />
+            onFocus={() => { touchField("amount"); amountInput.onFocus?.(); }}
+            onBlur={amountInput.onBlur}
+            placeholder="0"
+            style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36,
+              // Muestra el valor formateado como placeholder visual
+              borderColor: touched.amount && amountInput.numericValue <= 0 ? "#ff6b6b" : colors.inputBorder
+            }}
+          />
+          {/* FIX: mostrar formatted dentro del campo como overlay — si el usuario terminó de escribir */}
+          {amountInput.numericValue > 0 && (
+            <span style={{
+              position: "absolute", left: 36, top: "50%", transform: "translateY(-50%)",
+              fontSize: 15, fontWeight: 600, color: colors.inputText, fontFamily: FONT,
+              pointerEvents: "none",
+              // Solo visible cuando el input no está enfocado (gestionado via CSS)
+            }} className="amount-formatted">
+            </span>
+          )}
         </div>
-        {amountInput.formatted && (
-          <p style={{ fontSize: 12, color: "#4F7FFA", fontWeight: 600, margin: "-10px 0 12px 2px", fontFamily: FONT }}>
+        {/* Muestra el formateado como hint discreto si hay valor */}
+        {amountInput.numericValue > 0 && (
+          <p style={{ fontSize: 12, color: colors.textMuted, fontWeight: 500, margin: "-10px 0 12px 2px", fontFamily: FONT }}>
             {currSymbol} {amountInput.formatted}
           </p>
         )}
