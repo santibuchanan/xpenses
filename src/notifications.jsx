@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { collection, addDoc, onSnapshot, query, where, orderBy, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch } from "firebase/firestore";
-import { db } from "./firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { db, auth } from "./firebase";
 import { useTheme } from "./theme.jsx";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
@@ -35,7 +36,11 @@ export const NOTIF_ICONS = {
   fixed_due_soon: "⏰",
 };
 
-export function NotifProvider({ children, currentUser, accountId }) {
+// NotifProvider ya no recibe currentUser ni accountId como props.
+// Gestiona su propio listener de auth internamente — esto elimina el
+// listener duplicado que existía en el outer App component.
+export function NotifProvider({ children }) {
+  const [currentUser, setCurrentUser] = useState(undefined);
   const [notifications, setNotifications] = useState([]);
   const [prefs, setPrefs] = useState({
     expense_added: true, expense_edited: true, fixed_paid: true,
@@ -43,6 +48,14 @@ export function NotifProvider({ children, currentUser, accountId }) {
     pushEnabled: false,
   });
   const [toast, setToast] = useState(null);
+
+  // Listener de auth propio — única fuente de verdad para el uid del usuario
+  useEffect(() => {
+    return onAuthStateChanged(auth, user => {
+      setCurrentUser(user || null);
+      if (!user) setNotifications([]); // limpiar al cerrar sesión
+    });
+  }, []);
 
   useEffect(() => {
     if (!currentUser) return;

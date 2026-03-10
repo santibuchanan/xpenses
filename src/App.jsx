@@ -247,7 +247,7 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
           </div>
         </div>
         <div style={{ padding: "10px 16px", background: "#4F7FFA11", borderRadius: 14, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 20 }}>{account?.type === "shared" ? "👥" : "👤"}</span>
+          <span style={{ fontSize: 20 }}>{account?.emoji || (account?.type === "shared" ? "👥" : "👤")}</span>
           <div>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#4F7FFA", fontFamily: FONT }}>{account?.name}</p>
             <p style={{ margin: 0, fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{account?.type === "shared" ? "Cuenta compartida" : "Cuenta personal"}</p>
@@ -429,9 +429,12 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
 
   // Saldos incluyen gastos fijos no pagados
   const realMembers = allMembers?.filter(m => !m._isLabel) || [];
+  // settlements del mes actual — necesarios para que el balance del hero
+  // refleje lo que ya fue saldado (igual que SaldosScreen)
+  const allMonthSettlements = (settlements || []).filter(s => s.month === currentMonth);
   const saldos = useMemo(
-    () => calcSaldos(sharedExp, isPersonal ? [] : visibleFixed, realMembers, account?.divisionSystem, currentMonth),
-    [sharedExp, visibleFixed, realMembers, account?.divisionSystem, currentMonth]
+    () => calcSaldos(sharedExp, isPersonal ? [] : visibleFixed, realMembers, account?.divisionSystem, currentMonth, allMonthSettlements),
+    [sharedExp, visibleFixed, realMembers, account?.divisionSystem, currentMonth, allMonthSettlements]
   );
   const myBalance = saldos[currentUser.uid]?.balance || 0;
 
@@ -635,12 +638,14 @@ function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, 
 }
 
 // ── MODAL SALDO PARCIAL ──
-function PartialSettleModal({ debtor, creditor, totalDebt, fmt, colors, onConfirm, onClose }) {
+function PartialSettleModal({ debtor, creditor, totalDebt, fmt, currencySymbol, colors, onConfirm, onClose }) {
   const [amount, setAmount] = useState(totalDebt.toString());
   const [date, setDate]     = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
   const parsed = parseFloat(amount) || 0;
   const valid  = parsed > 0 && parsed <= totalDebt;
+  // Padding dinámico para el símbolo — símbolos largos como "US$" necesitan más espacio
+  const symbolWidth = (currencySymbol || "$").length > 1 ? 38 : 30;
 
   const handleConfirm = async () => {
     if (!valid) return;
@@ -660,12 +665,12 @@ function PartialSettleModal({ debtor, creditor, totalDebt, fmt, colors, onConfir
 
         <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, fontFamily: FONT }}>Monto a saldar</p>
         <div style={{ position: "relative", marginBottom: 14 }}>
-          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontFamily: FONT }}>$</span>
+          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontFamily: FONT, fontSize: 13 }}>{currencySymbol || "$"}</span>
           <input
             type="number" inputMode="decimal"
             value={amount}
             onChange={e => setAmount(e.target.value)}
-            style={{ width: "100%", padding: "13px 14px 13px 30px", borderRadius: 14, border: `2px solid ${valid || !amount ? colors.inputBorder : "#e74c3c"}`, fontSize: 15, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+            style={{ width: "100%", padding: `13px 14px 13px ${symbolWidth}px`, borderRadius: 14, border: `2px solid ${valid || !amount ? colors.inputBorder : "#e74c3c"}`, fontSize: 15, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
           />
         </div>
         {parsed > totalDebt && <p style={{ fontSize: 12, color: "#e74c3c", margin: "-10px 0 12px", fontFamily: FONT }}>No puede superar la deuda total ({fmt(totalDebt)})</p>}
@@ -798,8 +803,9 @@ function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth,
 
   const handlePassDebt = async (debts) => {
     const currentMonthName = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long" });
-    for (const d of debts) {
-      await onAddExpense({
+    // Promise.all — escribe todos los gastos en paralelo en lugar de secuencial
+    await Promise.all(debts.map(d =>
+      onAddExpense({
         concept: `Saldo pendiente del mes de ${currentMonthName}`,
         amount: d.amount,
         type: "personal",
@@ -811,8 +817,8 @@ function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth,
         createdBy: currentUser.uid,
         accountId: account?.id,
         isDebtCarryover: true,
-      });
-    }
+      })
+    ));
     setShowPassDebt(false);
   };
 
@@ -924,6 +930,7 @@ function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth,
           creditor={members.find(m => m.uid === partialModal.creditorUid)}
           totalDebt={partialModal.amount}
           fmt={fmt}
+          currencySymbol={CURRENCIES[account?.currency || "ARS"]?.symbol || "$"}
           colors={colors}
           onConfirm={handlePartialSettle}
           onClose={() => setPartialModal(null)}
@@ -949,7 +956,9 @@ function GraficosScreen({ expenses, account, customCategories }) {
   const { colors } = useTheme();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
-  const allMonths = [...new Set(expenses.map(e => e.month))].sort();
+  // Excluir gastos eliminados (soft-delete) de todos los cálculos
+  const activeExpenses = expenses.filter(e => !e.deleted);
+  const allMonths = [...new Set(activeExpenses.map(e => e.month))].sort();
   const last6 = allMonths.slice(-6);
   const monthLabel = (m) => new Date(m + "-02").toLocaleString("es-AR", { month: "short" });
 
@@ -962,19 +971,19 @@ function GraficosScreen({ expenses, account, customCategories }) {
 
   const barDataTotal = last6.map(m => ({
     mes: monthLabel(m),
-    Total: expenses.filter(e => e.month === m).reduce((s, e) => s + e.amount, 0),
+    Total: activeExpenses.filter(e => e.month === m).reduce((s, e) => s + e.amount, 0),
   }));
 
   const barDataTipo = last6.map(m => ({
     mes: monthLabel(m),
-    Hogar:    expenses.filter(e => e.month === m && e.type === "hogar").reduce((s, e) => s + e.amount, 0),
-    Personal: expenses.filter(e => e.month === m && e.type === "mio").reduce((s, e) => s + e.amount, 0),
-    Extra:    expenses.filter(e => e.month === m && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0),
+    Hogar:    activeExpenses.filter(e => e.month === m && e.type === "hogar").reduce((s, e) => s + e.amount, 0),
+    Personal: activeExpenses.filter(e => e.month === m && e.type === "mio").reduce((s, e) => s + e.amount, 0),
+    Extra:    activeExpenses.filter(e => e.month === m && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0),
   }));
 
   const pieData = allCategories.map((c, i) => ({
     name: c.label,
-    value: expenses.filter(e => e.month === pieMonth && e.category === c.id).reduce((s, e) => s + e.amount, 0),
+    value: activeExpenses.filter(e => e.month === pieMonth && e.category === c.id).reduce((s, e) => s + e.amount, 0),
     color: CAT_COLORS[i % CAT_COLORS.length],
   })).filter(c => c.value > 0);
 
@@ -1148,6 +1157,9 @@ function AppInner() {
     } catch (err) { console.error("Error al unirse:", err); }
   };
 
+  // Declarado antes del useEffect de onAuthStateChanged que lo usa
+  const [accountIds, setAccountIds] = useState([]);
+
   useEffect(() => {
     return onAuthStateChanged(auth, user => {
       // Resetear TODO el estado antes de cargar el nuevo usuario
@@ -1174,7 +1186,6 @@ function AppInner() {
   }, []);
 
   // ── Un solo listener sobre users/{uid} — evita el doble-listener anterior ──
-  const [accountIds, setAccountIds] = useState([]);
   useEffect(() => {
     if (!authUser) return;
     return onSnapshot(doc(db, "users", authUser.uid), snap => {
@@ -1383,12 +1394,11 @@ function AppInner() {
   );
 }
 
+// App es un wrapper puro. NotifProvider gestiona su propio listener de auth
+// internamente — ya no se necesita duplicar onAuthStateChanged aquí.
 export default function App() {
-  const [authUser, setAuthUser] = useState(undefined);
-  const [accountId, setAccountId] = useState(null);
-  useEffect(() => { return onAuthStateChanged(auth, user => { setAuthUser(user || null); setAccountId(user?.uid || null); }); }, []);
   return (
-    <NotifProvider currentUser={authUser} accountId={accountId}>
+    <NotifProvider>
       <AppInner />
     </NotifProvider>
   );
