@@ -336,7 +336,17 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
     const ownerName = members[0]?.name?.trim() || ownerDisplayName;
     const otherMembers = members.slice(1).filter(m => m.name.trim());
 
-    const memberLabels = otherMembers.map((m, i) => ({
+    const ownerLabel = {
+      id: `label_owner`,
+      name: ownerName || user.displayName || "Yo",
+      color: MEMBER_COLORS[0],
+      linkedUid: user.uid,
+      ...(divisionSystem === "proportional" && memberSalaries[0]
+        ? { salary: parseFloat(memberSalaries[0].replace(/\./g, "").replace(",", ".")) || 0 }
+        : {}),
+    };
+
+    const memberLabels = [ownerLabel, ...otherMembers.map((m, i) => ({
       id: `label_${i}`,
       name: m.name.trim(),
       color: m.color,
