@@ -128,15 +128,17 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   const isSubmitting = useRef(false);
 
   const monthExp = expenses.filter(e => e.month === currentMonth && !e.deleted);
+  // Filtrar labels — calcSaldos solo funciona con usuarios reales (con uid real de Firebase Auth)
+  const realMembers = (members || []).filter(m => !m._isLabel);
   // visibleFixed ya viene filtrado desde App.jsx via getVisibleFixed()
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth);
 
   const saldos = useMemo(
-    () => calcSaldos(monthExp, visibleFixed, members, account?.divisionSystem, currentMonth, monthSettlements),
-    [monthExp, visibleFixed, members, account?.divisionSystem, currentMonth, monthSettlements]
+    () => calcSaldos(monthExp, visibleFixed, realMembers, account?.divisionSystem, currentMonth, monthSettlements),
+    [monthExp, visibleFixed, realMembers, account?.divisionSystem, currentMonth, monthSettlements]
   );
 
-  const balances = (members || []).map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
+  const balances = realMembers.map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
   const debtPairs = [];
   balances.forEach(debtor => {
     if (debtor.balance >= 0) return;
@@ -156,8 +158,8 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     if (isSubmitting.current) return;
     isSubmitting.current = true;
     try {
-      const debtor   = members.find(m => m.uid === debtorUid);
-      const creditor = members.find(m => m.uid === creditorUid);
+      const debtor   = realMembers.find(m => m.uid === debtorUid);
+      const creditor = realMembers.find(m => m.uid === creditorUid);
       await addDoc(collection(db, "accounts", account.id, "settlements"), {
         debtorUid, creditorUid, amount,
         date: new Date().toISOString().slice(0, 10),
@@ -169,7 +171,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
         title: "¡Cuentas saldadas! 🎉",
         body: `${debtor?.name} saldó ${fmt(amount)} con ${creditor?.name}`,
         fromName: debtor?.name || "Un miembro",
-        toUids: members.filter(m => m.uid !== debtorUid).map(m => m.uid),
+        toUids: realMembers.filter(m => m.uid !== debtorUid).map(m => m.uid),
         accountId: account?.id, accountName: account?.name,
       });
     } finally {
@@ -226,13 +228,13 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     .map(d => ({ ...d, remaining: getRemainingDebt(d.debtorUid, d.creditorUid, d.amount) }))
     .filter(d => d.remaining > 0);
 
-  const totalSalary = (members || []).reduce((acc, mb) => acc + (mb.salary || 0), 0);
+  const totalSalary = (realMembers || []).reduce((acc, mb) => acc + (mb.salary || 0), 0);
 
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
       <SectionTitle>Saldos del mes</SectionTitle>
 
-      {members?.map(m => {
+      {realMembers?.map(m => {
         const s = saldos[m.uid] || { paid: 0, owes: 0, balance: 0 };
         const showPct = account?.divisionSystem === "proportional" && totalSalary > 0;
         const pct = showPct ? ((m.salary || 0) / totalSalary * 100).toFixed(0) : null;
@@ -267,8 +269,8 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
           </div>
         ) : (
           debtPairs.map(pair => {
-            const debtor   = members.find(m => m.uid === pair.debtorUid);
-            const creditor = members.find(m => m.uid === pair.creditorUid);
+            const debtor   = realMembers.find(m => m.uid === pair.debtorUid);
+            const creditor = realMembers.find(m => m.uid === pair.creditorUid);
             const remaining = getRemainingDebt(pair.debtorUid, pair.creditorUid, pair.amount);
             const isSettled = remaining === 0 || settledPairs[pair.debtorUid];
             const pairSettlements = monthSettlements.filter(s => s.debtorUid === pair.debtorUid && s.creditorUid === pair.creditorUid);
@@ -318,8 +320,8 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
       {partialModal && (
         <PartialSettleModal
-          debtor={members.find(m => m.uid === partialModal.debtorUid)}
-          creditor={members.find(m => m.uid === partialModal.creditorUid)}
+          debtor={realMembers.find(m => m.uid === partialModal.debtorUid)}
+          creditor={realMembers.find(m => m.uid === partialModal.creditorUid)}
           totalDebt={partialModal.amount}
           fmt={fmt}
           currencySymbol={CURRENCIES[account?.currency || "ARS"]?.symbol || "$"}
@@ -331,7 +333,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       {showPassDebt && (
         <PassDebtModal
           debts={pendingDebts}
-          members={members}
+          members={realMembers}
           nextMonth={nextMonth}
           fmt={fmt}
           colors={colors}
