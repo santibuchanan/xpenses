@@ -135,7 +135,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
   ];
 
   const showPaidBy  = form.type !== "mio" && profiles.length > 0;
-  const showForWhom = form.type === "personal" && profiles.length > 0;
+  const showForWhom = (form.type === "personal" || form.type === "hogar" || form.type === "extraordinary") && profiles.length > 0;
   // owner se asigna automáticamente, no se muestra selector
 
   const forWhomArr = Array.isArray(form.forWhom) ? form.forWhom : (form.forWhom ? [form.forWhom] : []);
@@ -176,13 +176,15 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
         {/* MONTO */}
         <p style={labelStyle}>Monto</p>
         <div style={{ position: "relative", marginBottom: 14 }}>
-          <input type="text" inputMode="decimal" value={amountInput.displayValue}
+          <input type="number" inputMode="decimal" value={amountInput.displayValue}
             onChange={amountInput.onChange}
-            onFocus={amountInput.onFocus}
-            onBlur={amountInput.onBlur}
-            placeholder="0"
             style={{ ...inputStyle, marginBottom: 0 }} />
         </div>
+        {amountInput.formatted && (
+          <p style={{ fontSize: 12, color: "#4F7FFA", fontWeight: 600, margin: "-10px 0 12px 2px", fontFamily: FONT }}>
+            {amountInput.formatted}
+          </p>
+        )}
 
         {/* CATEGORÍA */}
         <p style={labelStyle}>Categoría</p>

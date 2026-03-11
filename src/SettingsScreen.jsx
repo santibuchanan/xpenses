@@ -187,20 +187,51 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors }) {
   );
 }
 
-function FixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
+function SwipeableFixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
+  const [swipeX,   setSwipeX]   = useState(0);
+  const [swiped,   setSwiped]   = useState(false);
+  const startX                  = useRef(null);
+  const isDragging              = useRef(false);
+  const DELETE_THRESHOLD        = 80;
+
+  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; isDragging.current = true; };
+  const onTouchMove  = (e) => {
+    if (!isDragging.current || startX.current === null) return;
+    const diff = startX.current - e.touches[0].clientX;
+    if (diff > 0) setSwipeX(Math.min(diff, DELETE_THRESHOLD + 20));
+    else if (diff < -10) { setSwipeX(0); setSwiped(false); }
+  };
+  const onTouchEnd = () => {
+    isDragging.current = false;
+    if (swipeX > DELETE_THRESHOLD / 2) { setSwipeX(DELETE_THRESHOLD); setSwiped(true); }
+    else { setSwipeX(0); setSwiped(false); }
+    startX.current = null;
+  };
+
   return (
-    <div style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{ width: 40, height: 40, borderRadius: 14, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
-        {f.shared ? "🏠" : "👤"}
+    <div style={{ position: "relative", marginBottom: 8, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: DELETE_THRESHOLD, background: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "0 16px 16px 0" }}>
+        <button onClick={(e) => { e.stopPropagation(); onDelete(f.id); }}
+          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 0 }}>
+          <span style={{ fontSize: 20 }}>🗑️</span>
+          <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+        </button>
       </div>
-      <div style={{ flex: 1 }}>
-        <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>{f.name}</p>
-        <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
-          ${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}
-        </p>
+      <div
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        onClick={() => { if (swiped) { setSwipeX(0); setSwiped(false); } else { onEdit(f); } }}
+        style={{ transform: `translateX(-${swipeX}px)`, transition: isDragging.current ? "none" : "transform 0.3s ease", ...cardStyle, display: "flex", alignItems: "center", gap: 12, cursor: "pointer", position: "relative", zIndex: 1, marginBottom: 0 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 14, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+          {f.shared ? "🏠" : "👤"}
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>{f.name}</p>
+          <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
+            ${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}
+          </p>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <button onClick={() => onEdit(f)} style={{ background: "#4F7FFA11", border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: "#4F7FFA", cursor: "pointer", fontFamily: FONT }}>✏️</button>
-      <button onClick={() => onDelete(f.id)} style={{ background: colors.dangerBg, border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: colors.danger, cursor: "pointer", fontFamily: FONT }}>✕</button>
     </div>
   );
 }
@@ -520,7 +551,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
             </div>
           )}
           {visibleFixed.map(f => (
-            <FixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
+            <SwipeableFixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
           ))}
           <button onClick={() => setShowNewFixed(true)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, border: "2px dashed #4F7FFA", color: "#4F7FFA", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
             + Agregar gasto fijo
@@ -544,7 +575,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
             <>
               <p style={{ fontSize: 11, fontWeight: 700, color: "#4F7FFA", letterSpacing: 0.8, textTransform: "uppercase", margin: "12px 0 6px", fontFamily: FONT }}>🏠 Hogar</p>
               {sharedFixed.map(f => (
-                <FixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
+                <SwipeableFixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
               ))}
             </>
           )}
@@ -553,7 +584,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
             <>
               <p style={{ fontSize: 11, fontWeight: 700, color: "#FA4F7F", letterSpacing: 0.8, textTransform: "uppercase", margin: "12px 0 6px", fontFamily: FONT }}>👤 Personal</p>
               {personalFixed.map(f => (
-                <FixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
+                <SwipeableFixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
               ))}
             </>
           )}
