@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
 import { collection, onSnapshot, doc, query, orderBy, where, getDoc, updateDoc, setDoc, arrayUnion } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
@@ -98,7 +98,6 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
 
   const [fontSize, setFontSizeState] = useState(() => localStorage.getItem("expenseFontSize") || "medium");
   const [showFontPopup, setShowFontPopup] = useState(false);
-
   const handleFontSize = (id) => {
     setFontSizeState(id);
     localStorage.setItem("expenseFontSize", id);
@@ -149,16 +148,11 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
           </button>
         ))}
 
-        {/* Popup tamaño de letra */}
         {showFontPopup && (
-          <div
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-            onClick={() => setShowFontPopup(false)}
-          >
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{ background: colors.card, borderRadius: 20, padding: 24, width: "100%", maxWidth: 320, fontFamily: FONT }}
-            >
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+            onClick={() => setShowFontPopup(false)}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background: colors.card, borderRadius: 20, padding: 24, width: "100%", maxWidth: 320, fontFamily: FONT }}>
               <p style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: colors.text, fontFamily: FONT }}>🔡 Tamaño de letra</p>
               {fontSizes.map(f => (
                 <button key={f.id} onClick={() => handleFontSize(f.id)}
@@ -166,8 +160,7 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
                     borderColor: fontSize === f.id ? "#4F7FFA" : colors.inputBorder,
                     background: fontSize === f.id ? "#4F7FFA11" : colors.input,
                     color: fontSize === f.id ? "#4F7FFA" : colors.text,
-                    fontWeight: fontSize === f.id ? 700 : 500,
-                  }}>
+                    fontWeight: fontSize === f.id ? 700 : 500 }}>
                   {f.label}
                   {fontSize === f.id && <span style={{ color: "#4F7FFA" }}>✓</span>}
                 </button>
@@ -378,6 +371,12 @@ function AppInner() {
   // cada elemento tiene { uid, name, color, _isLabel } garantizados.
   const allMembers = buildAllMembers(members, account?.memberLabels);
 
+  // FIX: visibleFixed calculado una vez aquí — HomeScreen y SaldosScreen lo reciben como prop
+  const visibleFixed = useMemo(
+    () => (fixedExpenses || []).filter(f => f.shared || f.createdBy === authUser?.uid),
+    [fixedExpenses, authUser?.uid]
+  );
+
   const [deleteWarning, setDeleteWarning] = useState(null);
   const { sendNotification } = useNotif();
   const { addExpense, handleEditSave, deleteExpense, doDeleteExpense, markFixedPaid } = useExpenses({
@@ -431,9 +430,9 @@ function AppInner() {
       <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
-        {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} />}
+        {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} visibleFixed={visibleFixed} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} />}
         <Suspense fallback={<Spinner text="Cargando..." />}>
-          {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={allMembers} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} />}
+          {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} visibleFixed={visibleFixed} members={allMembers} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} />}
           {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} />}
           {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
         </Suspense>
