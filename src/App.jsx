@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { collection, onSnapshot, doc, query, orderBy, where, getDoc, updateDoc, setDoc, arrayUnion } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
 import AuthScreen from "./AuthScreen";
 import ConfigScreen from "./ConfigScreen";
-import SettingsScreen from "./SettingsScreen";
 import AccountSelectorScreen from "./AccountSelectorScreen";
 import WelcomeScreen from "./WelcomeScreen";
 import EmailAuthScreen from "./EmailAuthScreen";
@@ -14,10 +13,13 @@ import { useTheme, formatAmount } from "./theme.jsx";
 import { useExpenses } from "./hooks/useExpenses.js";
 import AddExpenseModal from "./components/expenses/AddExpenseModal.jsx";
 
-// Screens extraídas
+// HomeScreen: eager — es la pantalla inicial
 import HomeScreen from "./screens/HomeScreen.jsx";
-import SaldosScreen from "./screens/SaldosScreen.jsx";
-import GraficosScreen from "./screens/GraficosScreen.jsx";
+
+// Screens no iniciales: lazy — se cargan solo cuando el usuario las abre
+const SaldosScreen   = lazy(() => import("./screens/SaldosScreen.jsx"));
+const GraficosScreen = lazy(() => import("./screens/GraficosScreen.jsx"));
+const SettingsScreen = lazy(() => import("./SettingsScreen"));
 
 // Utilidad centralizada de normalización de miembros
 import { buildAllMembers } from "./utils/normalizeMembers.js";
@@ -413,10 +415,12 @@ function AppInner() {
       <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
-        {tab === "home"     && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} />}
-        {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={allMembers} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} />}
-        {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} />}
-        {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
+        {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} />}
+        <Suspense fallback={<Spinner text="Cargando..." />}>
+          {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={allMembers} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} />}
+          {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} />}
+          {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
+        </Suspense>
       </div>
 
       {/* Bottom Nav */}
