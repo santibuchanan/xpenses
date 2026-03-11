@@ -1,12 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useTheme, formatAmount, CURRENCIES } from "../theme.jsx";
 import { useNotif, NOTIF_TYPES } from "../notifications";
 import { calcSaldos } from "../hooks/useBalances.js";
 import DateInput from "../DateInput.jsx";
-
-const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
+import { FONT } from "../constants/ui.js";
 
 const fmtDate = (iso) => {
   if (!iso) return "";
@@ -120,14 +119,16 @@ function PassDebtModal({ debts, members, nextMonth, fmt, colors, onConfirm, onCl
 }
 
 // ── SALDOS SCREEN ──
-export default function SaldosScreen({ expenses, fixedExpenses, members, account, currentMonth, currentUser, onAddExpense, settlements }) {
+export default function SaldosScreen({ expenses, visibleFixed, members, account, currentMonth, currentUser, onAddExpense, settlements }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
 
+  // FIX #6: ref para evitar double-submit en settlements
+  const isSubmitting = useRef(false);
+
   const monthExp = expenses.filter(e => e.month === currentMonth && !e.deleted);
-  // Misma lógica de visibleFixed que HomeScreen — centralizada aquí para no duplicar
-  const visibleFixed = (fixedExpenses || []).filter(f => f.shared || f.createdBy === currentUser.uid);
+  // visibleFixed ya viene filtrado desde App.jsx via getVisibleFixed()
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth);
 
   const saldos = useMemo(
@@ -151,22 +152,29 @@ export default function SaldosScreen({ expenses, fixedExpenses, members, account
   const [settledPairs, setSettledPairs] = useState({});
 
   const handleFullSettle = async (debtorUid, creditorUid, amount) => {
-    const debtor   = members.find(m => m.uid === debtorUid);
-    const creditor = members.find(m => m.uid === creditorUid);
-    await addDoc(collection(db, "accounts", account.id, "settlements"), {
-      debtorUid, creditorUid, amount,
-      date: new Date().toISOString().slice(0, 10),
-      month: currentMonth, full: true,
-    });
-    setSettledPairs(p => ({ ...p, [debtorUid]: true }));
-    await sendNotification({
-      type: NOTIF_TYPES.ACCOUNT_SETTLED,
-      title: "¡Cuentas saldadas! 🎉",
-      body: `${debtor?.name} saldó ${fmt(amount)} con ${creditor?.name}`,
-      fromName: debtor?.name || "Un miembro",
-      toUids: members.filter(m => m.uid !== debtorUid).map(m => m.uid),
-      accountId: account?.id, accountName: account?.name,
-    });
+    // FIX #6: evitar double-submit
+    if (isSubmitting.current) return;
+    isSubmitting.current = true;
+    try {
+      const debtor   = members.find(m => m.uid === debtorUid);
+      const creditor = members.find(m => m.uid === creditorUid);
+      await addDoc(collection(db, "accounts", account.id, "settlements"), {
+        debtorUid, creditorUid, amount,
+        date: new Date().toISOString().slice(0, 10),
+        month: currentMonth, full: true,
+      });
+      setSettledPairs(p => ({ ...p, [debtorUid]: true }));
+      await sendNotification({
+        type: NOTIF_TYPES.ACCOUNT_SETTLED,
+        title: "¡Cuentas saldadas! 🎉",
+        body: `${debtor?.name} saldó ${fmt(amount)} con ${creditor?.name}`,
+        fromName: debtor?.name || "Un miembro",
+        toUids: members.filter(m => m.uid !== debtorUid).map(m => m.uid),
+        accountId: account?.id, accountName: account?.name,
+      });
+    } finally {
+      isSubmitting.current = false;
+    }
   };
 
   const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => {
@@ -176,7 +184,17 @@ export default function SaldosScreen({ expenses, fixedExpenses, members, account
     setPartialModal(null);
   };
 
-  const getRemainingDebt = (debtorUid, creditorUid, originalAmount) => originalAmount;
+  /**
+   * FIX #12: getRemainingDebt — antes era un stub que devolvía siempre
+   * el monto original, ignorando pagos parciales ya registrados.
+   * Ahora descuenta los settlements del mes para ese par deudor/acreedor.
+   */
+  const getRemainingDebt = (debtorUid, creditorUid, originalAmount) => {
+    const paid = monthSettlements
+      .filter(s => s.debtorUid === debtorUid && s.creditorUid === creditorUid)
+      .reduce((sum, s) => sum + (s.amount || 0), 0);
+    return Math.max(0, originalAmount - paid);
+  };
 
   const nextMonth = (() => {
     const [y, m] = currentMonth.split("-").map(Number);

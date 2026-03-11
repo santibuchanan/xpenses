@@ -1,10 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { collection, addDoc, onSnapshot, query, where, orderBy, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, where, orderBy, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch, limit } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "./firebase";
 import { useTheme } from "./theme.jsx";
-
-const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
+import { FONT } from "./constants/ui.js";
 const NotifContext = createContext({});
 
 export const NOTIF_TYPES = {
@@ -59,10 +58,14 @@ export function NotifProvider({ children }) {
 
   useEffect(() => {
     if (!currentUser) return;
+    // FIX #3: limit(50) evita descargar cientos de notificaciones acumuladas.
+    // Las notificaciones más antiguas quedan en Firestore pero no se cargan
+    // hasta que el usuario las necesite (futura paginación).
     const q = query(
       collection(db, "notifications"),
       where("toUid", "==", currentUser.uid),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(50)
     );
     return onSnapshot(q, snap => {
       const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -110,9 +113,15 @@ export function NotifProvider({ children }) {
 
   const deleteAllNotifs = async () => {
     if (!notifications.length) return;
-    const batch = writeBatch(db);
-    notifications.forEach(n => batch.delete(doc(db, "notifications", n.id)));
-    await batch.commit();
+    // FIX: batch múltiple para manejar más de 500 notificaciones sin fallar
+    const BATCH_SIZE = 490;
+    for (let i = 0; i < notifications.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      notifications.slice(i, i + BATCH_SIZE).forEach(n =>
+        batch.delete(doc(db, "notifications", n.id))
+      );
+      await batch.commit();
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;

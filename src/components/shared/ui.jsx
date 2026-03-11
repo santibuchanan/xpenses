@@ -1,6 +1,5 @@
 import { useTheme } from "../../theme.jsx";
-
-const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
+import { FONT } from "../../constants/ui.js";
 
 export function Card({ children, style = {} }) {
   const { colors } = useTheme();

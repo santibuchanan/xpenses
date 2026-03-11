@@ -1,10 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTheme, formatAmount } from "../theme.jsx";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
 import { calcSaldos } from "../hooks/useBalances.js";
 import { SwipeableExpenseRow } from "../components/expenses/SwipeableExpenseRow.jsx";
-
-const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
+import { FONT } from "../constants/ui.js";
 
 const FONT_SIZE_MAP = {
   small:  { base: 12, sub: 10, title: 18 },
@@ -12,13 +11,21 @@ const FONT_SIZE_MAP = {
   large:  { base: 17, sub: 14, title: 22 },
 };
 
+/**
+ * FIX #8: Reemplaza el segundo useState() (incorrecto) por useEffect.
+ * Antes: el event listener NUNCA se registraba porque useState no ejecuta
+ * callbacks como effects — cambiar el tamaño de fuente desde el menú
+ * no actualizaba HomeScreen hasta que el componente se remontaba.
+ */
 function useExpenseFontSize() {
   const [size, setSize] = useState(() => localStorage.getItem("expenseFontSize") || "medium");
-  useState(() => {
+
+  useEffect(() => {
     const handler = (e) => setSize(e.detail);
     window.addEventListener("expenseFontSizeChange", handler);
     return () => window.removeEventListener("expenseFontSizeChange", handler);
-  });
+  }, []);
+
   return FONT_SIZE_MAP[size] || FONT_SIZE_MAP.medium;
 }
 
@@ -54,7 +61,9 @@ function StatPill({ label, value, color }) {
 }
 
 // ── FIXED EXPENSE ROW ──
-function FixedExpenseHomeRow({ f, fmt, fs, colors, currentMonth, allMembers, onMarkPaid }) {
+// FIX #11: colors eliminado como prop — se consume directo de useTheme()
+function FixedExpenseHomeRow({ f, fmt, fs, currentMonth, allMembers, onMarkPaid }) {
+  const { colors } = useTheme();
   const payment = f.payments?.[currentMonth];
   const isPaid = payment?.paid === true;
   const paidByMember = isPaid ? allMembers?.find(m => m.uid === payment.paidBy) : null;
@@ -98,7 +107,9 @@ function FixedExpenseHomeRow({ f, fmt, fs, colors, currentMonth, allMembers, onM
 }
 
 // ── MARK PAID MODAL ──
-function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, onConfirm, onClose, colors }) {
+// FIX #11: colors eliminado como prop — se consume directo de useTheme()
+function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, onConfirm, onClose }) {
+  const { colors } = useTheme();
   const [paidBy, setPaidBy] = useState(currentUser.uid);
   const [loading, setLoading] = useState(false);
   // allMembers ya viene normalizado desde App.jsx via buildAllMembers()
@@ -149,7 +160,7 @@ function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, on
 }
 
 // ── HOME SCREEN ──
-export default function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, customCategories, fixedExpenses, onEdit, onDelete, onMarkFixedPaid, settlements }) {
+export default function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, customCategories, visibleFixed, onEdit, onDelete, onMarkFixedPaid, settlements }) {
   const { colors } = useTheme();
   const fs = useExpenseFontSize();
   const isPersonal = account?.type === "personal";
@@ -163,13 +174,10 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const monthExpAll = expenses.filter(e => e.month === currentMonth);
   const sharedExp   = monthExp.filter(e => e.type !== "mio");
 
-  // Gastos fijos visibles para este usuario
-  const visibleFixed = (fixedExpenses || []).filter(f =>
-    f.shared || f.createdBy === currentUser.uid
-  );
-  const sharedFixed   = visibleFixed.filter(f => f.shared);
-  const personalFixed = visibleFixed.filter(f => !f.shared);
-  const fixedTotal    = visibleFixed.reduce((s, f) => s + (f.amount || 0), 0);
+  // visibleFixed ya viene filtrado desde App.jsx (FIX #9 — no se recalcula aquí)
+  const sharedFixed   = (visibleFixed || []).filter(f => f.shared);
+  const personalFixed = (visibleFixed || []).filter(f => !f.shared);
+  const fixedTotal    = (visibleFixed || []).reduce((s, f) => s + (f.amount || 0), 0);
 
   // Saldos — solo miembros reales (sin labels) para el cálculo
   const realMembers = allMembers?.filter(m => !m._isLabel) || [];
@@ -289,7 +297,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
                       </div>
                     </button>
                     {fixedSharedExpanded && sharedFixed.map(f => (
-                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} colors={colors} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
+                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
                     ))}
                   </>
                 )}
@@ -304,13 +312,13 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
                       </div>
                     </button>
                     {fixedPersonalExpanded && personalFixed.map(f => (
-                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} colors={colors} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
+                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
                     ))}
                   </>
                 )}
 
                 {isPersonal && visibleFixed.map(f => (
-                  <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} colors={colors} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
+                  <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
                 ))}
               </div>
             )}
@@ -362,7 +370,6 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
           allMembers={allMembers}
           currentUser={currentUser}
           currentMonth={currentMonth}
-          colors={colors}
           onConfirm={async (fixedId, paidByUid) => {
             await onMarkFixedPaid(fixedId, paidByUid, currentMonth);
             setPayingFixed(null);
