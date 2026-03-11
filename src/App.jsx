@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from "react";
-import { signOut } from "firebase/auth";
-import { auth } from "./firebase";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { collection, onSnapshot, doc, query, orderBy, where, getDoc, updateDoc, setDoc, arrayUnion } from "firebase/firestore";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { db, auth } from "./firebase";
 import AuthScreen from "./AuthScreen";
 import ConfigScreen from "./ConfigScreen";
 import AccountSelectorScreen from "./AccountSelectorScreen";
@@ -10,10 +11,6 @@ import EditExpenseModal from "./EditExpenseModal";
 import { NotifProvider, useNotif, NotifCenter } from "./notifications";
 import { useTheme, formatAmount } from "./theme.jsx";
 import { useExpenses } from "./hooks/useExpenses.js";
-import { useAuth } from "./hooks/useAuth.js";
-import { useAccountData } from "./hooks/useAccountData.js";
-import { useFirestoreData } from "./hooks/useFirestoreData.js";
-import { useInvite } from "./hooks/useInvite.js";
 import AddExpenseModal from "./components/expenses/AddExpenseModal.jsx";
 
 // HomeScreen: eager — es la pantalla inicial
@@ -24,11 +21,12 @@ const SaldosScreen   = lazy(() => import("./screens/SaldosScreen.jsx"));
 const GraficosScreen = lazy(() => import("./screens/GraficosScreen.jsx"));
 const SettingsScreen = lazy(() => import("./SettingsScreen"));
 
-// Utilidades centralizadas
+// Utilidad centralizada de normalización de miembros
 import { buildAllMembers } from "./utils/normalizeMembers.js";
-import { getVisibleFixed } from "./utils/expenseFilters.js";
-import { FONT, FONT_IMPORT, NAV_HEIGHT } from "./constants/ui.js";
 
+const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');`;
+const NAV_HEIGHT = 72;
 const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
 function Spinner({ text = "Cargando..." }) {
@@ -99,17 +97,22 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
   };
 
   const [fontSize, setFontSizeState] = useState(() => localStorage.getItem("expenseFontSize") || "medium");
+  const [showFontPopup, setShowFontPopup] = useState(false);
+
   const handleFontSize = (id) => {
     setFontSizeState(id);
     localStorage.setItem("expenseFontSize", id);
     window.dispatchEvent(new CustomEvent("expenseFontSizeChange", { detail: id }));
+    setShowFontPopup(false);
   };
   const fontSizes = [{ id: "small", label: "Pequeño" }, { id: "medium", label: "Mediano" }, { id: "large", label: "Grande" }];
+  const fontLabel = fontSizes.find(f => f.id === fontSize)?.label || "Mediano";
 
   const rows = [
     { icon: "🔀", label: "Cambiar de cuenta", sub: account?.name || "", action: () => { onClose(); onSwitchAccount(); } },
     { icon: "📤", label: "Compartir X-penses", sub: "Invitá a otros a usar la app", action: () => { onClose(); handleShare(); } },
     { icon: isDark ? "☀️" : "🌙", label: isDark ? "Modo claro" : "Modo oscuro", sub: "Tema de la app", action: () => { onToggleTheme(); onClose(); } },
+    { icon: "🔡", label: "Tamaño de letra", sub: fontLabel, action: () => setShowFontPopup(true) },
     { icon: "🚪", label: "Cerrar sesión", sub: "", action: () => { onClose(); onSignOut(); }, danger: true },
   ];
 
@@ -135,22 +138,6 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
           </div>
         </div>
 
-        {/* Tamaño de letra — preferencia global del usuario */}
-        <div style={{ padding: "12px 16px", background: colors.pill, borderRadius: 14, marginBottom: 8 }}>
-          <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.4, textTransform: "uppercase", fontFamily: FONT }}>🔡 Tamaño de letra</p>
-          <div style={{ display: "flex", gap: 6 }}>
-            {fontSizes.map(f => (
-              <button key={f.id} onClick={() => handleFontSize(f.id)}
-                style={{ flex: 1, padding: "8px 4px", borderRadius: 10, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600,
-                  borderColor: fontSize === f.id ? "#4F7FFA" : colors.inputBorder,
-                  background: fontSize === f.id ? "#4F7FFA" : colors.input,
-                  color: fontSize === f.id ? "#fff" : colors.textMuted }}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {rows.map((r, i) => (
           <button key={i} onClick={r.action} style={{ width: "100%", background: "none", border: "none", borderRadius: 14, padding: "13px 16px", marginBottom: 4, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", fontFamily: FONT, textAlign: "left" }}>
             <span style={{ fontSize: 22, width: 32 }}>{r.icon}</span>
@@ -161,6 +148,33 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
         ))}
+
+        {/* Popup tamaño de letra */}
+        {showFontPopup && (
+          <div
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+            onClick={() => setShowFontPopup(false)}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ background: colors.card, borderRadius: 20, padding: 24, width: "100%", maxWidth: 320, fontFamily: FONT }}
+            >
+              <p style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: colors.text, fontFamily: FONT }}>🔡 Tamaño de letra</p>
+              {fontSizes.map(f => (
+                <button key={f.id} onClick={() => handleFontSize(f.id)}
+                  style={{ width: "100%", padding: "13px 16px", borderRadius: 14, border: "2px solid", marginBottom: 8, cursor: "pointer", fontFamily: FONT, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between",
+                    borderColor: fontSize === f.id ? "#4F7FFA" : colors.inputBorder,
+                    background: fontSize === f.id ? "#4F7FFA11" : colors.input,
+                    color: fontSize === f.id ? "#4F7FFA" : colors.text,
+                    fontWeight: fontSize === f.id ? 700 : 500,
+                  }}>
+                  {f.label}
+                  {fontSize === f.id && <span style={{ color: "#4F7FFA" }}>✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -209,99 +223,182 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
 function AppInner() {
   const { colors, toggleTheme, isDark } = useTheme();
   const { unreadCount } = useNotif();
-
-  // ── Hooks extraídos (FIX #7) ──
-  // Antes: 27 useState + 13 useEffect todos en AppInner.
-  // Ahora: responsabilidades separadas por dominio.
-  const { authUser, userProfile, accountIds, initializing } = useAuth();
+  const [authUser, setAuthUser]         = useState(undefined);
+  const [userProfile, setUserProfile]   = useState(null);
+  const [initializing, setInitializing] = useState(true);
+  const [account, setAccount]           = useState(null);
+  const [members, setMembers]           = useState([]);
+  const [expenses, setExpenses]         = useState([]);
+  const [customCategories, setCustomCategories] = useState([]);
+  const [fixedExpenses, setFixedExpenses]       = useState([]);
+  const [settlements, setSettlements]           = useState([]);
+  const [tab, setTab]                   = useState("home");
+  const [showAdd, setShowAdd]           = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [showNotifs, setShowNotifs]     = useState(false);
+  const [showMenu, setShowMenu]         = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
-  const { userAccounts, account, members } = useAccountData(accountIds, selectedAccountId);
-  const {
-    expenses, setExpenses,
-    customCategories,
-    fixedExpenses,
-    settlements,
-  } = useFirestoreData(account?.id);
+  const [userAccounts, setUserAccounts] = useState([]);
+  const [showWelcome, setShowWelcome]   = useState(false);
+  const [showEmailAuth, setShowEmailAuth] = useState(false);
+  const [pendingInviteId, setPendingInviteId] = useState(null);
+  const [claimData, setClaimData]       = useState(null);
+  const [accountIds, setAccountIds]     = useState([]);
+  const currentMonth = getCurrentMonth();
 
-  // FIX #9: visibleFixed calculado una sola vez aquí, pasado como prop
-  // a HomeScreen y SaldosScreen — elimina la duplicación entre screens.
-  const visibleFixed = useMemo(
-    () => getVisibleFixed(fixedExpenses, authUser?.uid),
-    [fixedExpenses, authUser?.uid]
-  );
-
-  // ── UI state ──
-  const [tab,             setTab]             = useState("home");
-  const [showAdd,         setShowAdd]         = useState(false);
-  const [editingExpense,  setEditingExpense]   = useState(null);
-  const [showNotifs,      setShowNotifs]       = useState(false);
-  const [showMenu,        setShowMenu]         = useState(false);
-  const [showWelcome,     setShowWelcome]      = useState(false);
-  const [showEmailAuth,   setShowEmailAuth]    = useState(false);
-  const [deleteWarning,   setDeleteWarning]    = useState(null);
-
-  // ── Invite flow (FIX #5: join atómico via useInvite) ──
-  const { claimData, setClaimData, finishJoinAccount } = useInvite({
-    authUser,
-    onJoined: (accountId) => {
-      setSelectedAccountId(accountId);
-      setTab("home");
-    },
-  });
-
-  // Mostrar welcome cuando no hay usuario
   useEffect(() => {
-    if (authUser === null) setShowWelcome(true);
+    const params = new URLSearchParams(window.location.search);
+    const inviteId = params.get("invite");
+    if (inviteId) { setPendingInviteId(inviteId); window.history.replaceState({}, "", window.location.pathname); }
+  }, []);
+
+  useEffect(() => {
+    if (!pendingInviteId || !authUser) return;
+    const processInvite = async () => {
+      try {
+        const inviteSnap = await getDoc(doc(db, "invites", pendingInviteId));
+        if (!inviteSnap.exists()) return;
+        const invite = inviteSnap.data();
+        if (invite.used) return;
+        const accountId = invite.accountId;
+        const accountSnap = await getDoc(doc(db, "accounts", accountId));
+        if (!accountSnap.exists()) return;
+        const accountData = accountSnap.data();
+        const labels = accountData.memberLabels || [];
+        const unlinked = labels.filter(l => !l.linkedUid);
+        if (unlinked.length > 0) {
+          setClaimData({ inviteId: pendingInviteId, accountId, accountData, memberLabels: unlinked });
+          setPendingInviteId(null);
+          return;
+        }
+        await finishJoinAccount({ inviteId: pendingInviteId, accountId, accountData, claimedLabelId: null });
+        setPendingInviteId(null);
+      } catch (err) { console.error("Error procesando invitación:", err); }
+    };
+    processInvite();
+  }, [pendingInviteId, authUser]);
+
+  const finishJoinAccount = async ({ inviteId, accountId, accountData, claimedLabelId }) => {
+    try {
+      const memberIds = accountData.memberIds || [];
+      if (!memberIds.includes(authUser.uid)) await updateDoc(doc(db, "accounts", accountId), { memberIds: arrayUnion(authUser.uid) });
+      if (claimedLabelId) {
+        const updatedLabels = (accountData.memberLabels || []).map(l => l.id === claimedLabelId ? { ...l, linkedUid: authUser.uid } : l);
+        await updateDoc(doc(db, "accounts", accountId), { memberLabels: updatedLabels });
+        const labelName = (accountData.memberLabels || []).find(l => l.id === claimedLabelId)?.name;
+        if (labelName) await setDoc(doc(db, "users", authUser.uid), { name: labelName }, { merge: true });
+      }
+      const userSnap = await getDoc(doc(db, "users", authUser.uid));
+      const existingIds = userSnap.exists() ? (userSnap.data().accountIds || []) : [];
+      if (!existingIds.includes(accountId)) await setDoc(doc(db, "users", authUser.uid), { accountIds: [...existingIds, accountId] }, { merge: true });
+      await updateDoc(doc(db, "invites", inviteId), { used: true });
+      setClaimData(null);
+      setSelectedAccountId(accountId);
+    } catch (err) { console.error("Error al unirse:", err); }
+  };
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, user => {
+      setUserProfile(null);
+      setAccount(null);
+      setMembers([]);
+      setUserAccounts([]);
+      setAccountIds([]);
+      setSelectedAccountId(null);
+      setAuthUser(user || null);
+      if (!user) {
+        setInitializing(false);
+        setShowWelcome(true);
+        setShowEmailAuth(false);
+      } else {
+        setInitializing(true);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!authUser) return;
+    return onSnapshot(doc(db, "users", authUser.uid), snap => {
+      const data = snap.data();
+      setUserProfile(data || null);
+      setAccountIds(data?.accountIds || (data?.accountId ? [data.accountId] : [authUser.uid]));
+      setInitializing(false);
+    });
   }, [authUser]);
 
-  // Limpiar selectedAccountId si la cuenta ya no existe en userAccounts
-  // (FIX pantalla con datos viejos: evita mostrar cuenta eliminada)
   useEffect(() => {
-    if (!selectedAccountId || !userAccounts.length) return;
-    const exists = userAccounts.some(a => a.id === selectedAccountId);
-    if (!exists) setSelectedAccountId(null);
-  }, [userAccounts, selectedAccountId]);
+    if (!accountIds.length) return;
+    const unsubs = accountIds.map(id =>
+      onSnapshot(doc(db, "accounts", id), aSnap => {
+        if (aSnap.exists()) {
+          setUserAccounts(prev => {
+            const filtered = prev.filter(a => a.id !== id);
+            return [...filtered, { id: aSnap.id, ...aSnap.data() }];
+          });
+        }
+      })
+    );
+    return () => unsubs.forEach(u => u());
+  }, [accountIds]);
 
-  // Redirigir a home si cuenta personal intenta ver saldos
   useEffect(() => {
-    if (account?.type === "personal" && tab === "saldos") setTab("home");
-  }, [account?.type, tab]);
+    if (!selectedAccountId || userAccounts.length === 0) return;
+    const acc = userAccounts.find(a => a.id === selectedAccountId);
+    if (acc) {
+      setAccount(acc);
+      setMembers([]);
+      const fs = acc.fontSize || "medium";
+      localStorage.setItem("expenseFontSize", fs);
+      window.dispatchEvent(new CustomEvent("expenseFontSizeChange", { detail: fs }));
+    }
+  }, [selectedAccountId, userAccounts]);
 
-  const currentMonth = getCurrentMonth();
-  const allMembers   = buildAllMembers(members, account?.memberLabels);
+  useEffect(() => {
+    if (!account?.memberIds) return;
+    setMembers([]);
+    const ids = [...account.memberIds];
+    const unsubs = ids.map(uid => onSnapshot(doc(db, "users", uid), snap => {
+      if (snap.exists()) setMembers(prev => [...prev.filter(m => m.uid !== uid), { uid, ...snap.data() }]);
+    }));
+    return () => unsubs.forEach(u => u());
+  }, [account?.memberIds?.join(",")]);
 
+  useEffect(() => {
+    if (!account?.id) return;
+    const q = query(collection(db, "expenses"), where("accountId", "==", account.id), orderBy("date", "desc"));
+    return onSnapshot(q, snap => { setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+  }, [account?.id]);
+
+  useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "categories"), snap => { setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
+  useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "fixedExpenses"), snap => { setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
+  useEffect(() => { if (!account?.id) return; return onSnapshot(query(collection(db, "accounts", account.id, "settlements"), orderBy("date", "desc")), snap => { setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
+
+  // ── allMembers normalizado — fuente única via buildAllMembers() ──
+  // Todos los componentes que reciben allMembers pueden confiar en que
+  // cada elemento tiene { uid, name, color, _isLabel } garantizados.
+  const allMembers = buildAllMembers(members, account?.memberLabels);
+
+  const [deleteWarning, setDeleteWarning] = useState(null);
   const { sendNotification } = useNotif();
   const { addExpense, handleEditSave, deleteExpense, doDeleteExpense, markFixedPaid } = useExpenses({
-    authUser, account, members,
-    expenses, settlements,      // FIX #2: settlements del estado local
+    authUser, account, members, expenses,
     currentMonth, setExpenses, setEditingExpense,
     setDeleteWarning, sendNotification,
   });
 
-  const handleSignOut = async () => {
-    await signOut(auth);
-    setSelectedAccountId(null);
-    setShowWelcome(true);
-  };
+  const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); setShowWelcome(true); };
 
-  // ── Guards de renderizado ──
-  if (initializing)          return <Spinner text="Cargando..." />;
+  useEffect(() => {
+    if (account?.type === "personal" && tab === "saldos") setTab("home");
+  }, [account?.type, tab]);
+
+  if (initializing) return <Spinner text="Cargando..." />;
   if (authUser === undefined) return <Spinner text="Iniciando X-penses..." />;
-  if (showWelcome && showEmailAuth) return (
-    <EmailAuthScreen
-      onBack={() => setShowEmailAuth(false)}
-      onEnter={() => { setShowEmailAuth(false); setShowWelcome(false); }}
-    />
-  );
-  if (showWelcome) return (
-    <WelcomeScreen
-      onEnter={() => setShowWelcome(false)}
-      onEmailClick={() => setShowEmailAuth(true)}
-    />
-  );
-  if (!authUser)               return <AuthScreen />;
+  if (showWelcome && showEmailAuth) return <EmailAuthScreen onBack={() => setShowEmailAuth(false)} onEnter={() => { setShowEmailAuth(false); setShowWelcome(false); }} />;
+  if (showWelcome) return <WelcomeScreen onEnter={() => setShowWelcome(false)} onEmailClick={() => setShowEmailAuth(true)} />;
+  if (!authUser) return <AuthScreen />;
   if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
-  if (!selectedAccountId)      return (
+  if (!selectedAccountId) return (
     <AccountSelectorScreen
       user={authUser} userProfile={userProfile} accounts={userAccounts}
       onSelect={(id) => { setSelectedAccountId(id); setTab("home"); }}
@@ -310,6 +407,7 @@ function AppInner() {
     />
   );
 
+  const accountExpenses = expenses;
   const isPersonal = account?.type === "personal";
 
   const NAV_LEFT = isPersonal
@@ -330,62 +428,14 @@ function AppInner() {
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      <AppHeader
-        account={account}
-        onMenuOpen={() => setShowMenu(true)}
-        onNotifsOpen={() => setShowNotifs(true)}
-        unreadCount={unreadCount}
-        colors={colors}
-      />
+      <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
-        {tab === "home" && (
-          <HomeScreen
-            expenses={expenses}
-            currentUser={authUser}
-            allMembers={allMembers}
-            account={account}
-            currentMonth={currentMonth}
-            customCategories={customCategories}
-            visibleFixed={visibleFixed}
-            onEdit={setEditingExpense}
-            onDelete={deleteExpense}
-            onMarkFixedPaid={markFixedPaid}
-            settlements={settlements}
-          />
-        )}
+        {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} fixedExpenses={fixedExpenses} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} />}
         <Suspense fallback={<Spinner text="Cargando..." />}>
-          {tab === "saldos" && (
-            <SaldosScreen
-              expenses={expenses}
-              visibleFixed={visibleFixed}
-              members={allMembers}
-              account={account}
-              currentMonth={currentMonth}
-              currentUser={authUser}
-              onAddExpense={addExpense}
-              settlements={settlements}
-            />
-          )}
-          {tab === "graficos" && (
-            <GraficosScreen
-              expenses={expenses}
-              account={account}
-              customCategories={customCategories}
-              fixedExpenses={fixedExpenses}
-            />
-          )}
-          {tab === "ajustes" && (
-            <SettingsScreen
-              currentUser={authUser}
-              userProfile={userProfile}
-              account={account}
-              members={members}
-              allMembers={allMembers}
-              onSignOut={handleSignOut}
-              onSwitchAccount={() => setSelectedAccountId(null)}
-            />
-          )}
+          {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} fixedExpenses={fixedExpenses} members={allMembers} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} />}
+          {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} />}
+          {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
         </Suspense>
       </div>
 
@@ -412,44 +462,11 @@ function AppInner() {
       </div>
 
       {/* Modales */}
-      {showAdd && (
-        <AddExpenseModal
-          onClose={() => setShowAdd(false)}
-          onAdd={addExpense}
-          currentUser={authUser}
-          allMembers={allMembers}
-          currency={account?.currency || "ARS"}
-          customCategories={customCategories}
-          isPersonal={isPersonal}
-        />
-      )}
-      {editingExpense && (
-        <EditExpenseModal
-          expense={editingExpense}
-          members={allMembers}
-          customCategories={customCategories}
-          currentUser={authUser}
-          onClose={() => setEditingExpense(null)}
-          onSave={handleEditSave}
-        />
-      )}
-      {showNotifs  && <NotifCenter onClose={() => setShowNotifs(false)} />}
-      {showMenu    && (
-        <MenuPanel
-          onClose={() => setShowMenu(false)}
-          currentUser={authUser}
-          userProfile={userProfile}
-          members={members}
-          account={account}
-          onSignOut={handleSignOut}
-          onSwitchAccount={() => setSelectedAccountId(null)}
-          isDark={isDark}
-          onToggleTheme={toggleTheme}
-          colors={colors}
-        />
-      )}
+      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={customCategories} isPersonal={isPersonal} />}
+      {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={customCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}
+      {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
+      {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
 
-      {/* Modal advertencia delete con settlements */}
       {deleteWarning && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
           <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
@@ -475,22 +492,9 @@ function AppInner() {
       )}
 
       {claimData && (
-        <ClaimIdentityModal
-          claimData={claimData}
-          colors={colors}
-          onClaim={(labelId) => finishJoinAccount({
-            inviteId:      claimData.inviteId,
-            accountId:     claimData.accountId,
-            accountData:   claimData.accountData,
-            claimedLabelId: labelId,
-          })}
-          onSkip={() => finishJoinAccount({
-            inviteId:      claimData.inviteId,
-            accountId:     claimData.accountId,
-            accountData:   claimData.accountData,
-            claimedLabelId: null,
-          })}
-        />
+        <ClaimIdentityModal claimData={claimData} colors={colors}
+          onClaim={(labelId) => finishJoinAccount({ inviteId: claimData.inviteId, accountId: claimData.accountId, accountData: claimData.accountData, claimedLabelId: labelId })}
+          onSkip={() => finishJoinAccount({ inviteId: claimData.inviteId, accountId: claimData.accountId, accountData: claimData.accountData, claimedLabelId: null })} />
       )}
     </div>
   );

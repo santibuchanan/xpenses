@@ -264,12 +264,13 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
   const [confirmDelete,  setConfirmDelete] = useState(null);
   const [deletedIds,     setDeletedIds]    = useState([]);
 
-  const [selectedEmoji,      setSelectedEmoji]      = useState("🏠");
+  const [selectedEmoji,      setSelectedEmoji]      = useState("");
   const [selectedCurrency,   setSelectedCurrency]   = useState("ARS");
   const [memberSalaries,     setMemberSalaries]     = useState({ 0: "" });
   // FIX: ninguna categoría seleccionada por default — mínimo 1 obligatoria
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [catError,           setCatError]           = useState(false);
+  const [emojiError,         setEmojiError]         = useState(false);
   const [showCurrencySheet,  setShowCurrencySheet]  = useState(false);
 
   const emojiInputRef = useRef(null);
@@ -293,6 +294,11 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
 
   // FIX: todo en una sola página — handleCreate directo sin step "members"
   const handleCreate = async () => {
+    // Validar emoji obligatorio
+    if (!selectedEmoji) {
+      setEmojiError(true);
+      return;
+    }
     // Validar categoría mínima
     if (selectedCategories.length === 0) {
       setCatError(true);
@@ -501,24 +507,35 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
             <div style={{ background: colors.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Título</p>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                {/* FIX: emoji editable — abre teclado nativo de emojis */}
+                {/* FIX: emoji obligatorio — sin default, abre teclado nativo, muestra error si vacío */}
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   <button
-                    onClick={() => emojiInputRef.current?.click()}
-                    style={{ width: 52, height: 52, borderRadius: 14, background: colors.pill, border: `2px solid ${colors.inputBorder}`, fontSize: 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {selectedEmoji}
+                    onClick={() => { setEmojiError(false); emojiInputRef.current?.focus(); emojiInputRef.current?.click(); }}
+                    style={{
+                      width: 52, height: 52, borderRadius: 14,
+                      background: selectedEmoji ? colors.pill : (emojiError ? "#ff6b6b11" : colors.pill),
+                      border: `2px solid ${emojiError ? "#ff6b6b" : (selectedEmoji ? colors.inputBorder : "#4F7FFA")}`,
+                      fontSize: selectedEmoji ? 26 : 20, cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: selectedEmoji ? undefined : (emojiError ? "#ff6b6b" : "#4F7FFA"),
+                    }}>
+                    {selectedEmoji || "＋"}
                   </button>
+                  {emojiError && !selectedEmoji && (
+                    <p style={{ position: "absolute", top: 54, left: 0, margin: 0, fontSize: 10, color: "#ff6b6b", fontFamily: FONT, whiteSpace: "nowrap" }}>Obligatorio</p>
+                  )}
                   <input
                     ref={emojiInputRef}
                     type="text"
                     inputMode="text"
                     style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 26 }}
+                    onFocus={e => { e.target.value = ""; }}
                     onInput={e => {
                       const val = e.target.value;
                       if (val) {
-                        // Tomar el último carácter (puede ser emoji multi-codepoint)
                         const chars = [...val];
                         setSelectedEmoji(chars[chars.length - 1]);
+                        setEmojiError(false);
                         e.target.value = "";
                       }
                     }}
