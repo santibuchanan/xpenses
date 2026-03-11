@@ -144,44 +144,25 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
           </>
         )}
 
+        <p style={labelStyle}>Concepto</p>
+        <input value={form.concept} onChange={e => set("concept", e.target.value)} onFocus={() => touchField("concept")} placeholder="Ej: Supermercado" style={{ ...inputStyle, borderColor: touched.concept && !form.concept ? "#ff6b6b" : colors.inputBorder }} />
+
         <p style={labelStyle}>Monto ({currSymbol})</p>
-        {/* FIX: formato con separador de miles dentro del input, no en azul debajo */}
         <div style={{ position: "relative", marginBottom: 14 }}>
           <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
           <input
             type="text"
             inputMode="decimal"
-            autoFocus
             value={amountInput.displayValue}
             onChange={amountInput.onChange}
             onFocus={() => { touchField("amount"); amountInput.onFocus?.(); }}
             onBlur={amountInput.onBlur}
             placeholder="0"
             style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36,
-              // Muestra el valor formateado como placeholder visual
               borderColor: touched.amount && amountInput.numericValue <= 0 ? "#ff6b6b" : colors.inputBorder
             }}
           />
-          {/* FIX: mostrar formatted dentro del campo como overlay — si el usuario terminó de escribir */}
-          {amountInput.numericValue > 0 && (
-            <span style={{
-              position: "absolute", left: 36, top: "50%", transform: "translateY(-50%)",
-              fontSize: 15, fontWeight: 600, color: colors.inputText, fontFamily: FONT,
-              pointerEvents: "none",
-              // Solo visible cuando el input no está enfocado (gestionado via CSS)
-            }} className="amount-formatted">
-            </span>
-          )}
         </div>
-        {/* Muestra el formateado como hint discreto si hay valor */}
-        {amountInput.numericValue > 0 && (
-          <p style={{ fontSize: 12, color: colors.textMuted, fontWeight: 500, margin: "-10px 0 12px 2px", fontFamily: FONT }}>
-            {currSymbol} {amountInput.formatted}
-          </p>
-        )}
-
-        <p style={labelStyle}>Concepto</p>
-        <input value={form.concept} onChange={e => set("concept", e.target.value)} onFocus={() => touchField("concept")} placeholder="Ej: Supermercado" style={{ ...inputStyle, borderColor: touched.concept && !form.concept ? "#ff6b6b" : colors.inputBorder }} />
 
         <p style={labelStyle}>Categoría</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>

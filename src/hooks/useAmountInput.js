@@ -2,107 +2,131 @@
  * useAmountInput
  * Maneja input de montos con formateo y parseado.
  *
- * FIX:
- * - Separador de miles visible DENTRO del input mientras se tipea
- * - Coma y punto ambos funcionan como separador decimal
- * - En mobile (inputMode="decimal") la coma del teclado numérico funciona correctamente
- * - El valor raw se guarda internamente para el parseo
+ * FIX CRÍTICO (v3):
+ * El bug era que el displayValue formateado ("1.250") se re-enviaba al onChange
+ * como e.target.value en el siguiente keystroke. El punto de miles era
+ * interpretado como separador decimal → "1.250" → intRaw="1", decRaw="250" → $1.25
+ *
+ * Solución: el state guarda SOLO dígitos puros sin formato. El onChange
+ * SIEMPRE extrae solo los dígitos del valor ingresado, ignorando puntos/comas
+ * que vengan de miles ya formateados. El separador decimal se detecta solo
+ * cuando el usuario lo tipea explícitamente al final del string.
  */
 import { useState } from "react";
 
 export function useAmountInput(initial = "") {
-  // digits: parte entera (string de dígitos puros)
-  // decimals: parte decimal (string de dígitos, null = sin parte decimal)
-  // hasDecimalSep: el usuario tipió el separador decimal pero puede no tener dígitos aún
+  // State: dígitos enteros puros + dígitos decimales + si hay separador decimal
   const parseInitial = (v) => {
-    if (v === "" || v == null) return { digits: "", decimals: null, hasDecimalSep: false };
-    const s = String(v).replace(",", ".");
-    const [intPart, decPart] = s.split(".");
+    if (v === "" || v == null) return { intDigits: "", decDigits: "", hasDecSep: false };
+    const s = String(v);
+    // Normalizar: tratar coma como punto decimal
+    const normalized = s.replace(",", ".");
+    const [intPart = "", decPart] = normalized.split(".");
     return {
-      digits: intPart.replace(/\D/g, "") || "",
-      decimals: decPart != null ? decPart.replace(/\D/g, "") : null,
-      hasDecimalSep: decPart != null,
+      intDigits: intPart.replace(/\D/g, ""),
+      decDigits: decPart != null ? decPart.replace(/\D/g, "").slice(0, 2) : "",
+      hasDecSep: decPart != null,
     };
   };
 
   const [state, setState] = useState(() => parseInitial(initial));
 
   const onChange = (e) => {
-    // Normalizar: eliminar todo excepto dígitos, punto y coma
-    let val = e.target.value;
+    const raw = e.target.value;
 
-    // En algunos teclados mobile el separador llega como "," — normalizarlo
-    // Eliminar caracteres no válidos
-    val = val.replace(/[^0-9.,]/g, "");
+    // Caso vacío
+    if (!raw || raw === "") {
+      setState({ intDigits: "", decDigits: "", hasDecSep: false });
+      return;
+    }
 
-    // Si tiene ambos separadores (1.234,56 o 1,234.56), detectar cuál es decimal
-    // Regla: el último separador es el decimal
-    const lastComma = val.lastIndexOf(",");
-    const lastDot   = val.lastIndexOf(".");
+    // PASO 1: ¿el usuario está escribiendo un separador decimal?
+    // Detectar si el ÚLTIMO carácter es coma o punto
+    const lastChar = raw[raw.length - 1];
+    const userTypedDecSep = lastChar === "," || lastChar === ".";
+
+    // PASO 2: Separar en parte entera y decimal
+    // Buscamos el ÚLTIMO punto o coma que no sea separador de miles.
+    // Criterio: si hay UNA sola coma/punto, es decimal.
+    // Si hay más de una, el último es decimal y los anteriores son miles.
+    const commas = (raw.match(/,/g) || []).length;
+    const dots   = (raw.match(/\./g) || []).length;
+    const totalSeps = commas + dots;
 
     let intRaw = "";
-    let decRaw = null;
-    let hasDecimalSep = false;
+    let decRaw = "";
+    let hasDecSep = false;
 
-    if (lastComma === -1 && lastDot === -1) {
-      // Solo dígitos
-      intRaw = val.replace(/\D/g, "");
+    if (totalSeps === 0 || userTypedDecSep) {
+      // Sin separadores: solo extraer dígitos
+      intRaw = raw.replace(/\D/g, "");
+      hasDecSep = userTypedDecSep;
     } else {
-      const lastSep = Math.max(lastComma, lastDot);
-      const sepChar = val[lastSep];
-      const beforeSep = val.slice(0, lastSep).replace(/[^0-9]/g, "");
-      const afterSep  = val.slice(lastSep + 1).replace(/[^0-9]/g, "");
-      intRaw = beforeSep;
-      decRaw = afterSep;
-      hasDecimalSep = true;
+      // Buscar la posición del separador decimal (el último separador)
+      const lastCommaIdx = raw.lastIndexOf(",");
+      const lastDotIdx   = raw.lastIndexOf(".");
+      const lastSepIdx   = Math.max(lastCommaIdx, lastDotIdx);
+
+      const beforeSep = raw.slice(0, lastSepIdx);
+      const afterSep  = raw.slice(lastSepIdx + 1);
+
+      // ¿Es realmente decimal o es solo miles?
+      // Si después del último sep hay exactamente 3 dígitos (y nada más), 
+      // probablemente es un separador de miles, no decimal.
+      // Pero si el usuario lo tipeo explícitamente como último char antes de borrar,
+      // lo tratamos como decimal. Usamos heurística: si afterSep tiene 0-2 dígitos → decimal.
+      const afterDigits = afterSep.replace(/\D/g, "");
+
+      if (afterDigits.length <= 2) {
+        // Tratar como separador decimal
+        intRaw = beforeSep.replace(/\D/g, "");
+        decRaw = afterDigits;
+        hasDecSep = true;
+      } else {
+        // Tratar como separador de miles — ignorarlo, extraer todos los dígitos
+        intRaw = raw.replace(/\D/g, "");
+        hasDecSep = false;
+      }
     }
 
-    // Remover ceros a la izquierda innecesarios
+    // Limpiar ceros a la izquierda en parte entera
     if (intRaw.length > 1 && intRaw[0] === "0") {
-      intRaw = intRaw.replace(/^0+/, "") || "0";
+      intRaw = intRaw.replace(/^0+/, "") || "";
     }
 
-    // Limitar decimales a 2 dígitos
-    if (decRaw != null && decRaw.length > 2) {
-      decRaw = decRaw.slice(0, 2);
-    }
+    // Limitar decimales a 2
+    decRaw = decRaw.slice(0, 2);
 
-    setState({ digits: intRaw, decimals: decRaw, hasDecimalSep });
+    setState({ intDigits: intRaw, decDigits: decRaw, hasDecSep });
   };
 
-  // Formatear parte entera con separador de miles (punto)
+  // Formatear parte entera con separador de miles (punto en es-AR)
   const formatInt = (digits) => {
     if (!digits) return "";
     return parseInt(digits, 10).toLocaleString("es-AR", { maximumFractionDigits: 0 });
   };
 
-  // Valor que se muestra en el input SIEMPRE con separador de miles
-  // Garantizado como string — nunca undefined
+  // displayValue: lo que se muestra en el input
   const displayValue = (() => {
-    if (!state.digits && !state.hasDecimalSep) return "";
-    const intFormatted = state.digits ? formatInt(state.digits) : "0";
-    if (!state.hasDecimalSep) return intFormatted;
-    const dec = state.decimals != null ? state.decimals : "";
-    return `${intFormatted},${dec}`;
+    if (!state.intDigits && !state.hasDecSep) return "";
+    const intFormatted = state.intDigits ? formatInt(state.intDigits) : "0";
+    if (!state.hasDecSep) return intFormatted;
+    return `${intFormatted},${state.decDigits}`;
   })() ?? "";
 
-  // Valor numérico para cálculos
+  // numericValue: para cálculos
   const numericValue = (() => {
-    if (!state.digits && !state.hasDecimalSep) return 0;
-    const intPart  = parseInt(state.digits || "0", 10);
-    const decPart  = state.decimals ? parseFloat(`0.${state.decimals}`) : 0;
+    if (!state.intDigits && !state.hasDecSep) return 0;
+    const intPart = parseInt(state.intDigits || "0", 10);
+    const decPart = state.decDigits ? parseFloat(`0.${state.decDigits}`) : 0;
     return intPart + decPart;
   })();
 
-  // Valor formateado para mostrar (igual que displayValue)
   const formatted = displayValue;
-
-  const reset = () => setState({ digits: "", decimals: null, hasDecimalSep: false });
+  const reset = () => setState({ intDigits: "", decDigits: "", hasDecSep: false });
   const set   = (v) => setState(parseInitial(v));
-
-  // onFocus y onBlur son no-ops — el formateado es siempre visible
   const onFocus = () => {};
   const onBlur  = () => {};
 
-  return { displayValue, numericValue, formatted, onChange, onFocus, onBlur, reset, set, raw: state.digits };
+  return { displayValue, numericValue, formatted, onChange, onFocus, onBlur, reset, set, raw: state.intDigits };
 }
