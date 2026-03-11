@@ -354,7 +354,7 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
       ...(divisionSystem === "proportional" && memberSalaries[i + 1]
         ? { salary: parseFloat(memberSalaries[i + 1].replace(/\./g, "").replace(",", ".")) || 0 }
         : {}),
-    }));
+    }))];
 
     const ref = await addDoc(collection(db, "accounts"), {
       name: accountName,
