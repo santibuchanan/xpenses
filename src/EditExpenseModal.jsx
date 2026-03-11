@@ -176,15 +176,13 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
         {/* MONTO */}
         <p style={labelStyle}>Monto</p>
         <div style={{ position: "relative", marginBottom: 14 }}>
-          <input type="number" inputMode="decimal" value={amountInput.displayValue}
+          <input type="text" inputMode="decimal" value={amountInput.displayValue}
             onChange={amountInput.onChange}
+            onFocus={amountInput.onFocus}
+            onBlur={amountInput.onBlur}
+            placeholder="0"
             style={{ ...inputStyle, marginBottom: 0 }} />
         </div>
-        {amountInput.formatted && (
-          <p style={{ fontSize: 12, color: "#4F7FFA", fontWeight: 600, margin: "-10px 0 12px 2px", fontFamily: FONT }}>
-            {amountInput.formatted}
-          </p>
-        )}
 
         {/* CATEGORÍA */}
         <p style={labelStyle}>Categoría</p>

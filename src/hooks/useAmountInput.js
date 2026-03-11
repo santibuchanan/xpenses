@@ -77,14 +77,14 @@ export function useAmountInput(initial = "") {
   };
 
   // Valor que se muestra en el input SIEMPRE con separador de miles
+  // Garantizado como string — nunca undefined
   const displayValue = (() => {
     if (!state.digits && !state.hasDecimalSep) return "";
     const intFormatted = state.digits ? formatInt(state.digits) : "0";
     if (!state.hasDecimalSep) return intFormatted;
-    // Tiene separador decimal — mostrar con coma (estilo es-AR)
     const dec = state.decimals != null ? state.decimals : "";
     return `${intFormatted},${dec}`;
-  })();
+  })() ?? "";
 
   // Valor numérico para cálculos
   const numericValue = (() => {
