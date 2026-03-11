@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useTheme, formatAmount } from "../theme.jsx";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
 import { calcSaldos } from "../hooks/useBalances.js";
-import { SwipeableExpenseRow } from "./expenses/SwipeableExpenseRow.jsx";
+import { SwipeableExpenseRow } from "../components/expenses/SwipeableExpenseRow.jsx";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
