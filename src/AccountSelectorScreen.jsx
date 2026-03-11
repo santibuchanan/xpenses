@@ -111,11 +111,13 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
   );
 }
 
-function ProfileTab({ user, userProfile, onSignOut, colors }) {
+function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
   const { setManualTheme } = useTheme();
   const [editingField, setEditingField] = useState(null);
   const [fieldValue,   setFieldValue]   = useState("");
   const [saving,       setSaving]       = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const currentTheme = localStorage.getItem("xpenses-theme") || "auto";
   const currentLang  = localStorage.getItem("xpenses-lang")  || "es";
@@ -179,7 +181,31 @@ function ProfileTab({ user, userProfile, onSignOut, colors }) {
         style={{ width: "100%", marginTop: 24, padding: 14, borderRadius: 14, background: "#ff6b6b18", border: "2px solid #ff6b6b44", color: "#ff6b6b", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
         Cerrar sesión
       </button>
+      <button onClick={() => setShowDeleteConfirm(true)}
+        style={{ background: "none", border: "none", cursor: "pointer", marginTop: 16, color: colors.textMuted, fontSize: 12, fontFamily: FONT, textDecoration: "underline", display: "block", width: "100%", textAlign: "center" }}>
+        Eliminar mi cuenta
+      </button>
       <div style={{ height: 40 }} />
+
+      {showDeleteConfirm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: colors.card, borderRadius: 24, padding: 24, width: "100%", maxWidth: 340, fontFamily: FONT, border: `1px solid ${colors.cardBorder}` }}>
+            <p style={{ fontSize: 36, textAlign: "center", margin: "0 0 12px" }}>⚠️</p>
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", textAlign: "center", fontFamily: FONT }}>¿Eliminar tu cuenta?</p>
+            <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 24px", textAlign: "center", lineHeight: 1.5, fontFamily: FONT }}>
+              Se eliminará tu perfil. En cuentas compartidas, tu usuario quedará desvinculado pero el integrante seguirá en la cuenta. Esta acción no se puede deshacer.
+            </p>
+            <button onClick={async () => { setDeleting(true); await onDeleteAccount(); setDeleting(false); }}
+              disabled={deleting}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: deleting ? "default" : "pointer", fontFamily: FONT, marginBottom: 8, opacity: deleting ? 0.7 : 1 }}>
+              {deleting ? "Eliminando..." : "Sí, eliminar"}
+            </button>
+            <button onClick={() => setShowDeleteConfirm(false)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Bottom sheet edición */}
       {editingField && (
@@ -471,7 +497,35 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
 
         {/* ── PERFIL TAB ── */}
         {step === "list" && activeTab === "perfil" && (
-          <ProfileTab user={user} userProfile={userProfile} onSignOut={onSignOut} colors={colors} />
+          <ProfileTab user={user} userProfile={userProfile} onSignOut={onSignOut} onDeleteAccount={async () => {
+            // Desvincular uid de todos los memberLabels en cuentas donde participa
+            try {
+              const { deleteUser } = await import("firebase/auth");
+              const { getAuth }    = await import("firebase/auth");
+              const { writeBatch, getDocs, query, where, collectionGroup } = await import("firebase/firestore");
+              // Eliminar doc de usuario en Firestore
+              await import("firebase/firestore").then(async ({ doc: docFn, deleteDoc: deleteFn }) => {
+                await deleteFn(docFn(db, "users", user.uid));
+              });
+              // Desvincular uid de memberLabels en todas las cuentas donde está vinculado
+              for (const acc of accounts) {
+                const labels = acc.memberLabels || [];
+                const hasLinked = labels.some(l => l.linkedUid === user.uid);
+                if (hasLinked) {
+                  const { updateDoc, doc: docFn } = await import("firebase/firestore");
+                  await updateDoc(docFn(db, "accounts", acc.id), {
+                    memberLabels: labels.map(l => l.linkedUid === user.uid ? { ...l, linkedUid: null } : l),
+                    memberIds: (acc.memberIds || []).filter(id => id !== user.uid),
+                  });
+                }
+              }
+              // Eliminar usuario de Firebase Auth
+              const auth = getAuth();
+              if (auth.currentUser) await deleteUser(auth.currentUser);
+            } catch (err) {
+              console.error("Error eliminando cuenta:", err);
+            }
+          }} colors={colors} />
         )}
 
         {/* ── LISTA ── */}

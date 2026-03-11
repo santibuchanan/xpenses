@@ -21,7 +21,6 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
 
-  // Excluir gastos eliminados (soft-delete)
   const activeExpenses = expenses.filter(e => !e.deleted);
   const allMonths = [...new Set(activeExpenses.map(e => e.month))].sort();
   const last6 = allMonths.slice(-6);
@@ -29,24 +28,26 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
 
   const [barView, setBarView] = useState("total");
   const [pieMonthIdx, setPieMonthIdx] = useState(last6.length - 1);
+  const [barMonthIdx, setBarMonthIdx] = useState(last6.length - 1);
+
   const pieMonth = last6[pieMonthIdx] || last6[last6.length - 1];
+  const barMonth = last6[barMonthIdx] || last6[last6.length - 1];
 
   const barDataTotal = last6.map(m => ({
     mes: monthLabel(m),
     Total: activeExpenses.filter(e => e.month === m).reduce((s, e) => s + e.amount, 0),
   }));
 
-  const barDataTipo = last6.map(m => ({
-    mes: monthLabel(m),
-    Hogar:    activeExpenses.filter(e => e.month === m && e.type === "hogar").reduce((s, e) => s + e.amount, 0),
-    Personal: activeExpenses.filter(e => e.month === m && e.type === "mio").reduce((s, e) => s + e.amount, 0),
-    Extra:    activeExpenses.filter(e => e.month === m && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0),
-    // Fijos = suma de gastos fijos activos ese mes (startDate <= mes) como presupuesto mensual
+  const barDataTipoMonth = [{
+    mes: barMonth ? new Date(barMonth + "-02").toLocaleString("es-AR", { month: "short", year: "2-digit" }) : "-",
+    Hogar:    activeExpenses.filter(e => e.month === barMonth && e.type === "hogar").reduce((s, e) => s + e.amount, 0),
+    Personal: activeExpenses.filter(e => e.month === barMonth && e.type === "mio").reduce((s, e) => s + e.amount, 0),
+    Extra:    activeExpenses.filter(e => e.month === barMonth && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0),
     Fijos: (fixedExpenses || []).filter(f => {
       const start = (f.startDate || "2000-01").slice(0, 7);
-      return m >= start;
+      return barMonth >= start;
     }).reduce((s, f) => s + (f.amount || 0), 0),
-  }));
+  }];
 
   const pieData = allCategories.map((c, i) => ({
     name: c.label,
@@ -65,7 +66,7 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
 
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
-      <SectionTitle>Comparación mensual</SectionTitle>
+      <SectionTitle>Comparación</SectionTitle>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         {[["total","Por mes"],["por_tipo","Por tipo"]].map(([val, lbl]) => (
@@ -79,24 +80,38 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
         ))}
       </div>
 
+      {barView === "por_tipo" && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 8, gap: 8 }}>
+          <button onClick={() => setBarMonthIdx(i => Math.max(0, i - 1))} disabled={barMonthIdx === 0}
+            style={{ background: "none", border: "none", cursor: barMonthIdx === 0 ? "default" : "pointer", color: barMonthIdx === 0 ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>←</button>
+          <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, minWidth: 70, textAlign: "center" }}>
+            {barMonth ? new Date(barMonth + "-02").toLocaleString("es-AR", { month: "short", year: "2-digit" }) : "-"}
+          </span>
+          <button onClick={() => setBarMonthIdx(i => Math.min(last6.length - 1, i + 1))} disabled={barMonthIdx === last6.length - 1}
+            style={{ background: "none", border: "none", cursor: barMonthIdx === last6.length - 1 ? "default" : "pointer", color: barMonthIdx === last6.length - 1 ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>→</button>
+        </div>
+      )}
+
       <Card>
-        {last6.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p> :
-          <ResponsiveContainer width="100%" height={210}>
-            <BarChart data={barView === "total" ? barDataTotal : barDataTipo} barCategoryGap="30%">
-              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: colors.textMuted, fontFamily: FONT }} />
-              <YAxis tick={{ fontSize: 10, fill: colors.textMuted, fontFamily: FONT }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
-              {barView === "total"
-                ? <Bar dataKey="Total" fill="#4F7FFA" radius={[6,6,0,0]} />
-                : <>
-                    <Bar dataKey="Hogar"    fill="#4F7FFA" radius={[6,6,0,0]} />
-                    <Bar dataKey="Personal" fill="#2ecc71" radius={[6,6,0,0]} />
-                    <Bar dataKey="Extra"    fill="#f39c12" radius={[6,6,0,0]} />
-                    <Bar dataKey="Fijos"    fill="#9b59b6" radius={[6,6,0,0]} />
-                  </>
-              }
-            </BarChart>
-          </ResponsiveContainer>}
+        {last6.length === 0
+          ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p>
+          : <ResponsiveContainer width="100%" height={210}>
+              <BarChart data={barView === "total" ? barDataTotal : barDataTipoMonth} barCategoryGap="30%">
+                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: colors.textMuted, fontFamily: FONT }} />
+                <YAxis tick={{ fontSize: 10, fill: colors.textMuted, fontFamily: FONT }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
+                {barView === "total"
+                  ? <Bar dataKey="Total" fill="#4F7FFA" radius={[6,6,0,0]} />
+                  : <>
+                      <Bar dataKey="Hogar"    fill="#4F7FFA" radius={[6,6,0,0]} />
+                      <Bar dataKey="Personal" fill="#2ecc71" radius={[6,6,0,0]} />
+                      <Bar dataKey="Extra"    fill="#f39c12" radius={[6,6,0,0]} />
+                      <Bar dataKey="Fijos"    fill="#9b59b6" radius={[6,6,0,0]} />
+                    </>
+                }
+              </BarChart>
+            </ResponsiveContainer>
+        }
         {barView === "por_tipo" && (
           <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>
             {[["#4F7FFA","Hogar"],["#2ecc71","Personal"],["#f39c12","Extra"],["#9b59b6","Fijos"]].map(([col, lbl]) => (
@@ -123,15 +138,17 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
       </div>
 
       <Card>
-        {pieData.length === 0 ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos para este mes</p> :
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" labelLine={false} label={renderCustomLabel}>
-                {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
-              </Pie>
-              <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
-            </PieChart>
-          </ResponsiveContainer>}
+        {pieData.length === 0
+          ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos para este mes</p>
+          : <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" labelLine={false} label={renderCustomLabel}>
+                  {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                </Pie>
+                <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
+              </PieChart>
+            </ResponsiveContainer>
+        }
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6, justifyContent: "center" }}>
           {pieData.map(p => (
             <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 4 }}>

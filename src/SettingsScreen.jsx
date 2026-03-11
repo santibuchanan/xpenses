@@ -58,10 +58,51 @@ function ShareAppModal({ onClose, colors }) {
 function EditCategoryModal({ category, onSave, onClose, onDelete, isDefault, colors }) {
   const [label, setLabel] = useState(category.label);
   const [icon, setIcon]   = useState(category.icon);
+
+  // Swipe-down to close
+  const startY    = useRef(null);
+  const sheetRef  = useRef(null);
+  const [translateY, setTranslateY] = useState(0);
+  const onTouchStart = (e) => { startY.current = e.touches[0].clientY; };
+  const onTouchMove  = (e) => {
+    if (startY.current === null) return;
+    const diff = e.touches[0].clientY - startY.current;
+    if (diff > 0) setTranslateY(diff);
+  };
+  const onTouchEnd = () => {
+    if (translateY > 80) { onClose(); }
+    else setTranslateY(0);
+    startY.current = null;
+  };
+
+  // Default category — show informational popup
+  if (isDefault) {
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+        onClick={onClose}>
+        <div onClick={e => e.stopPropagation()}
+          style={{ background: colors.card, borderRadius: 20, padding: 24, width: "100%", maxWidth: 320, fontFamily: FONT, textAlign: "center" }}>
+          <p style={{ fontSize: 36, margin: "0 0 12px" }}>{category.icon}</p>
+          <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>{category.label}</p>
+          <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", lineHeight: 1.5, fontFamily: FONT }}>
+            Esta es una categoría predeterminada y no se puede editar ni eliminar.
+          </p>
+          <button onClick={onClose} style={{ width: "100%", padding: 13, borderRadius: 14, background: "#4F7FFA", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>
+            Entendido
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 16, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
+      onClick={onClose}>
+      <div ref={sheetRef}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        onClick={e => e.stopPropagation()}
+        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto", transform: `translateY(${translateY}px)`, transition: startY.current ? "none" : "transform 0.3s ease" }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
         <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>Editar categoría</p>
         <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
@@ -73,7 +114,7 @@ function EditCategoryModal({ category, onSave, onClose, onDelete, isDefault, col
           ))}
         </div>
         <button onClick={() => onSave({ ...category, label, icon })} style={{ width: "100%", padding: 14, borderRadius: 14, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Guardar</button>
-        {!isDefault && <button onClick={() => onDelete(category.id)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.dangerBg, color: colors.danger, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Eliminar</button>}
+        <button onClick={() => onDelete(category.id)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.dangerBg, color: colors.danger, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Eliminar</button>
         <button onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
       </div>
     </div>
@@ -155,9 +196,10 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
   );
 }
 
-function EditMemberModal({ member, onSave, onClose, onDelete, colors }) {
-  const [name, setName]   = useState(member.name || "");
-  const [color, setColor] = useState(member.color || MEMBER_COLORS[0]);
+function EditMemberModal({ member, isProportional, onSave, onClose, onDelete, colors }) {
+  const [name, setName]     = useState(member.name || "");
+  const [color, setColor]   = useState(member.color || MEMBER_COLORS[0]);
+  const [salary, setSalary] = useState(member.salary?.toString() || "");
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
@@ -172,7 +214,16 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors }) {
             <button key={c} onClick={() => setColor(c)} style={{ width: 36, height: 36, borderRadius: 18, background: c, border: color === c ? "3px solid #fff" : "3px solid transparent", cursor: "pointer", boxShadow: color === c ? `0 0 0 2px ${c}` : "none" }} />
           ))}
         </div>
-        <button onClick={() => onSave({ ...member, name: name.trim(), color })} disabled={!name.trim()}
+        {isProportional && (
+          <>
+            <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Ingreso mensual</p>
+            <div style={{ position: "relative", marginBottom: 14 }}>
+              <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontFamily: FONT, fontSize: 13 }}>$</span>
+              <input type="number" inputMode="decimal" value={salary} onChange={e => setSalary(e.target.value)} placeholder="0" style={{ ...inputStyle, paddingLeft: 28, marginBottom: 0 }} />
+            </div>
+          </>
+        )}
+        <button onClick={() => onSave({ ...member, name: name.trim(), color, ...(isProportional ? { salary: parseFloat(salary) || 0 } : {}) })} disabled={!name.trim()}
           style={{ width: "100%", padding: 14, borderRadius: 14, background: !name.trim() ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: !name.trim() ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
           Guardar
         </button>
@@ -187,25 +238,56 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors }) {
   );
 }
 
-function FixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
+function SwipeableFixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
+  const [swipeX,   setSwipeX]   = useState(0);
+  const [swiped,   setSwiped]   = useState(false);
+  const startX                  = useRef(null);
+  const isDragging              = useRef(false);
+  const DELETE_THRESHOLD        = 80;
+
+  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; isDragging.current = true; };
+  const onTouchMove  = (e) => {
+    if (!isDragging.current || startX.current === null) return;
+    const diff = startX.current - e.touches[0].clientX;
+    if (diff > 0) setSwipeX(Math.min(diff, DELETE_THRESHOLD + 20));
+    else if (diff < -10) { setSwipeX(0); setSwiped(false); }
+  };
+  const onTouchEnd = () => {
+    isDragging.current = false;
+    if (swipeX > DELETE_THRESHOLD / 2) { setSwipeX(DELETE_THRESHOLD); setSwiped(true); }
+    else { setSwipeX(0); setSwiped(false); }
+    startX.current = null;
+  };
+
   return (
-    <div style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{ width: 40, height: 40, borderRadius: 14, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
-        {f.shared ? "🏠" : "👤"}
+    <div style={{ position: "relative", marginBottom: 8, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: DELETE_THRESHOLD, background: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "0 16px 16px 0" }}>
+        <button onClick={(e) => { e.stopPropagation(); onDelete(f.id); }}
+          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 0 }}>
+          <span style={{ fontSize: 20 }}>🗑️</span>
+          <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+        </button>
       </div>
-      <div style={{ flex: 1 }}>
-        <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>{f.name}</p>
-        <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
-          ${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}
-        </p>
+      <div
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        onClick={() => { if (swiped) { setSwipeX(0); setSwiped(false); } else { onEdit(f); } }}
+        style={{ transform: `translateX(-${swipeX}px)`, transition: isDragging.current ? "none" : "transform 0.3s ease", ...cardStyle, display: "flex", alignItems: "center", gap: 12, cursor: "pointer", position: "relative", zIndex: 1, marginBottom: 0 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 14, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+          {f.shared ? "🏠" : "👤"}
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>{f.name}</p>
+          <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
+            ${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}
+          </p>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <button onClick={() => onEdit(f)} style={{ background: "#4F7FFA11", border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: "#4F7FFA", cursor: "pointer", fontFamily: FONT }}>✏️</button>
-      <button onClick={() => onDelete(f.id)} style={{ background: colors.dangerBg, border: "none", borderRadius: 10, padding: "6px 10px", fontSize: 12, color: colors.danger, cursor: "pointer", fontFamily: FONT }}>✕</button>
     </div>
   );
 }
 
-function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, colors }) {
+function SwipeableMemberRow({ member, isCurrentUser, isProportional, onEdit, onRemoveRequest, colors }) {
   const [swipeX,     setSwipeX]   = useState(0);
   const [swiped,     setSwiped]   = useState(false);
   const startX                    = useRef(null);
@@ -268,8 +350,8 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
             {isCurrentUser && <span style={{ fontSize: 11, color: colors.textMuted }}> (vos)</span>}
           </p>
           <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
-            {member.salary ? `$${(member.salary || 0).toLocaleString("es-AR")}/mes` : "Sin sueldo cargado"}
-            {" · "}{member.linkedUid ? "Vinculado ✓" : "Sin vincular"}
+            {isProportional && member.salary ? `$${(member.salary || 0).toLocaleString("es-AR")}/mes · ` : ""}
+            {isCurrentUser ? "Vinculado ✓" : (member.linkedUid ? "Vinculado ✓" : "Sin vincular")}
           </p>
         </div>
       </div>
@@ -375,11 +457,11 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     const currentLabels = account?.memberLabels || [];
     let newLabels;
     if (updated.id) {
-      newLabels = currentLabels.map(l => l.id === updated.id ? { ...l, name: updated.name, color: updated.color } : l);
+      newLabels = currentLabels.map(l => l.id === updated.id ? { ...l, name: updated.name, color: updated.color, salary: updated.salary ?? l.salary } : l);
     } else {
       const newId = `label_${Date.now()}`;
       const color = MEMBER_COLORS[currentLabels.length % MEMBER_COLORS.length];
-      newLabels = [...currentLabels, { id: newId, name: updated.name, color: updated.color || color, linkedUid: null }];
+      newLabels = [...currentLabels, { id: newId, name: updated.name, color: updated.color || color, linkedUid: null, ...(updated.salary ? { salary: updated.salary } : {}) }];
     }
     await updateDoc(doc(db, "accounts", account.id), { memberLabels: newLabels });
     setEditingMember(null);
@@ -444,7 +526,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           <div>
             <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
             <input value={myName} onChange={e => setMyName(e.target.value)} style={inputStyle} />
-            {!isPersonal && (
+            {account?.divisionSystem === "proportional" && (
               <>
                 <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Salario mensual</p>
                 <input type="number" value={mySalary} onChange={e => setMySalary(e.target.value)} style={inputStyle} />
@@ -461,7 +543,14 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       <SectionHeader title="Configuracion de Cuenta" colors={colors} />
       <div style={cardStyle}>
         <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT }}>{account?.name || "Sin cuenta"}</p>
-        <p style={{ margin: "0 0 14px", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{isPersonal ? "Personal" : "Compartida"} · {account?.memberIds?.length || 1} miembro{(account?.memberIds?.length || 1) !== 1 ? "s" : ""}</p>
+        {(() => {
+          const memberLabels = account?.memberLabels || [];
+          const unlinkedCount = memberLabels.filter(l => !l.linkedUid).length;
+          const totalMembers = (account?.memberIds?.length || 1) + unlinkedCount;
+          return (
+            <p style={{ margin: "0 0 14px", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{isPersonal ? "Personal" : "Compartida"} · {totalMembers} miembro{totalMembers !== 1 ? "s" : ""}</p>
+          );
+        })()}
         <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 8, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Moneda</p>
         <button onClick={() => setShowCurrencySheet(true)}
           style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, background: colors.input, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: FONT }}>
@@ -482,6 +571,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           key={m.uid}
           member={{ ...m, linkedUid: undefined }}
           isCurrentUser={m.uid === currentUser.uid}
+          isProportional={account?.divisionSystem === "proportional"}
           onEdit={setEditingMember}
           onRemoveRequest={setRemovingMember}
           colors={colors}
@@ -492,6 +582,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           key={l.id}
           member={l}
           isCurrentUser={false}
+          isProportional={account?.divisionSystem === "proportional"}
           onEdit={setEditingMember}
           onRemoveRequest={setRemovingMember}
           colors={colors}
@@ -511,7 +602,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       {isPersonal ? (
         <>
           <SectionHeader title="Mis Gastos Fijos" colors={colors} />
-          <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: FONT }}>Gastos que se repiten cada mes</p>
+          <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: FONT }}>Deslizá a la izquierda para eliminar · Tocá para editar</p>
           {visibleFixed.length === 0 && (
             <div style={{ ...cardStyle, textAlign: "center", color: colors.textMuted, padding: 24 }}>
               <p style={{ fontSize: 28, margin: "0 0 6px" }}>📋</p>
@@ -519,7 +610,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
             </div>
           )}
           {visibleFixed.map(f => (
-            <FixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
+            <SwipeableFixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
           ))}
           <button onClick={() => setShowNewFixed(true)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, border: "2px dashed #4F7FFA", color: "#4F7FFA", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
             + Agregar gasto fijo
@@ -529,7 +620,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         <>
           <SectionHeader title="Gastos Fijos" colors={colors} />
           <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: FONT }}>
-            Gastos que se repiten cada mes. El tipo (Hogar o Personal) lo elegís al crear cada uno.
+            Deslizá a la izquierda para eliminar · Tocá para editar
           </p>
 
           {visibleFixed.length === 0 && (
@@ -543,7 +634,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
             <>
               <p style={{ fontSize: 11, fontWeight: 700, color: "#4F7FFA", letterSpacing: 0.8, textTransform: "uppercase", margin: "12px 0 6px", fontFamily: FONT }}>🏠 Hogar</p>
               {sharedFixed.map(f => (
-                <FixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
+                <SwipeableFixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
               ))}
             </>
           )}
@@ -552,7 +643,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
             <>
               <p style={{ fontSize: 11, fontWeight: 700, color: "#FA4F7F", letterSpacing: 0.8, textTransform: "uppercase", margin: "12px 0 6px", fontFamily: FONT }}>👤 Personal</p>
               {personalFixed.map(f => (
-                <FixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
+                <SwipeableFixedRow key={f.id} f={f} colors={colors} cardStyle={cardStyle} onEdit={setEditingFixed} onDelete={handleDeleteFixed} />
               ))}
             </>
           )}
@@ -563,13 +654,14 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         </>
       )}
 
-      {/* CATEGORÍAS — FIX: solo las activas de esta cuenta */}
+      {/* CATEGORÍAS — solo las activas, sin lápiz, popup para defaults */}
       <SectionHeader title="Categorias" colors={colors} />
       <div style={{ ...cardStyle, padding: 14 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {allCategories.map(c => (
-            <button key={c.id} onClick={() => setEditingCategory(c)} style={{ padding: "9px 14px", borderRadius: 20, border: `2px solid ${colors.inputBorder}`, fontSize: 13, cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: 6, background: colors.input, color: colors.text }}>
-              {c.icon} {c.label} <span style={{ fontSize: 10, color: colors.textMuted }}>✏️</span>
+            <button key={c.id} onClick={() => setEditingCategory(c)}
+              style={{ padding: "9px 14px", borderRadius: 20, border: `2px solid #4F7FFA`, fontSize: 13, cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: 6, background: "#4F7FFA14", color: "#4F7FFA", fontWeight: 600 }}>
+              {c.icon} {c.label}
             </button>
           ))}
           <button onClick={() => setEditingCategory({ id: null, label: "", icon: "📦", isNew: true })} style={{ padding: "9px 14px", borderRadius: 20, border: "2px dashed #4F7FFA", fontSize: 13, cursor: "pointer", fontFamily: FONT, color: "#4F7FFA", background: "#4F7FFA08", fontWeight: 600 }}>
@@ -663,6 +755,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         <EditMemberModal
           colors={colors}
           member={editingMember}
+          isProportional={account?.divisionSystem === "proportional"}
           onSave={handleSaveMember}
           onDelete={handleDeleteMember}
           onClose={() => setEditingMember(null)}

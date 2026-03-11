@@ -197,6 +197,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
     .filter(c => c.total > 0)
     .sort((a, b) => b.total - a.total);
 
+  const [catSectionExpanded, setCatSectionExpanded] = useState(false);
   const [catExpanded, setCatExpanded] = useState(false);
   const monthLabel = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
 
@@ -248,30 +249,39 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
         </div>
 
         {catTotals.length > 0 && (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "22px 0 10px" }}>
-              <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Top categorías</span>
-              {catTotals.length > 4 && (
-                <button onClick={() => setCatExpanded(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#4F7FFA", fontWeight: 600, fontFamily: FONT }}>
-                  {catExpanded ? "Ver menos ▲" : `Ver todas (${catTotals.length}) ▼`}
-                </button>
-              )}
-            </div>
-            {(catExpanded ? catTotals : catTotals.slice(0, 4)).map(c => (
-              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                <span style={{ fontSize: 22, width: 30 }}>{c.icon}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: fs.base, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</span>
-                    <span style={{ fontSize: fs.base, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</span>
-                  </div>
-                  <div style={{ background: colors.divider, borderRadius: 4, height: 5 }}>
-                    <div style={{ background: "#4F7FFA", borderRadius: 4, height: 5, width: `${Math.min(100, (c.total / catTotals[0].total) * 100)}%` }} />
-                  </div>
-                </div>
+          <div style={{ marginTop: 8 }}>
+            <button onClick={() => setCatSectionExpanded(v => !v)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 0 8px", fontFamily: FONT }}>
+              <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>🏷️ Top categorías</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{catTotals.length} categoría{catTotals.length !== 1 ? "s" : ""}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: catSectionExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}><path d="M6 9l6 6 6-6"/></svg>
               </div>
-            ))}
-          </>
+            </button>
+
+            {catSectionExpanded && (
+              <div>
+                {(catExpanded ? catTotals : catTotals.slice(0, 4)).map(c => (
+                  <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                    <span style={{ fontSize: 22, width: 30 }}>{c.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={{ fontSize: fs.base, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</span>
+                        <span style={{ fontSize: fs.base, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</span>
+                      </div>
+                      <div style={{ background: colors.divider, borderRadius: 4, height: 5 }}>
+                        <div style={{ background: "#4F7FFA", borderRadius: 4, height: 5, width: `${Math.min(100, (c.total / catTotals[0].total) * 100)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {catTotals.length > 4 && (
+                  <button onClick={() => setCatExpanded(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#4F7FFA", fontWeight: 600, fontFamily: FONT, padding: "4px 0" }}>
+                    {catExpanded ? "Ver menos ▲" : `Ver todas (${catTotals.length}) ▼`}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Gastos fijos */}
