@@ -20,16 +20,23 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
   const defaultType = isPersonal ? "mio" : "hogar";
 
-  // FIX: incluir miembros no vinculados (labels sin linkedUid) en la lista
-  // allMembers puede contener tanto usuarios reales (con uid) como labels (con id y sin linkedUid)
-  // Normalizamos para que todos tengan .uid (usamos .id como fallback para labels)
-  const memberList = (allMembers || []).map(m => ({
+  // Normalizar allMembers garantizando que todos tengan .uid
+  const baseMemberList = (allMembers || []).map(m => ({
     ...m,
     uid: m.uid || m.id,
     name: m.name || m.displayName || "Sin nombre",
   }));
 
-  // FIX: default paidBy = usuario que carga el gasto; forWhom = todos los demás
+  // FIX B2/B7: garantizar que el usuario actual SIEMPRE esté en la lista,
+  // independientemente del timing del onSnapshot en App.jsx.
+  // En cuentas nuevas, members[] puede llegar vacío o sin el creador
+  // porque el listener de Firestore aún no resolvió cuando se abre el modal.
+  const currentUserInList = baseMemberList.some(m => m.uid === currentUser.uid);
+  const memberList = (!isPersonal && !currentUserInList)
+    ? [{ uid: currentUser.uid, name: currentUser.displayName || "Vos", color: "#4F7FFA", _isFallback: true }, ...baseMemberList]
+    : baseMemberList;
+
+  // default paidBy = usuario que carga el gasto; forWhom = todos los miembros
   const othersUids = memberList.filter(m => m.uid !== currentUser.uid).map(m => m.uid);
 
   const [form, setForm] = useState({
@@ -99,8 +106,11 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
 
   const types = [["hogar","🏠 Hogar"],["personal","🎁 Para otro"],["extraordinary","✈️ Extraordinario"],["mio","👤 Para mí"]];
-  const showPaidBy  = !isPersonal && form.type !== "mio" && memberList.length > 0;
-  const showForWhom = !isPersonal && (form.type === "personal" || form.type === "extraordinary" || form.type === "hogar") && memberList.length > 0;
+  // FIX B2: removida dependencia de memberList.length — las secciones se
+  // muestran siempre en cuentas compartidas, incluso si allMembers aún no cargó,
+  // porque memberList ya garantiza que el usuario actual está presente.
+  const showPaidBy  = !isPersonal && form.type !== "mio";
+  const showForWhom = !isPersonal && (form.type === "personal" || form.type === "extraordinary" || form.type === "hogar");
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>

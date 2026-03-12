@@ -5,19 +5,9 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
 import DateInput from "./DateInput";
+import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
-
-const DEFAULT_CATEGORIES = [
-  { id: "super",      label: "Supermercado",          icon: "🛒" },
-  { id: "salidas",    label: "Salidas",                icon: "🍕" },
-  { id: "servicios",  label: "Impuestos y Servicios",  icon: "💡" },
-  { id: "transporte", label: "Transporte",             icon: "🚗" },
-  { id: "salud",      label: "Salud",                  icon: "💊" },
-  { id: "ropa",       label: "Ropa y Calzado",         icon: "👗" },
-  { id: "hogar",      label: "Hogar",                  icon: "🏠" },
-  { id: "otros",      label: "Otros",                  icon: "📦" },
-];
 
 // Calcula el tipo desde la perspectiva del usuario que mira
 function getPerspectiveType(expense, currentUserUid) {
@@ -134,8 +124,8 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
     ["mio",           "👤 Para mí"],
   ];
 
-  const showPaidBy  = form.type !== "mio" && profiles.length > 0;
-  const showForWhom = (form.type === "personal" || form.type === "hogar" || form.type === "extraordinary") && profiles.length > 0;
+  const showPaidBy  = form.type !== "mio";
+  const showForWhom = (form.type === "personal" || form.type === "hogar" || form.type === "extraordinary");
   // owner se asigna automáticamente, no se muestra selector
 
   const forWhomArr = Array.isArray(form.forWhom) ? form.forWhom : (form.forWhom ? [form.forWhom] : []);

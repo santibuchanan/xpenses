@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
-import { collection, onSnapshot, doc, query, orderBy, where, getDoc, updateDoc, setDoc, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, arrayUnion } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
 import AuthScreen from "./AuthScreen";
@@ -11,6 +11,8 @@ import EditExpenseModal from "./EditExpenseModal";
 import { NotifProvider, useNotif, NotifCenter } from "./notifications";
 import { useTheme, formatAmount } from "./theme.jsx";
 import { useExpenses } from "./hooks/useExpenses.js";
+import { useAccountData } from "./hooks/useAccountData.js";
+import { useFirestoreData } from "./hooks/useFirestoreData.js";
 import AddExpenseModal from "./components/expenses/AddExpenseModal.jsx";
 
 // HomeScreen: eager — es la pantalla inicial
@@ -219,25 +221,36 @@ function AppInner() {
   const [authUser, setAuthUser]         = useState(undefined);
   const [userProfile, setUserProfile]   = useState(null);
   const [initializing, setInitializing] = useState(true);
-  const [account, setAccount]           = useState(null);
-  const [members, setMembers]           = useState([]);
-  const [expenses, setExpenses]         = useState([]);
-  const [customCategories, setCustomCategories] = useState([]);
-  const [fixedExpenses, setFixedExpenses]       = useState([]);
-  const [settlements, setSettlements]           = useState([]);
   const [tab, setTab]                   = useState("home");
   const [showAdd, setShowAdd]           = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [showNotifs, setShowNotifs]     = useState(false);
   const [showMenu, setShowMenu]         = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
-  const [userAccounts, setUserAccounts] = useState([]);
   const [showWelcome, setShowWelcome]   = useState(false);
   const [showEmailAuth, setShowEmailAuth] = useState(false);
   const [pendingInviteId, setPendingInviteId] = useState(null);
   const [claimData, setClaimData]       = useState(null);
   const [accountIds, setAccountIds]     = useState([]);
   const currentMonth = getCurrentMonth();
+
+  // ── Hooks de datos — reemplazan todos los useEffects inline de App.jsx ──
+  // useAccountData: maneja userAccounts, account activa y members[].
+  // FIX PROBLEMA RAÍZ B2/B7: seed inmediato del usuario actual en members[]
+  // antes de que resuelvan los listeners de Firestore, eliminando la ventana
+  // de tiempo en que allMembers llegaba vacío a AddExpenseModal/EditExpenseModal.
+  const { userAccounts, account, members } = useAccountData(
+    accountIds, selectedAccountId, authUser, userProfile
+  );
+
+  // useFirestoreData: maneja expenses, categories, fixedExpenses, settlements.
+  // Expenses tiene filtro de 6 meses para minimizar lecturas de Firestore.
+  const {
+    expenses, setExpenses,
+    customCategories,
+    fixedExpenses,
+    settlements,
+  } = useFirestoreData(account?.id);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -293,9 +306,6 @@ function AppInner() {
   useEffect(() => {
     return onAuthStateChanged(auth, user => {
       setUserProfile(null);
-      setAccount(null);
-      setMembers([]);
-      setUserAccounts([]);
       setAccountIds([]);
       setSelectedAccountId(null);
       setAuthUser(user || null);
@@ -319,52 +329,6 @@ function AppInner() {
     });
   }, [authUser]);
 
-  useEffect(() => {
-    if (!accountIds.length) return;
-    const unsubs = accountIds.map(id =>
-      onSnapshot(doc(db, "accounts", id), aSnap => {
-        if (aSnap.exists()) {
-          setUserAccounts(prev => {
-            const filtered = prev.filter(a => a.id !== id);
-            return [...filtered, { id: aSnap.id, ...aSnap.data() }];
-          });
-        }
-      })
-    );
-    return () => unsubs.forEach(u => u());
-  }, [accountIds]);
-
-  useEffect(() => {
-    if (!selectedAccountId || userAccounts.length === 0) return;
-    const acc = userAccounts.find(a => a.id === selectedAccountId);
-    if (acc) {
-      setAccount(acc);
-      setMembers([]);
-      const fs = acc.fontSize || "medium";
-      localStorage.setItem("expenseFontSize", fs);
-      window.dispatchEvent(new CustomEvent("expenseFontSizeChange", { detail: fs }));
-    }
-  }, [selectedAccountId, userAccounts]);
-
-  useEffect(() => {
-    if (!account?.memberIds) return;
-    setMembers([]);
-    const ids = [...account.memberIds];
-    const unsubs = ids.map(uid => onSnapshot(doc(db, "users", uid), snap => {
-      if (snap.exists()) setMembers(prev => [...prev.filter(m => m.uid !== uid), { uid, ...snap.data() }]);
-    }));
-    return () => unsubs.forEach(u => u());
-  }, [account?.memberIds?.join(",")]);
-
-  useEffect(() => {
-    if (!account?.id) return;
-    const q = query(collection(db, "expenses"), where("accountId", "==", account.id), orderBy("date", "desc"));
-    return onSnapshot(q, snap => { setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-  }, [account?.id]);
-
-  useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "categories"), snap => { setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
-  useEffect(() => { if (!account?.id) return; return onSnapshot(collection(db, "accounts", account.id, "fixedExpenses"), snap => { setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
-  useEffect(() => { if (!account?.id) return; return onSnapshot(query(collection(db, "accounts", account.id, "settlements"), orderBy("date", "desc")), snap => { setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }); }, [account?.id]);
 
   // ── allMembers normalizado — fuente única via buildAllMembers() ──
   // Todos los componentes que reciben allMembers pueden confiar en que
@@ -385,7 +349,7 @@ function AppInner() {
     setDeleteWarning, sendNotification,
   });
 
-  const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setAccount(null); setMembers([]); setShowWelcome(true); };
+  const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setShowWelcome(true); };
 
   useEffect(() => {
     if (account?.type === "personal" && tab === "saldos") setTab("home");
