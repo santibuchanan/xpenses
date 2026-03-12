@@ -29,7 +29,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
-  const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
+  const allCategories = customCategories || [];
 
   const perspectiveType = getPerspectiveType(expense, currentUser?.uid);
   const [form, setForm]   = useState({ ...expense });

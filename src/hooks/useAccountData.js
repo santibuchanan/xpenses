@@ -72,17 +72,7 @@ export function useAccountData(accountIds, selectedAccountId, authUser, userProf
       return;
     }
 
-    // FIX PROBLEMA RAÍZ: seed inmediato con el usuario actual.
-    // members[] nunca queda vacío mientras Firestore carga —
-    // el usuario actual está disponible sincrónicamente desde authUser.
-    const seedMember = authUser ? {
-      uid:   authUser.uid,
-      name:  userProfile?.name || authUser.displayName || "Vos",
-      color: userProfile?.color || "#4F7FFA",
-      _seed: true, // marcador temporal, se sobreescribe cuando llega el snap real
-    } : null;
-
-    setMembers(seedMember ? [seedMember] : []);
+    setMembers([]);
 
     const ids = [...account.memberIds];
     const unsubs = ids.map(uid =>

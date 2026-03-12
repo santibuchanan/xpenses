@@ -17,7 +17,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
+  const allCategories = customCategories || [];
   const defaultType = isPersonal ? "mio" : "hogar";
 
   // Normalizar allMembers garantizando que todos tengan .uid

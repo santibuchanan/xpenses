@@ -25,6 +25,7 @@ const SettingsScreen = lazy(() => import("./SettingsScreen"));
 
 // Utilidad centralizada de normalización de miembros
 import { buildAllMembers } from "./utils/normalizeMembers.js";
+import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');`;
@@ -335,6 +336,13 @@ function AppInner() {
   // cada elemento tiene { uid, name, color, _isLabel } garantizados.
   const allMembers = buildAllMembers(members, account?.memberLabels);
 
+  // Categorías activas = DEFAULT sin las desactivadas + custom de la subcolección
+  const activeCategories = useMemo(() => {
+    const disabled = account?.disabledCategories || [];
+    const activeDefaults = DEFAULT_CATEGORIES.filter(c => !disabled.includes(c.id));
+    return [...activeDefaults, ...(customCategories || [])];
+  }, [account?.disabledCategories, customCategories]);
+
   // FIX: visibleFixed calculado una vez aquí — HomeScreen y SaldosScreen lo reciben como prop
   const visibleFixed = useMemo(
     () => (fixedExpenses || []).filter(f => f.shared || f.createdBy === authUser?.uid),
@@ -425,8 +433,8 @@ function AppInner() {
       </div>
 
       {/* Modales */}
-      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={customCategories} isPersonal={isPersonal} />}
-      {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={customCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}
+      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={activeCategories} isPersonal={isPersonal} />}
+      {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={activeCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
       {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
 

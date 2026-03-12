@@ -601,7 +601,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {allCategories.map(c => (
             <button key={c.id} onClick={() => setEditingCategory(c)} style={{ padding: "9px 14px", borderRadius: 20, border: `2px solid ${colors.inputBorder}`, fontSize: 13, cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: 6, background: colors.input, color: colors.text }}>
-              {c.icon} {c.label} <span style={{ fontSize: 10, color: colors.textMuted }}>✏️</span>
+              {c.icon} {c.label}
             </button>
           ))}
           <button onClick={() => setEditingCategory({ id: null, label: "", icon: "📦", isNew: true })} style={{ padding: "9px 14px", borderRadius: 20, border: "2px dashed #4F7FFA", fontSize: 13, cursor: "pointer", fontFamily: FONT, color: "#4F7FFA", background: "#4F7FFA08", fontWeight: 600 }}>
