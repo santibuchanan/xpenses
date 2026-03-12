@@ -12,7 +12,6 @@ import {
   collection, query, where, orderBy, onSnapshot,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { getExpenseCutoffMonth } from "../utils/expenseFilters";
 
 export function useFirestoreData(accountId) {
   const [expenses,         setExpenses]         = useState([]);
@@ -28,12 +27,9 @@ export function useFirestoreData(accountId) {
       setExpenses([]);
       return;
     }
-    const cutoff = getExpenseCutoffMonth(6);
     const q = query(
       collection(db, "expenses"),
       where("accountId", "==", accountId),
-      where("month", ">=", cutoff),
-      orderBy("month", "desc"),
       orderBy("date", "desc")
     );
     return onSnapshot(q, snap => {
