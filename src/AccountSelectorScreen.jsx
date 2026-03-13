@@ -3,7 +3,7 @@
  * Lista de cuentas del usuario + tabs de notificaciones y perfil.
  * La creación de nueva cuenta fue extraída a CreateAccountScreen.jsx
  */
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
@@ -87,6 +87,13 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
 function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
   const { setManualTheme } = useTheme();
   const [editingField,      setEditingField]      = useState(null);
+  const [sheetDragY,  setSheetDragY]  = useState(0);
+  const sheetDragging = useRef(false);
+  const sheetStartY   = useRef(null);
+  const onSheetTouchStart = (e) => { sheetStartY.current = e.touches[0].clientY; sheetDragging.current = true; };
+  const onSheetTouchMove  = (e) => { if (!sheetDragging.current) return; const dy = e.touches[0].clientY - sheetStartY.current; if (dy > 0) setSheetDragY(dy); };
+  const onSheetTouchEnd   = () => { if (sheetDragY > 80) setEditingField(null); else setSheetDragY(0); sheetDragging.current = false; sheetStartY.current = null; };
+  const closeSheet = () => { setSheetDragY(0); setEditingField(null); };
   const [fieldValue,        setFieldValue]        = useState("");
   const [saving,            setSaving]            = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -98,7 +105,7 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
   const displayName = userProfile?.name  || user.displayName || "Usuario";
   const alias       = userProfile?.alias || "";
 
-  const openEdit = (field, current) => { setEditingField(field); setFieldValue(current || ""); };
+  const openEdit = (field, current) => { setSheetDragY(0); setEditingField(field); setFieldValue(current || ""); };
 
   const saveField = async () => {
     setSaving(true);
@@ -182,10 +189,18 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
 
       {editingField && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
-          onClick={() => setEditingField(null)}>
-          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+          onClick={closeSheet}>
+          <div
+            onClick={e => e.stopPropagation()}
+            onTouchStart={onSheetTouchStart}
+            onTouchMove={onSheetTouchMove}
+            onTouchEnd={onSheetTouchEnd}
+            style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT,
+              transform: `translateY(${sheetDragY}px)`,
+              transition: sheetDragging.current ? "none" : "transform 0.3s ease" }}>
+            <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
+              <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
+            </div>
 
             {(editingField === "name" || editingField === "alias") && (
               <>
@@ -206,12 +221,12 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
               <>
                 <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Modo</p>
                 {[["auto","Automático"],["dark","Oscuro"],["light","Claro"]].map(([val, lbl]) => (
-                  <button key={val} onClick={async () => {
+                  <button key={val} onClick={() => {
                     setFieldValue(val);
                     if (val === "auto") { setManualTheme(null); localStorage.removeItem("xpenses-theme"); }
                     else { setManualTheme(val); localStorage.setItem("xpenses-theme", val); }
-                    await setDoc(doc(db, "users", user.uid), { theme: val }, { merge: true });
-                    setEditingField(null);
+                    closeSheet(); // cerrar inmediatamente, sin esperar Firestore
+                    setDoc(doc(db, "users", user.uid), { theme: val }, { merge: true }); // fire and forget
                   }}
                     style={{ width: "100%", padding: "14px 16px", borderRadius: 14, border: `2px solid ${fieldValue === val ? "#4F7FFA" : colors.inputBorder}`, background: fieldValue === val ? "#4F7FFA11" : colors.input, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: FONT }}>
                     <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: fieldValue === val ? "#4F7FFA" : colors.text, fontFamily: FONT }}>{lbl}</p>
