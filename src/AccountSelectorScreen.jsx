@@ -6,7 +6,7 @@ import { useNotif, SwipeableNotifRow } from "./notifications.jsx";
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
-const EMOJI_OPTIONS = ["👩🏼‍❤️‍👨🏼","🏠","🚙","🏟️","🍔","💃🏾","🏝️","🛫","🏥","🐶","🐱","🍣","🎂","🍺","🍾","⚽️","🏋🏽‍♂️","🏂","⛷️","💻"];
+const EMOJI_OPTIONS = ["👩🏼‍❤️‍👨🏼","🏠","🚙","🏟️","🍔","💃🏾","🏝️","🛫","🏥","🐶","🐱","🍣","🎂","🍺","🍾","⚽️","🏋🏽‍♂️","🏂","⛷️","💻","🚁","🥊","🧳","🎓"];
 
 const DIVISION_SYSTEMS = [
   { id: "proportional", label: "Proporcional al ingreso", icon: "📊", desc: "Ideal para parejas que conviven. Cada uno aporta según su sueldo." },
