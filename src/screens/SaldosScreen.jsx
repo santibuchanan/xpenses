@@ -293,7 +293,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
           const showPct = account?.divisionSystem === "proportional" && totalSalary > 0;
           const pct = showPct ? ((m.salary || 0) / totalSalary * 100).toFixed(0) : null;
           // ¿Este miembro tiene deuda pendiente hacia alguien?
-          const myDebts = debtPairs.filter(p => p.debtorUid === m.uid && !settledPairs[p.debtorUid + "-" + p.creditorUid]);
+          const myDebts = debtPairs.filter(p => p.debtorUid === m.uid && p.amount > 0 && !settledPairs[p.debtorUid + "-" + p.creditorUid]);
 
           return (
             <div key={m.uid} style={{
@@ -340,19 +340,18 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       {debtPairs.length > 0 && (
         <div style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, margin: "0 0 10px", fontFamily: FONT }}>Quién le debe a quién</p>
-          {debtPairs.map(pair => {
+          {debtPairs.filter(pair => pair.amount > 0).map(pair => {
             const debtor   = realMembers.find(m => m.uid === pair.debtorUid);
             const creditor = realMembers.find(m => m.uid === pair.creditorUid);
             const isSettled = !!settledPairs[pair.debtorUid + "-" + pair.creditorUid];
             return (
               <div key={pair.debtorUid + "-" + pair.creditorUid}
                 style={{ display: "flex", alignItems: "center", gap: 10, paddingVertical: 6, marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: isSettled ? colors.textMuted : colors.text, fontFamily: FONT, flex: 1,
-                  textDecoration: isSettled ? "line-through" : "none" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: isSettled ? colors.textMuted : colors.text, fontFamily: FONT, flex: 1 }}>
                   {debtor?.name} → {creditor?.name}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: isSettled ? colors.textMuted : colors.danger, fontFamily: FONT, flexShrink: 0 }}>
-                  {isSettled ? "✅" : fmt(pair.amount)}
+                <span style={{ fontSize: 13, fontWeight: 700, color: isSettled ? "#4F7FFA" : colors.danger, fontFamily: FONT, flexShrink: 0 }}>
+                  {isSettled ? fmt(0) : fmt(pair.amount)}
                 </span>
               </div>
             );
