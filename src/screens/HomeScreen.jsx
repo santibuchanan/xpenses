@@ -204,12 +204,17 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const [filterType, setFilterType] = useState("todos");
   const filtered = filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.category === filterType);
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth && !s.isCorrection && s.amount > 0);
-  // Ordenar por fecha desc, luego por createdAt desc (más reciente primero)
-  const sorted = [...filtered].sort((a, b) => {
-    const dateDiff = (b.date || "").localeCompare(a.date || "");
-    if (dateDiff !== 0) return dateDiff;
-    return (b.createdAt || "").localeCompare(a.createdAt || "");
-  });
+
+  // Lista unificada: gastos + settlements mezclados por fecha+createdAt desc
+  const sortKey = item => {
+    // settlements usan s.date (YYYY-MM-DD) + s.id como tiebreaker (Firestore genera IDs cronológicos)
+    // gastos usan e.date + e.createdAt
+    if (item._type === "settlement") return (item.date || "") + "T" + (item.createdAt || item.id || "");
+    return (item.date || "") + "T" + (item.createdAt || "");
+  };
+  const settlementsAsItems = isPersonal ? [] : monthSettlements.map(s => ({ ...s, _type: "settlement" }));
+  const sorted = [...filtered.map(e => ({ ...e, _type: "expense" })), ...settlementsAsItems]
+    .sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
 
   const [fixedExpanded,         setFixedExpanded]         = useState(false);
   const [fixedSharedExpanded,   setFixedSharedExpanded]   = useState(false);
@@ -353,27 +358,28 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
             <p style={{ margin: 0, fontFamily: FONT }}>Sin gastos este mes</p>
           </Card>
         )}
-        {sorted.map(e => (
-          <SwipeableExpenseRow key={`${e.id}-${e.deleted ? "del" : "ok"}`} e={e} allCategories={allCategories} allMembers={allMembers} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} isPersonal={isPersonal} currentUser={currentUser} />
-        ))}
-
-        {!isPersonal && monthSettlements.map(s => {
-          const debtor   = allMembers?.find(m => m.uid === s.debtorUid);
-          const creditor = allMembers?.find(m => m.uid === s.creditorUid);
-          return (
-            <div key={s.id} style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 22 }}>🫱🏼‍🫲🏾</span>
-                <div>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>
-                    {debtor?.name || "?"} saldó con {creditor?.name || "?"}
-                  </p>
-                  <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(s.date)}</p>
-                  <Tag color="#2ecc71">{s.full ? "Saldo total" : "Saldo parcial"}</Tag>
+        {sorted.map(item => {
+          if (item._type === "settlement") {
+            const debtor   = allMembers?.find(m => m.uid === item.debtorUid);
+            const creditor = allMembers?.find(m => m.uid === item.creditorUid);
+            return (
+              <div key={item.id} style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow, marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 22 }}>🫱🏼‍🫲🏾</span>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>
+                      {debtor?.name || "?"} saldó con {creditor?.name || "?"}
+                    </p>
+                    <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>{fmtDate(item.date)}</p>
+                    <Tag color="#2ecc71">{item.full ? "Saldo total" : "Saldo parcial"}</Tag>
+                  </div>
                 </div>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT, flexShrink: 0, marginLeft: 8 }}>{fmt(item.amount)}</p>
               </div>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT, flexShrink: 0, marginLeft: 8 }}>{fmt(s.amount)}</p>
-            </div>
+            );
+          }
+          return (
+            <SwipeableExpenseRow key={`${item.id}-${item.deleted ? "del" : "ok"}`} e={item} allCategories={allCategories} allMembers={allMembers} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} isPersonal={isPersonal} currentUser={currentUser} />
           );
         })}
         <div style={{ height: 120 }} />
