@@ -19,26 +19,36 @@ function SectionTitle({ children, style = {} }) {
   return <p style={{ fontSize: 20, fontWeight: 700, margin: "22px 0 10px", color: colors.text, fontFamily: FONT, ...style }}>{children}</p>;
 }
 
-// ── MODAL SALDAR (total o parcial) ──
-function SettleModal({ debtor, creditor, totalDebt, fmt, currencySymbol, colors, onFullSettle, onPartialSettle, onClose }) {
+// ── MODAL SALDAR (soporta múltiples acreedores) ──
+// debts = [{ debtorUid, creditorUid, amount }]
+function SettleModal({ debtor, debts, members, fmt, currencySymbol, colors, onFullSettle, onPartialSettle, onClose }) {
+  // selectedDebt: cuál par deudor/acreedor estamos saldando ahora
+  const [selectedDebt, setSelectedDebt] = useState(debts.length === 1 ? debts[0] : null);
   const [mode, setMode]     = useState(null); // null | "partial"
-  const [amount, setAmount] = useState(totalDebt.toString());
+  const [amount, setAmount] = useState("");
   const [date, setDate]     = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
   const parsed = parseFloat(amount) || 0;
-  const valid  = parsed > 0 && parsed <= totalDebt;
+  const valid  = selectedDebt && parsed > 0 && parsed <= selectedDebt.amount;
   const symbolWidth = (currencySymbol || "$").length > 1 ? 38 : 30;
 
+  const selectDebt = (debt) => {
+    setSelectedDebt(debt);
+    setAmount(debt.amount.toString());
+    setMode(null);
+  };
+
   const handleFull = async () => {
+    if (!selectedDebt) return;
     setLoading(true);
-    await onFullSettle();
+    await onFullSettle(selectedDebt.debtorUid, selectedDebt.creditorUid, selectedDebt.amount);
     setLoading(false);
   };
 
   const handlePartial = async () => {
     if (!valid) return;
     setLoading(true);
-    await onPartialSettle({ debtorUid: debtor.uid, creditorUid: creditor.uid, amount: parsed, date });
+    await onPartialSettle({ debtorUid: selectedDebt.debtorUid, creditorUid: selectedDebt.creditorUid, amount: parsed, date });
     setLoading(false);
   };
 
@@ -47,51 +57,81 @@ function SettleModal({ debtor, creditor, totalDebt, fmt, currencySymbol, colors,
       <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
 
-        <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 4px", fontFamily: FONT }}>
-          {debtor.name} le debe a {creditor.name}
-        </p>
-        <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>
-          Deuda pendiente: <span style={{ fontWeight: 700, color: colors.text }}>{fmt(totalDebt)}</span>
+        <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>
+          Saldar deuda — {debtor?.name}
         </p>
 
-        {mode === null && (
-          <>
-            <button onClick={handleFull} disabled={loading}
-              style={{ width: "100%", padding: 15, borderRadius: 14, background: loading ? "#aaa" : "linear-gradient(135deg,#2ecc71,#27ae60)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10 }}>
-              {loading ? "Guardando..." : `✅ Saldar todo — ${fmt(totalDebt)}`}
-            </button>
-            <button onClick={() => setMode("partial")}
-              style={{ width: "100%", padding: 15, borderRadius: 14, background: colors.pill, color: colors.text, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>
-              💸 Saldar parcialmente
-            </button>
-          </>
+        {/* Si hay múltiples acreedores, mostrar selector */}
+        {debts.length > 1 && (
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8, fontFamily: FONT }}>¿Con quién?</p>
+            {debts.map(d => {
+              const creditor = members.find(m => m.uid === d.creditorUid);
+              const isSelected = selectedDebt?.creditorUid === d.creditorUid;
+              return (
+                <button key={d.creditorUid} onClick={() => selectDebt(d)}
+                  style={{ width: "100%", padding: "12px 16px", borderRadius: 14, border: `2px solid ${isSelected ? "#2ecc71" : colors.inputBorder}`, background: isSelected ? "#2ecc7111" : colors.input, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: FONT }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 16, background: (creditor?.color || "#4F7FFA") + "22", border: `2px solid ${creditor?.color || "#4F7FFA"}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: creditor?.color || "#4F7FFA", fontFamily: FONT }}>
+                      {creditor?.name?.[0]?.toUpperCase() || "?"}
+                    </div>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{creditor?.name}</p>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: colors.danger, fontFamily: FONT }}>{fmt(d.amount)}</p>
+                </button>
+              );
+            })}
+          </div>
         )}
 
-        {mode === "partial" && (
-          <>
-            <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, fontFamily: FONT }}>Monto a saldar</p>
-            <div style={{ position: "relative", marginBottom: 14 }}>
-              <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontFamily: FONT, fontSize: 13 }}>{currencySymbol || "$"}</span>
-              <input
-                type="number" inputMode="decimal"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                style={{ width: "100%", padding: `13px 14px 13px ${symbolWidth}px`, borderRadius: 14, border: `2px solid ${valid || !amount ? colors.inputBorder : "#e74c3c"}`, fontSize: 15, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
-              />
-            </div>
-            {parsed > totalDebt && <p style={{ fontSize: 12, color: "#e74c3c", margin: "-10px 0 12px", fontFamily: FONT }}>No puede superar la deuda ({fmt(totalDebt)})</p>}
-            <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, fontFamily: FONT }}>Fecha del pago</p>
-            <DateInput value={date} onChange={setDate} />
-            <button onClick={handlePartial} disabled={!valid || loading}
-              style={{ width: "100%", padding: 15, borderRadius: 14, background: !valid || loading ? "#aaa" : "linear-gradient(135deg,#2ecc71,#27ae60)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: !valid || loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10, marginTop: 4 }}>
-              {loading ? "Guardando..." : `Registrar pago de ${fmt(parsed)}`}
-            </button>
-            <button onClick={() => setMode(null)}
-              style={{ width: "100%", padding: 13, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 14, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
-              ← Volver
-            </button>
-          </>
-        )}
+        {/* Una vez seleccionado el acreedor, mostrar opciones */}
+        {selectedDebt && (() => {
+          const creditor = members.find(m => m.uid === selectedDebt.creditorUid);
+          return (
+            <>
+              {debts.length === 1 && (
+                <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 16px", fontFamily: FONT }}>
+                  Le debe a <span style={{ fontWeight: 700, color: colors.text }}>{creditor?.name}</span> · <span style={{ fontWeight: 700, color: colors.text }}>{fmt(selectedDebt.amount)}</span>
+                </p>
+              )}
+
+              {mode === null && (
+                <>
+                  <button onClick={handleFull} disabled={loading}
+                    style={{ width: "100%", padding: 15, borderRadius: 14, background: loading ? "#aaa" : "linear-gradient(135deg,#2ecc71,#27ae60)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10 }}>
+                    {loading ? "Guardando..." : `✅ Saldar todo — ${fmt(selectedDebt.amount)}`}
+                  </button>
+                  <button onClick={() => { setMode("partial"); setAmount(""); }}
+                    style={{ width: "100%", padding: 15, borderRadius: 14, background: colors.pill, color: colors.text, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>
+                    💸 Saldar parcialmente
+                  </button>
+                </>
+              )}
+
+              {mode === "partial" && (
+                <>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, fontFamily: FONT }}>Monto a saldar</p>
+                  <div style={{ position: "relative", marginBottom: 14 }}>
+                    <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontFamily: FONT, fontSize: 13 }}>{currencySymbol || "$"}</span>
+                    <input type="number" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}
+                      style={{ width: "100%", padding: `13px 14px 13px ${symbolWidth}px`, borderRadius: 14, border: `2px solid ${valid || !amount ? colors.inputBorder : "#e74c3c"}`, fontSize: 15, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }} />
+                  </div>
+                  {parsed > selectedDebt.amount && <p style={{ fontSize: 12, color: "#e74c3c", margin: "-10px 0 12px", fontFamily: FONT }}>No puede superar la deuda ({fmt(selectedDebt.amount)})</p>}
+                  <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, fontFamily: FONT }}>Fecha del pago</p>
+                  <DateInput value={date} onChange={setDate} />
+                  <button onClick={handlePartial} disabled={!valid || loading}
+                    style={{ width: "100%", padding: 15, borderRadius: 14, background: !valid || loading ? "#aaa" : "linear-gradient(135deg,#2ecc71,#27ae60)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: !valid || loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10, marginTop: 4 }}>
+                    {loading ? "Guardando..." : `Registrar pago de ${fmt(parsed)}`}
+                  </button>
+                  <button onClick={() => setMode(null)}
+                    style={{ width: "100%", padding: 13, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 14, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+                    ← Volver
+                  </button>
+                </>
+              )}
+            </>
+          );
+        })()}
 
         <button onClick={onClose} style={{ width: "100%", padding: 13, borderRadius: 14, background: "none", color: colors.textMuted, border: "none", fontSize: 14, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
       </div>
@@ -188,7 +228,12 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
         createdAt: new Date().toISOString(),
       });
       setSettledPairs(p => ({ ...p, [debtorUid + "-" + creditorUid]: true }));
-      setSettleModal(null);
+      // Si el deudor ya no tiene más deudas pendientes, cerrar modal
+      setSettleModal(prev => {
+        if (!prev) return null;
+        const remaining = prev.debts.filter(d => d.creditorUid !== creditorUid);
+        return remaining.length === 0 ? null : { ...prev, debts: remaining };
+      });
       await sendNotification({
         type: NOTIF_TYPES.ACCOUNT_SETTLED,
         title: "¡Cuentas saldadas! 🎉",
@@ -248,7 +293,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
           const showPct = account?.divisionSystem === "proportional" && totalSalary > 0;
           const pct = showPct ? ((m.salary || 0) / totalSalary * 100).toFixed(0) : null;
           // ¿Este miembro tiene deuda pendiente hacia alguien?
-          const myDebt = debtPairs.find(p => p.debtorUid === m.uid && !settledPairs[p.debtorUid + "-" + p.creditorUid]);
+          const myDebts = debtPairs.filter(p => p.debtorUid === m.uid && !settledPairs[p.debtorUid + "-" + p.creditorUid]);
 
           return (
             <div key={m.uid} style={{
@@ -272,14 +317,14 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
               {/* Balance */}
               <p style={{ margin: 0, fontWeight: 700, fontSize: 16, fontFamily: FONT, flexShrink: 0,
-                color: s.balance > 0.01 ? colors.success : s.balance < -0.01 ? colors.danger : colors.textMuted }}>
+                color: s.balance > 0.01 ? colors.success : s.balance < -0.01 ? colors.danger : "#4F7FFA" }}>
                 {s.balance > 0.01 ? "+" : ""}{fmt(s.balance)}
               </p>
 
               {/* Botón Saldar — solo si este miembro tiene deuda pendiente */}
-              {myDebt ? (
+              {myDebts.length > 0 ? (
                 <button
-                  onClick={() => setSettleModal({ debtorUid: m.uid, creditorUid: myDebt.creditorUid, amount: myDebt.amount })}
+                  onClick={() => setSettleModal({ debtorUid: m.uid, debts: myDebts })}
                   style={{ flexShrink: 0, marginLeft: 8, padding: "7px 14px", borderRadius: 20, background: "#2ecc7118", color: "#2ecc71", border: "1px solid #2ecc7144", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
                   Saldar
                 </button>
@@ -360,23 +405,19 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
       <div style={{ height: 120 }} />
 
-      {settleModal && (() => {
-        const debtor   = realMembers.find(m => m.uid === settleModal.debtorUid);
-        const creditor = realMembers.find(m => m.uid === settleModal.creditorUid);
-        return (
-          <SettleModal
-            debtor={debtor}
-            creditor={creditor}
-            totalDebt={settleModal.amount}
-            fmt={fmt}
-            currencySymbol={CURRENCIES[account?.currency || "ARS"]?.symbol || "$"}
-            colors={colors}
-            onFullSettle={() => handleFullSettle(settleModal.debtorUid, settleModal.creditorUid, settleModal.amount)}
-            onPartialSettle={handlePartialSettle}
-            onClose={() => setSettleModal(null)}
-          />
-        );
-      })()}
+      {settleModal && (
+        <SettleModal
+          debtor={realMembers.find(m => m.uid === settleModal.debtorUid)}
+          debts={settleModal.debts}
+          members={realMembers}
+          fmt={fmt}
+          currencySymbol={CURRENCIES[account?.currency || "ARS"]?.symbol || "$"}
+          colors={colors}
+          onFullSettle={handleFullSettle}
+          onPartialSettle={handlePartialSettle}
+          onClose={() => setSettleModal(null)}
+        />
+      )}
 
       {showPassDebt && (
         <PassDebtModal
