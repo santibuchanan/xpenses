@@ -11,7 +11,7 @@ const CURRENCY_SYMBOLS = Object.fromEntries(CURRENCY_LIST.map(c => [c.code, c.sy
 const MEMBER_COLORS = ["#4F7FFA","#FA4F7F","#2ecc71","#f39c12","#9b59b6","#1abc9c","#e74c3c","#3498db"];
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 import { removeMember } from "./hooks/removeMember.js";
-const EMOJI_OPTIONS = ["🏠","🛒","🧹","🪴","💡","🍕","🌮","🍔","🍦","☕","🍺","🚗","🚙","🛵","✈️","🛩️","🚁","💊","🏋️","🧴","🏥","👗","💈","👟","📱","💻","🎮","🐶","🐱","🎁","📦","🔥","🥰","🦅","🏟️","🏢","🎵","🎬","🏖️","⚽️","🎓","📚"];
+const EMOJI_OPTIONS = ["🛒","🍕","💡","🚗","💊","👗","🏠","📦","🐶","✈️","🏋️","📚","📱","🎮","🍺","☕","🎁","💈","🎵","🏥","🌮","🧴","🎬","🏖️","🎓","💻","🛵","🧹","🪴","🐱","⚽️","🔥","🍔","👩🏼‍❤️‍👨🏼","💃🏾","🏝️","🛫","🍣","🎂","🍾","🏂","⛷️"];
 
 function SectionHeader({ title, colors }) {
   return <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 1.2, textTransform: "uppercase", margin: "24px 0 8px", fontFamily: FONT }}>{title}</p>;

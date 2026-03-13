@@ -5,7 +5,7 @@ import { CURRENCIES } from "./theme.jsx";
 
 const SF_PRO = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
 
-const EMOJI_OPTIONS = ["🏠","🛒","🧹","🪴","💡","🍕","🌮","🍔","🍦","☕","🍺","🚗","🚙","🛵","✈️","🛩️","🚁","💊","🏋️","🧴","🏥","👗","💈","👟","📱","💻","🎮","🐶","🐱","🎁","📦","🔥","🥰","🦅","🏟️","🏢","🎵","🎬","🏖️","⚽️","🎓","📚"];
+const EMOJI_OPTIONS = ["👩🏼‍❤️‍👨🏼","🏠","🚙","🏟️","🍔","💃🏾","🏝️","🛫","🏥","🐶","🐱","🍣","🎂","🍺","🍾","⚽️","🏋🏽‍♂️","🏂","⛷️","💻"];
 
 const DIVISION_SYSTEMS = [
   { id: "proportional", label: "Proporcional al ingreso", desc: "Ideal para parejas que conviven. Cada uno aporta según su sueldo.", icon: "📊" },
