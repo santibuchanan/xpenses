@@ -95,7 +95,8 @@ export function useExpenses({
 
       // 2. Settlement correctivo si hay settlements activos en el mes
       if (addCorrectiveSettlement && account?.id) {
-        const realMembers = members.filter(m => !m._isLabel);
+        // Incluir labels — tienen uid estable y participan en gastos (paidBy/forWhom)
+        const realMembers = members.filter(m => !!m.uid);
         const totalSalary = realMembers.reduce((s, m) => s + (m.salary || 0), 0);
         const delta = {};
         realMembers.forEach(m => { delta[m.uid] = 0; });

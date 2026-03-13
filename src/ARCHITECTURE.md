@@ -2,7 +2,7 @@
 
 > **Propósito de este documento:** Referencia de arquitectura que debe consultarse antes de cada sprint. Su objetivo es evitar regresiones: si un cambio toca una zona marcada como "frágil" o modifica un contrato de datos, debe ser tratado con especial cuidado y verificado explícitamente.
 
-**Última actualización:** Sprint 5  
+**Última actualización:** Sprint 5 + hotfixes post-deploy  
 **Deploy:** https://xpenses-seven.vercel.app  
 **Firebase project:** xpenses-305ee
 
@@ -118,7 +118,12 @@ const allMembers = [
 ```
 
 **Componentes que reciben `allMembers`:**
-- `HomeScreen` → filtra por `_isLabel` para `realMembers` en `calcSaldos`
+- `HomeScreen` → filtra por `_isLabel` para `realMembers` en `calcSaldos` (solo muestra balance del usuario actual, labels no necesarios)
+- `SaldosScreen` → NO filtra por `_isLabel` — incluye labels porque tienen uid estable y los gastos referencian ese uid en paidBy/forWhom
+- `useExpenses.otherMembers()` → filtra `_isLabel` porque es para notificaciones (no se notifica a labels)
+- `useExpenses.deleteExpense` → NO filtra `_isLabel` en settlement correctivo — labels participan en gastos y el delta debe incluirlos para que la matemática sea correcta
+
+REGLA: usar `_isLabel` para excluir solo cuando la operación requiere un usuario real de Firebase Auth (notificaciones, auth checks). NO usar para cálculos de saldo — los labels participan en gastos con su uid propio.
 - `SaldosScreen` → usa directamente como `members` en `calcSaldos`
 - `AddExpenseModal` → normaliza internamente con `.uid = m.uid || m.id`
 - `MarkPaidModal` (en App.jsx) → normaliza internamente con `.uid = m.uid || m.id`
@@ -483,7 +488,7 @@ Esta sección refleja el comportamiento **esperado y confirmado** al final del S
 | Item | Impacto | Esfuerzo |
 |------|---------|----------|
 | `App.jsx` demasiado grande — `HomeScreen`, `SaldosScreen`, `GraficosScreen` deberían ser archivos propios | Cada modificación al archivo pone en riesgo las otras pantallas | Alto |
-| `calcSaldos()` debería vivir en `hooks/useBalances.js` | No se puede probar de forma aislada | Medio |
+| ~~`calcSaldos()` debería vivir en `hooks/useBalances.js`~~ | ✅ Completado en Sprint 5 — vive en `hooks/useBalances.js` | — |
 | `allMembers` debería normalizarse con una función centralizada (`normalizeMember()`) en lugar de inline en cada componente | Inconsistencias silenciosas cuando cambia la estructura | Medio |
 | Listeners duplicados de `categories` y `fixedExpenses` en `App.jsx` y `SettingsScreen` | Lecturas innecesarias de Firestore | Bajo |
 | Scroll lock de sheets no centralizado | Al agregar un nuevo sheet hay que recordar agregarlo manualmente | Bajo |
