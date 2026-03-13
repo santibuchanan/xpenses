@@ -51,8 +51,14 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
   };
   const onTouchEnd = () => {
     isDragging.current = false;
-    if (swipeX > DELETE_THRESHOLD / 2) { setSwipeX(DELETE_THRESHOLD); setSwiped(true); }
-    else { setSwipeX(0); setSwiped(false); }
+    if (swipeX > DELETE_THRESHOLD / 2) {
+      setSwipeX(0);
+      setSwiped(false);
+      onDeleteRequest(acc.id);
+    } else {
+      setSwipeX(0);
+      setSwiped(false);
+    }
     startX.current = null;
   };
 
@@ -63,26 +69,12 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
 
   return (
     <div style={{ position: "relative", marginBottom: 12, borderRadius: 20, overflow: "hidden" }}>
-      {/* Botón eliminar detrás */}
-      <div style={{
-        position: "absolute", right: 0, top: 0, bottom: 0, width: DELETE_THRESHOLD,
-        background: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center",
-        borderRadius: "0 20px 20px 0",
-      }}>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDeleteRequest(acc.id); }}
-          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 0 }}>
-          <span style={{ fontSize: 20 }}>🗑️</span>
-          <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
-        </button>
-      </div>
-
       {/* Fila deslizable */}
       <div
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        onClick={() => { if (swiped) { setSwipeX(0); setSwiped(false); } else { onSelect(acc.id); } }}
+        onClick={() => onSelect(acc.id)}
         style={{
           transform: `translateX(-${swipeX}px)`,
           transition: isDragging.current ? "none" : "transform 0.3s ease",
@@ -298,6 +290,10 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
   // FIX: ninguna categoría seleccionada por default — mínimo 1 obligatoria
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [catError,           setCatError]           = useState(false);
+  const [showNewCatModal,    setShowNewCatModal]    = useState(false);
+  const [newCatLabel,        setNewCatLabel]        = useState("");
+  const [newCatIcon,         setNewCatIcon]         = useState("📦");
+  const [customCats,         setCustomCats]         = useState([]);
   const [emojiError,         setEmojiError]         = useState(false);
   const [showCurrencySheet,  setShowCurrencySheet]  = useState(false);
 
@@ -316,6 +312,17 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
     setNewMemberName("");
   };
   const removeMember     = (idx) => setMembers(prev => prev.filter((_, i) => i !== idx));
+  const addCustomCat = () => {
+    const label = newCatLabel.trim();
+    if (!label) return;
+    const id = `custom_${Date.now()}`;
+    setCustomCats(prev => [...prev, { id, label, icon: newCatIcon }]);
+    setSelectedCategories(prev => [...prev, id]);
+    setNewCatLabel("");
+    setNewCatIcon("📦");
+    setCatError(false);
+  };
+
   const updateMemberName = (idx, val) => setMembers(prev => prev.map((m, i) => i === idx ? { ...m, name: val } : m));
 
   // FIX: todo en una sola página — handleCreate directo sin step "members"
@@ -380,6 +387,12 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
     }, { merge: true });
 
     setSaving(false);
+    // Guardar categorías custom creadas durante el setup
+    if (customCats.length > 0) {
+      await Promise.all(customCats.map(cat =>
+        addDoc(collection(db, "accounts", ref.id, "categories"), { label: cat.label, icon: cat.icon })
+      ));
+    }
     // FIX: navegar a tab "home" al crear cuenta
     onCreated(ref.id, "home");
   };
@@ -647,7 +660,7 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
               )}
               <p style={{ fontSize: 12, color: colors.textMuted, margin: "0 0 12px", fontFamily: FONT }}>Elegí las que vas a usar en esta cuenta</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {DEFAULT_CATEGORIES.map(c => {
+                {[...DEFAULT_CATEGORIES, ...customCats].map(c => {
                   const selected = selectedCategories.includes(c.id);
                   return (
                     <button key={c.id} onClick={() => {
@@ -661,6 +674,12 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
                     </button>
                   );
                 })}
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <button type="button" onClick={() => setShowNewCatModal(true)}
+                  style={{ padding: "8px 14px", borderRadius: 20, border: "2px dashed #4F7FFA", fontSize: 13, cursor: "pointer", fontFamily: FONT, color: "#4F7FFA", background: "#4F7FFA08", fontWeight: 600 }}>
+                  + Nueva
+                </button>
               </div>
               <p style={{ color: colors.textMuted, fontSize: 12, margin: "10px 0 0", fontFamily: FONT }}>
                 {selectedCategories.length} seleccionada{selectedCategories.length !== 1 ? "s" : ""}
@@ -748,6 +767,41 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
                   {selectedCurrency === c.code && <span style={{ color: "#4F7FFA", fontSize: 18 }}>✓</span>}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Modal nueva categoría */}
+        {showNewCatModal && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
+            <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
+              <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+              <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>Nueva categoría</p>
+              <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
+              <input
+                value={newCatLabel}
+                onChange={e => setNewCatLabel(e.target.value)}
+                placeholder="Ej: Mascotas"
+                style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 16, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+                autoFocus
+              />
+              <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Icono</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+                {EMOJI_OPTIONS.map(e => (
+                  <button type="button" key={e} onClick={() => setNewCatIcon(e)}
+                    style={{ width: 44, height: 44, borderRadius: 12, border: "2px solid", fontSize: 22, cursor: "pointer", borderColor: newCatIcon === e ? "#4F7FFA" : colors.inputBorder, background: newCatIcon === e ? "#4F7FFA11" : colors.input }}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={() => { addCustomCat(); setShowNewCatModal(false); }} disabled={!newCatLabel.trim()}
+                style={{ width: "100%", padding: 14, borderRadius: 14, background: newCatLabel.trim() ? "linear-gradient(135deg,#4F7FFA,#3a6ae8)" : "#ccc", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: newCatLabel.trim() ? "pointer" : "default", fontFamily: FONT, marginBottom: 8 }}>
+                Guardar
+              </button>
+              <button type="button" onClick={() => { setShowNewCatModal(false); setNewCatLabel(""); }}
+                style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
+                Cancelar
+              </button>
             </div>
           </div>
         )}
