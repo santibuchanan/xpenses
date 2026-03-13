@@ -99,7 +99,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
     setLoading(true);
     console.log("calling onAdd...");
     try {
-      await onAdd({ ...form, ...extra, amount, month: form.date.slice(0, 7) });
+      await onAdd({ ...form, amount, month: form.date.slice(0, 7) });
       console.log("onAdd success");
     } catch(e) {
       console.error("onAdd error", e);
