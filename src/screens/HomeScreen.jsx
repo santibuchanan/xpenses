@@ -204,7 +204,12 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const [filterType, setFilterType] = useState("todos");
   const filtered = filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.category === filterType);
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth && !s.isCorrection && s.amount > 0);
-  const sorted = [...filtered].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  // Ordenar por fecha desc, luego por createdAt desc (más reciente primero)
+  const sorted = [...filtered].sort((a, b) => {
+    const dateDiff = (b.date || "").localeCompare(a.date || "");
+    if (dateDiff !== 0) return dateDiff;
+    return (b.createdAt || "").localeCompare(a.createdAt || "");
+  });
 
   const [fixedExpanded,         setFixedExpanded]         = useState(false);
   const [fixedSharedExpanded,   setFixedSharedExpanded]   = useState(false);
@@ -228,17 +233,9 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
           <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Gastos — {monthLabel}</p>
           <p style={{ color: "#fff", fontSize: 36, fontWeight: 700, margin: "0 0 4px", letterSpacing: -1, fontFamily: FONT }}>{fmt(totalMonthExp)}</p>
           {!isPersonal && (
-            <div style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 8, background: myBalance > 0 ? "#2ecc7122" : myBalance < 0 ? "#ff6b6b22" : "#ffffff11", borderRadius: 12, padding: "8px 14px" }}>
-              <span style={{ fontSize: 18 }}>{myBalance > 0 ? "✅" : myBalance < 0 ? "⚠️" : "➖"}</span>
-              <div>
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", margin: 0, fontFamily: FONT, color: myBalance > 0 ? "#2ecc71" : myBalance < 0 ? "#ff6b6b" : "#ffffff88" }}>
-                  {myBalance > 0 ? "A favor" : myBalance < 0 ? "A pagar" : "Saldado"}
-                </p>
-                <p style={{ fontSize: 18, fontWeight: 700, margin: 0, fontFamily: FONT, color: myBalance > 0 ? "#2ecc71" : myBalance < 0 ? "#ff6b6b" : "#ffffff88" }}>
-                  {myBalance > 0 ? `+${fmt(myBalance)}` : myBalance < 0 ? `-${fmt(Math.abs(myBalance))}` : fmt(0)}
-                </p>
-              </div>
-            </div>
+            <p style={{ fontSize: 13, margin: "6px 0 0", fontFamily: FONT, color: myBalance > 0 ? "#2ecc71" : myBalance < 0 ? "#ff6b6b" : "#ffffff66", fontWeight: 600 }}>
+              {myBalance > 0 ? `+${fmt(myBalance)} a favor` : myBalance < 0 ? `-${fmt(Math.abs(myBalance))} a pagar` : "Saldado ✓"}
+            </p>
           )}
         </div>
       </div>
