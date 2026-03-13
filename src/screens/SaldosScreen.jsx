@@ -192,16 +192,11 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     setPartialModal(null);
   };
 
-  /**
-   * FIX #12: getRemainingDebt — antes era un stub que devolvía siempre
-   * el monto original, ignorando pagos parciales ya registrados.
-   * Ahora descuenta los settlements del mes para ese par deudor/acreedor.
-   */
+  // getRemainingDebt: el monto en debtPairs ya refleja la deuda real porque
+  // calcSaldos descuenta los settlements del balance. No hay que descontarlos
+  // de nuevo — solo devolvemos el monto tal cual viene del pair.
   const getRemainingDebt = (debtorUid, creditorUid, originalAmount) => {
-    const paid = monthSettlements
-      .filter(s => s.debtorUid === debtorUid && s.creditorUid === creditorUid)
-      .reduce((sum, s) => sum + (s.amount || 0), 0);
-    return Math.max(0, originalAmount - paid);
+    return originalAmount;
   };
 
   const nextMonth = (() => {
