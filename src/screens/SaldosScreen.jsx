@@ -130,7 +130,12 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   const monthExp = expenses.filter(e => e.month === currentMonth && !e.deleted);
   // Incluir labels no vinculados — tienen uid estable (label_0, label_1, etc.)
   // y los gastos les atribuyen paidBy/forWhom con ese mismo uid.
-  const realMembers = (members || []).filter(m => !!m.uid);
+  // Usuario actual siempre primero, resto en orden original
+  const realMembers = (members || []).filter(m => !!m.uid).sort((a, b) => {
+    if (a.uid === currentUser.uid) return -1;
+    if (b.uid === currentUser.uid) return 1;
+    return 0;
+  });
   // visibleFixed ya viene filtrado desde App.jsx via getVisibleFixed()
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth);
 
@@ -249,8 +254,8 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-              <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", fontFamily: FONT }}>Pagó</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.paid)}</p></div>
-              <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", fontFamily: FONT }}>Su parte</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.owes)}</p></div>
+              <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", fontFamily: FONT }}>{m.uid === currentUser.uid ? "Pagaste" : "Pagó"}</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.paid)}</p></div>
+              <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", fontFamily: FONT }}>{m.uid === currentUser.uid ? "Tu parte" : "Su parte"}</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.owes)}</p></div>
             </div>
             <div style={{ background: s.balance >= 0 ? colors.successBg : colors.dangerBg, borderRadius: 14, padding: 14, textAlign: "center" }}>
               <p style={{ margin: 0, fontWeight: 700, fontSize: 22, color: s.balance >= 0 ? colors.success : colors.danger, fontFamily: FONT }}>{s.balance >= 0 ? "+" : ""}{fmt(s.balance)}</p>
