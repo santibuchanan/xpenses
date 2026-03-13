@@ -145,15 +145,33 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   );
 
   const balances = realMembers.map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
-  const debtPairs = [];
-  balances.forEach(debtor => {
-    if (debtor.balance >= 0) return;
-    balances.forEach(creditor => {
-      if (creditor.balance <= 0) return;
-      const amount = Math.min(Math.abs(debtor.balance), creditor.balance);
-      if (amount > 0) debtPairs.push({ debtorUid: debtor.uid, creditorUid: creditor.uid, amount });
-    });
-  });
+  // Simplificación de deudas: genera el mínimo número de transacciones posible.
+  // En lugar de emparejar cada deudor con cada acreedor (N×M pares),
+  // se netean los balances en cascada: el deudor más grande paga al acreedor
+  // más grande, y el sobrante pasa al siguiente. Máximo N+M-1 transacciones.
+  const debtPairs = (() => {
+    const pairs = [];
+    // Copias mutables de balances para netear en cascada
+    const debtors   = balances.filter(m => m.balance < -0.01)
+                               .map(m => ({ ...m, remaining: Math.abs(m.balance) }))
+                               .sort((a, b) => b.remaining - a.remaining);
+    const creditors = balances.filter(m => m.balance > 0.01)
+                               .map(m => ({ ...m, remaining: m.balance }))
+                               .sort((a, b) => b.remaining - a.remaining);
+
+    let i = 0, j = 0;
+    while (i < debtors.length && j < creditors.length) {
+      const amount = Math.min(debtors[i].remaining, creditors[j].remaining);
+      if (amount > 0.01) {
+        pairs.push({ debtorUid: debtors[i].uid, creditorUid: creditors[j].uid, amount: Math.round(amount) });
+      }
+      debtors[i].remaining   -= amount;
+      creditors[j].remaining -= amount;
+      if (debtors[i].remaining   < 0.01) i++;
+      if (creditors[j].remaining < 0.01) j++;
+    }
+    return pairs;
+  })();
 
   const [partialModal, setPartialModal] = useState(null);
   const [showPassDebt, setShowPassDebt] = useState(false);
@@ -171,7 +189,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
         date: new Date().toISOString().slice(0, 10),
         month: currentMonth, full: true,
       });
-      setSettledPairs(p => ({ ...p, [debtorUid]: true }));
+      setSettledPairs(p => ({ ...p, [debtorUid + "-" + creditorUid]: true }));
       await sendNotification({
         type: NOTIF_TYPES.ACCOUNT_SETTLED,
         title: "¡Cuentas saldadas! 🎉",
@@ -273,11 +291,11 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
             const debtor   = realMembers.find(m => m.uid === pair.debtorUid);
             const creditor = realMembers.find(m => m.uid === pair.creditorUid);
             const remaining = getRemainingDebt(pair.debtorUid, pair.creditorUid, pair.amount);
-            const isSettled = remaining === 0 || settledPairs[pair.debtorUid];
+            const isSettled = remaining === 0 || settledPairs[pair.debtorUid + "-" + pair.creditorUid];
             const pairSettlements = monthSettlements.filter(s => s.debtorUid === pair.debtorUid && s.creditorUid === pair.creditorUid);
 
             return (
-              <div key={pair.debtorUid} style={{ marginBottom: 16 }}>
+              <div key={pair.debtorUid + "-" + pair.creditorUid} style={{ marginBottom: 16 }}>
                 <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 14, padding: "12px 14px", marginBottom: 8 }}>
                   <p style={{ margin: "0 0 2px", fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT }}>
                     {debtor?.name} le debe a {creditor?.name}
