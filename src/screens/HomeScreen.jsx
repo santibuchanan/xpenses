@@ -205,10 +205,9 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const filtered = filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.category === filterType);
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth && !s.isCorrection && s.amount > 0);
 
-  // Lista unificada: gastos + settlements mezclados por fecha+createdAt desc
-  // Ambos tipos usan date + createdAt. Los settlements antiguos sin createdAt
-  // usan su id de Firestore como fallback (cronológico por naturaleza).
-  const sortKey = item => (item.date || "") + "T" + (item.createdAt || item.id || "");
+  // Ordenar por createdAt desc (cuándo se creó el registro).
+  // Fallback a date+id para gastos viejos sin createdAt.
+  const sortKey = item => item.createdAt || (item.date || "") + "T" + (item.id || "");
   const settlementsAsItems = isPersonal ? [] : monthSettlements.map(s => ({ ...s, _type: "settlement" }));
   const sorted = [...filtered.map(e => ({ ...e, _type: "expense" })), ...settlementsAsItems]
     .sort((a, b) => sortKey(b).localeCompare(sortKey(a)));

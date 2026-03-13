@@ -42,6 +42,7 @@ export function useExpenses({
       ...expense,
       createdBy: authUser.uid,
       accountId: account?.id,
+      createdAt: new Date().toISOString(),
     });
 
     const others = otherMembers();
