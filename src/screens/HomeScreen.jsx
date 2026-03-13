@@ -179,8 +179,8 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const personalFixed = (visibleFixed || []).filter(f => !f.shared);
   const fixedTotal    = (visibleFixed || []).reduce((s, f) => s + (f.amount || 0), 0);
 
-  // Saldos — solo miembros reales (sin labels) para el cálculo
-  const realMembers = allMembers?.filter(m => !m._isLabel) || [];
+  // Saldos — incluir labels porque tienen uid estable y participan en gastos
+  const realMembers = allMembers?.filter(m => !!m.uid) || [];
   const allMonthSettlements = (settlements || []).filter(s => s.month === currentMonth);
   const saldos = useMemo(
     () => calcSaldos(sharedExp, isPersonal ? [] : visibleFixed, realMembers, account?.divisionSystem, currentMonth, allMonthSettlements),
