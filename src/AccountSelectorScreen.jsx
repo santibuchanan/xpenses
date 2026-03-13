@@ -116,7 +116,7 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
     setEditingField(null);
   };
 
-  const themeLabels = { auto: "Automático", dark: "Oscuro", light: "Claro" };
+  const themeLabels = { auto: "Automático", dark: "Oscuro", light: "Claro" }; // Modo
   const langLabels  = { es: "Español", en: "English" };
 
   const fieldRow = (key, label, value, currentVal) => (
@@ -146,7 +146,7 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
       {fieldRow("alias", "Alias",           alias || "Sin alias",   alias)}
 
       <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 1.2, textTransform: "uppercase", margin: "20px 0 8px", fontFamily: FONT }}>Preferencias</p>
-      {fieldRow("theme",    "Modo oscuro", themeLabels[currentTheme] || "Automático", currentTheme)}
+      {fieldRow("theme",    "Modo", themeLabels[currentTheme] || "Automático", currentTheme)}
       {fieldRow("language", "Idioma",      langLabels[currentLang]   || "Español",    currentLang)}
 
       <button onClick={onSignOut}
@@ -204,21 +204,20 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
 
             {editingField === "theme" && (
               <>
-                <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Modo oscuro</p>
-                {[["auto","Automático","Sigue la configuración del sistema"],["dark","Oscuro","Siempre oscuro"],["light","Claro","Siempre claro"]].map(([val, lbl, sub]) => (
-                  <button key={val} onClick={() => setFieldValue(val)}
+                <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Modo</p>
+                {[["auto","Automático"],["dark","Oscuro"],["light","Claro"]].map(([val, lbl]) => (
+                  <button key={val} onClick={async () => {
+                    setFieldValue(val);
+                    if (val === "auto") { setManualTheme(null); localStorage.removeItem("xpenses-theme"); }
+                    else { setManualTheme(val); localStorage.setItem("xpenses-theme", val); }
+                    await setDoc(doc(db, "users", user.uid), { theme: val }, { merge: true });
+                    setEditingField(null);
+                  }}
                     style={{ width: "100%", padding: "14px 16px", borderRadius: 14, border: `2px solid ${fieldValue === val ? "#4F7FFA" : colors.inputBorder}`, background: fieldValue === val ? "#4F7FFA11" : colors.input, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: FONT }}>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{lbl}</p>
-                      <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{sub}</p>
-                    </div>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: fieldValue === val ? "#4F7FFA" : colors.text, fontFamily: FONT }}>{lbl}</p>
                     {fieldValue === val && <span style={{ color: "#4F7FFA", fontSize: 18 }}>✓</span>}
                   </button>
                 ))}
-                <button onClick={saveField} disabled={saving}
-                  style={{ width: "100%", marginTop: 8, padding: 14, borderRadius: 14, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>
-                  {saving ? "Guardando..." : "Guardar"}
-                </button>
               </>
             )}
 

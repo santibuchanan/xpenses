@@ -38,12 +38,12 @@ function Spinner({ text = "Cargando..." }) {
 }
 
 function MenuIcon({ color = "#ffffffcc" }) {
+  // 3 líneas con la primera más corta (izquierda), estilo menú moderno
   return (
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-      <rect x="1.5" y="1.5" width="25" height="25" rx="7" stroke={color} strokeWidth="2"/>
-      <line x1="7" y1="9.5" x2="21" y2="9.5" stroke={color} strokeWidth="2" strokeLinecap="round"/>
-      <line x1="7" y1="14"  x2="21" y2="14"  stroke={color} strokeWidth="2" strokeLinecap="round"/>
-      <line x1="7" y1="18.5" x2="21" y2="18.5" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+      <line x1="4" y1="8"  x2="22" y2="8"  stroke={color} strokeWidth="2.2" strokeLinecap="round"/>
+      <line x1="4" y1="13" x2="16" y2="13" stroke={color} strokeWidth="2.2" strokeLinecap="round"/>
+      <line x1="4" y1="18" x2="22" y2="18" stroke={color} strokeWidth="2.2" strokeLinecap="round"/>
     </svg>
   );
 }
@@ -83,9 +83,18 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
 }
 
 // ── MENU PANEL ──
-function MenuPanel({ onClose, currentUser, userProfile, members, account, onSignOut, onSwitchAccount, isDark, onToggleTheme, colors }) {
+function MenuPanel({ onClose, currentUser, userProfile, members, account, onSignOut, onSwitchAccount, colors }) {
   const me = members?.find(m => m.uid === currentUser?.uid);
   const meColor = me?.color || "#4F7FFA";
+  const { setManualTheme } = useTheme();
+  const currentThemeMode = localStorage.getItem("xpenses-theme") || "auto";
+  const themeLabels = { auto: "Automático", dark: "Oscuro", light: "Claro" };
+  const [showThemePopup, setShowThemePopup] = useState(false);
+  const handleTheme = async (val) => {
+    if (val === "auto") { setManualTheme(null); localStorage.removeItem("xpenses-theme"); }
+    else { setManualTheme(val); localStorage.setItem("xpenses-theme", val); }
+    setShowThemePopup(false);
+  };
   const startY = useRef(null);
   const [dragY, setDragY] = useState(0);
   const dragging = useRef(false);
@@ -113,7 +122,7 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
   const rows = [
     { icon: "🔀", label: "Cambiar de cuenta", sub: account?.name || "", action: () => { onClose(); onSwitchAccount(); } },
     { icon: "📤", label: "Compartir X-penses", sub: "Invitá a otros a usar la app", action: () => { onClose(); handleShare(); } },
-    { icon: isDark ? "☀️" : "🌙", label: isDark ? "Modo claro" : "Modo oscuro", sub: "Tema de la app", action: () => { onToggleTheme(); onClose(); } },
+    { icon: "🎨", label: "Modo", sub: themeLabels[currentThemeMode], action: () => setShowThemePopup(true) },
     { icon: "🔡", label: "Tamaño de letra", sub: fontLabel, action: () => setShowFontPopup(true) },
     { icon: "🚪", label: "Cerrar sesión", sub: "", action: () => { onClose(); onSignOut(); }, danger: true },
   ];
@@ -168,6 +177,30 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
                   {fontSize === f.id && <span style={{ color: "#4F7FFA" }}>✓</span>}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {showThemePopup && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+            onClick={() => setShowThemePopup(false)}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background: colors.card, borderRadius: 20, padding: 24, width: "100%", maxWidth: 320, fontFamily: FONT }}>
+              <p style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: colors.text, fontFamily: FONT }}>🎨 Modo</p>
+              {[["auto","Automático"],["dark","Oscuro"],["light","Claro"]].map(([val, lbl]) => {
+                const active = currentThemeMode === val;
+                return (
+                  <button key={val} onClick={() => handleTheme(val)}
+                    style={{ width: "100%", padding: "13px 16px", borderRadius: 14, border: "2px solid", marginBottom: 8, cursor: "pointer", fontFamily: FONT, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between",
+                      borderColor: active ? "#4F7FFA" : colors.inputBorder,
+                      background: active ? "#4F7FFA11" : colors.input,
+                      color: active ? "#4F7FFA" : colors.text,
+                      fontWeight: active ? 700 : 500 }}>
+                    {lbl}
+                    {active && <span style={{ color: "#4F7FFA" }}>✓</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -436,7 +469,7 @@ function AppInner() {
       {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={activeCategories} isPersonal={isPersonal} accountId={account?.id} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={activeCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
-      {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
+      {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} colors={colors} />}
 
       {deleteWarning && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
