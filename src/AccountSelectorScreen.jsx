@@ -6,6 +6,7 @@ import { useNotif, SwipeableNotifRow } from "./notifications.jsx";
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
+const EMOJI_OPTIONS = ["👩🏼‍❤️‍👨🏼","🏠","🚙","🏟️","🍔","💃🏾","🏝️","🛫","🏥","🐶","🐱","🍣","🎂","🍺","🍾","⚽️","🏋🏽‍♂️","🏂","⛷️","💻"];
 
 const DIVISION_SYSTEMS = [
   { id: "proportional", label: "Proporcional al ingreso", icon: "📊", desc: "Ideal para parejas que conviven. Cada uno aporta según su sueldo." },
@@ -290,7 +291,8 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
   const [confirmDelete,  setConfirmDelete] = useState(null);
   const [deletedIds,     setDeletedIds]    = useState([]);
 
-  const [selectedEmoji,      setSelectedEmoji]      = useState("");
+  const [selectedEmoji,      setSelectedEmoji]      = useState("🏠");
+  const [showEmojiSheet,     setShowEmojiSheet]     = useState(false);
   const [selectedCurrency,   setSelectedCurrency]   = useState("ARS");
   const [memberSalaries,     setMemberSalaries]     = useState({ 0: "" });
   // FIX: ninguna categoría seleccionada por default — mínimo 1 obligatoria
@@ -298,8 +300,6 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
   const [catError,           setCatError]           = useState(false);
   const [emojiError,         setEmojiError]         = useState(false);
   const [showCurrencySheet,  setShowCurrencySheet]  = useState(false);
-
-  const emojiInputRef = useRef(null);
 
   const visibleAccounts = accounts.filter(a => !deletedIds.includes(a.id));
 
@@ -571,39 +571,23 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
             <div style={{ background: colors.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Título</p>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                {/* FIX: emoji obligatorio — sin default, abre teclado nativo, muestra error si vacío */}
+                {/* F3: emoji abre bottom sheet — sin teclado nativo */}
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   <button
-                    onClick={() => { setEmojiError(false); emojiInputRef.current?.focus(); emojiInputRef.current?.click(); }}
+                    type="button"
+                    onClick={() => { setEmojiError(false); setShowEmojiSheet(true); }}
                     style={{
                       width: 52, height: 52, borderRadius: 14,
-                      background: selectedEmoji ? colors.pill : (emojiError ? "#ff6b6b11" : colors.pill),
-                      border: `2px solid ${emojiError ? "#ff6b6b" : (selectedEmoji ? colors.inputBorder : "#4F7FFA")}`,
-                      fontSize: selectedEmoji ? 26 : 20, cursor: "pointer",
+                      background: emojiError ? "#ff6b6b11" : colors.pill,
+                      border: `2px solid ${emojiError ? "#ff6b6b" : "#4F7FFA"}`,
+                      fontSize: 26, cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      color: selectedEmoji ? undefined : (emojiError ? "#ff6b6b" : "#4F7FFA"),
                     }}>
-                    {selectedEmoji || "＋"}
+                    {selectedEmoji}
                   </button>
                   {emojiError && !selectedEmoji && (
                     <p style={{ position: "absolute", top: 54, left: 0, margin: 0, fontSize: 10, color: "#ff6b6b", fontFamily: FONT, whiteSpace: "nowrap" }}>Obligatorio</p>
                   )}
-                  <input
-                    ref={emojiInputRef}
-                    type="text"
-                    inputMode="text"
-                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 26 }}
-                    onFocus={e => { e.target.value = ""; }}
-                    onInput={e => {
-                      const val = e.target.value;
-                      if (val) {
-                        const chars = [...val];
-                        setSelectedEmoji(chars[chars.length - 1]);
-                        setEmojiError(false);
-                        e.target.value = "";
-                      }
-                    }}
-                  />
                 </div>
                 <input value={accountName} onChange={e => setAccountName(e.target.value)}
                   placeholder="Ej: Casa, Vacaciones..."
@@ -764,6 +748,32 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
                   {selectedCurrency === c.code && <span style={{ color: "#4F7FFA", fontSize: 18 }}>✓</span>}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Emoji picker bottom sheet */}
+        {showEmojiSheet && (
+          <div
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
+            onClick={() => setShowEmojiSheet(false)}
+            onTouchMove={e => e.preventDefault()}
+          >
+            <div
+              style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}
+              onClick={e => e.stopPropagation()}
+              onTouchMove={e => e.stopPropagation()}
+            >
+              <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+              <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Elegí un ícono</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {EMOJI_OPTIONS.map(e => (
+                  <button type="button" key={e} onClick={() => { setSelectedEmoji(e); setShowEmojiSheet(false); }}
+                    style={{ width: 52, height: 52, borderRadius: 14, border: "2px solid", fontSize: 26, cursor: "pointer", borderColor: selectedEmoji === e ? "#4F7FFA" : colors.inputBorder, background: selectedEmoji === e ? "#4F7FFA11" : colors.input }}>
+                    {e}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
