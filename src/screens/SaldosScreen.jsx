@@ -128,8 +128,9 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   const isSubmitting = useRef(false);
 
   const monthExp = expenses.filter(e => e.month === currentMonth && !e.deleted);
-  // Filtrar labels — calcSaldos solo funciona con usuarios reales (con uid real de Firebase Auth)
-  const realMembers = (members || []).filter(m => !m._isLabel);
+  // Incluir labels no vinculados — tienen uid estable (label_0, label_1, etc.)
+  // y los gastos les atribuyen paidBy/forWhom con ese mismo uid.
+  const realMembers = (members || []).filter(m => !!m.uid);
   // visibleFixed ya viene filtrado desde App.jsx via getVisibleFixed()
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth);
 

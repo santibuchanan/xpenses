@@ -31,7 +31,7 @@
  * @returns {object}                - { [uid]: { paid, owes, balance } }
  */
 export function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMonth, settlements) {
-  if (!members || members.length < 2) return {};
+  if (!members || members.length === 0) return {};
 
   const result = {};
   members.forEach(m => { result[m.uid] = { paid: 0, owes: 0 }; });
