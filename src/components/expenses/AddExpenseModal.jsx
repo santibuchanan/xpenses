@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../../firebase.js";
 import { useTheme } from "../../theme.jsx";
-import { DEFAULT_CATEGORIES } from "../../constants/categories.js";
 import { CURRENCIES } from "../../theme.jsx";
 import { useSwipeSheet } from "../../hooks/useSwipeSheet.js";
 import { useAmountInput } from "../../hooks/useAmountInput.js";
@@ -19,14 +18,11 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  // Combinar DEFAULT + custom (igual que SettingsScreen)
-  const disabledIds = []; // no tenemos account.disabledCategories aquí, se filtra en App
-  const allCategories = [
-    ...DEFAULT_CATEGORIES.map(c => ({ ...c, isDefault: true })),
-    ...(customCategories || []).map(c => ({ ...c, isCustom: true })),
-  ];
+  // App.jsx ya pasa activeCategories filtradas (defaults activas + custom).
+  // No reconstruir acá — usar directamente lo que llega.
+  const allCategories = customCategories || [];
 
-  // Default category: primera disponible (generalmente super)
+  // Default category: primera disponible
   const defaultCategory = allCategories[0]?.id || "otros";
 
   // Nueva categoría
