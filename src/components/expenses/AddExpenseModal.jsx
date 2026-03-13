@@ -124,7 +124,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
   const labelStyle = { fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT };
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
 
-  const types = [["ordinary","🛍️ Ordinario"],["personal","🫵🏽 Para otro"],["extraordinary","🏝️ Extraordinario"],["mio","🙋🏼‍♂️ Para mí"]];
+  const types = [["hogar","🛍️ Ordinario"],["personal","🫵🏽 Para otro"],["extraordinary","🏝️ Extraordinario"],["mio","🙋🏼‍♂️ Para mí"]];
   // FIX B2: removida dependencia de memberList.length — las secciones se
   // muestran siempre en cuentas compartidas, incluso si allMembers aún no cargó,
   // porque memberList ya garantiza que el usuario actual está presente.
