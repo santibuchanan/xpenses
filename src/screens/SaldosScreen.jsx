@@ -188,6 +188,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
         debtorUid, creditorUid, amount,
         date: new Date().toISOString().slice(0, 10),
         month: currentMonth, full: true,
+        createdAt: new Date().toISOString(),
       });
       setSettledPairs(p => ({ ...p, [debtorUid + "-" + creditorUid]: true }));
       await sendNotification({
@@ -206,6 +207,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => {
     await addDoc(collection(db, "accounts", account.id, "settlements"), {
       debtorUid, creditorUid, amount, date, month: currentMonth, full: false,
+      createdAt: new Date().toISOString(),
     });
     setPartialModal(null);
   };
