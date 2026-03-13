@@ -250,7 +250,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
               <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", fontFamily: FONT }}>Pagó</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.paid)}</p></div>
-              <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", fontFamily: FONT }}>Le toca</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.owes)}</p></div>
+              <div style={{ background: "#4F7FFA14", borderRadius: 12, padding: 12 }}><p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", fontFamily: FONT }}>Su parte</p><p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{fmt(s.owes)}</p></div>
             </div>
             <div style={{ background: s.balance >= 0 ? colors.successBg : colors.dangerBg, borderRadius: 14, padding: 14, textAlign: "center" }}>
               <p style={{ margin: 0, fontWeight: 700, fontSize: 22, color: s.balance >= 0 ? colors.success : colors.danger, fontFamily: FONT }}>{s.balance >= 0 ? "+" : ""}{fmt(s.balance)}</p>
