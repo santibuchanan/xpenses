@@ -318,7 +318,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
               {/* Balance */}
               <p style={{ margin: 0, fontWeight: 700, fontSize: 16, fontFamily: FONT, flexShrink: 0,
                 color: s.balance > 0.01 ? colors.success : s.balance < -0.01 ? colors.danger : "#4F7FFA" }}>
-                {s.balance > 0.01 ? "+" : ""}{fmt(s.balance)}
+                {s.balance > 0.01 ? "+" : ""}{fmt(Math.abs(s.balance) < 0.5 ? 0 : s.balance)}
               </p>
 
               {/* Botón Saldar — solo si este miembro tiene deuda pendiente */}
