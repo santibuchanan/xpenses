@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "../../firebase.js";
 import { useTheme } from "../../theme.jsx";
 import { DEFAULT_CATEGORIES } from "../../constants/categories.js";
 import { CURRENCIES } from "../../theme.jsx";
@@ -8,7 +10,7 @@ import DateInput from "../../DateInput.jsx";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
-export default function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, customCategories, isPersonal }) {
+export default function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, customCategories, isPersonal, accountId }) {
   const { colors } = useTheme();
 
   // Scroll lock
@@ -17,7 +19,22 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  const allCategories = customCategories || [];
+  // Combinar DEFAULT + custom (igual que SettingsScreen)
+  const disabledIds = []; // no tenemos account.disabledCategories aquí, se filtra en App
+  const allCategories = [
+    ...DEFAULT_CATEGORIES.map(c => ({ ...c, isDefault: true })),
+    ...(customCategories || []).map(c => ({ ...c, isCustom: true })),
+  ];
+
+  // Default category: primera disponible (generalmente super)
+  const defaultCategory = allCategories[0]?.id || "otros";
+
+  // Nueva categoría
+  const [showNewCat, setShowNewCat]   = useState(false);
+  const [newCatLabel, setNewCatLabel] = useState("");
+  const [newCatIcon,  setNewCatIcon]  = useState("📦");
+  const [savingCat,   setSavingCat]   = useState(false);
+  const CAT_ICONS = ["🛒","🍕","💡","🚗","💊","👗","🏠","📦","🐶","✈️","🏋️","📚","📱","🎮","🍺","☕","🎁","🎵","🏥","🌮","🎬","🏖️","🎓","💻","🧹","🔥","🍔","🍣","🎂","⚽️"];
   const defaultType = isPersonal ? "mio" : "hogar";
 
   // Normalizar allMembers garantizando que todos tengan .uid
@@ -40,7 +57,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
   const othersUids = memberList.filter(m => m.uid !== currentUser.uid).map(m => m.uid);
 
   const [form, setForm] = useState({
-    type: defaultType, concept: "", amount: "", category: "super",
+    type: defaultType, concept: "", amount: "", category: defaultCategory,
     date: new Date().toISOString().slice(0, 10),
     paidBy: currentUser.uid,
     forWhom: defaultType === "hogar" ? memberList.map(m => m.uid) : [],
@@ -191,6 +208,11 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
               {c.icon} {c.label}
             </button>
           ))}
+          <button onClick={() => setShowNewCat(true)}
+            style={{ padding: "7px 12px", borderRadius: 12, border: "2px dashed", fontSize: 12, cursor: "pointer", fontFamily: FONT,
+              borderColor: "#4F7FFA", background: "transparent", color: "#4F7FFA", fontWeight: 600 }}>
+            + Nueva
+          </button>
         </div>
 
         <p style={labelStyle}>Fecha</p>
@@ -240,6 +262,62 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
           {loading ? "Guardando..." : "Agregar ✓"}
         </button>
       </div>
+
+      {/* Modal nueva categoría */}
+      {showNewCat && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT }}>
+            <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>Nueva categoría</p>
+
+            <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
+            <input
+              value={newCatLabel}
+              onChange={e => setNewCatLabel(e.target.value)}
+              placeholder="Ej: Gimnasio"
+              style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 16, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+            />
+
+            <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Ícono</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+              {CAT_ICONS.map(e => (
+                <button key={e} onClick={() => setNewCatIcon(e)} type="button"
+                  style={{ width: 44, height: 44, borderRadius: 12, border: "2px solid", fontSize: 22, cursor: "pointer",
+                    borderColor: newCatIcon === e ? "#4F7FFA" : colors.inputBorder,
+                    background: newCatIcon === e ? "#4F7FFA11" : colors.input }}>
+                  {e}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              disabled={!newCatLabel.trim() || savingCat || !accountId}
+              onClick={async () => {
+                if (!newCatLabel.trim() || !accountId) return;
+                setSavingCat(true);
+                try {
+                  const ref = await addDoc(collection(db, "accounts", accountId, "categories"), {
+                    label: newCatLabel.trim(),
+                    icon: newCatIcon,
+                  });
+                  set("category", ref.id);
+                  setShowNewCat(false);
+                  setNewCatLabel("");
+                  setNewCatIcon("📦");
+                } catch(e) { console.error(e); }
+                setSavingCat(false);
+              }}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: (!newCatLabel.trim() || savingCat) ? "#aaa" : "#4F7FFA", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+              {savingCat ? "Guardando..." : "Crear categoría"}
+            </button>
+            <button type="button" onClick={() => setShowNewCat(false)}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal descartar */}
       {showDiscard && (

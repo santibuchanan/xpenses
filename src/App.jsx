@@ -433,7 +433,7 @@ function AppInner() {
       </div>
 
       {/* Modales */}
-      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={activeCategories} isPersonal={isPersonal} />}
+      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={activeCategories} isPersonal={isPersonal} accountId={account?.id} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={activeCategories} currentUser={authUser} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
       {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} isDark={isDark} onToggleTheme={toggleTheme} colors={colors} />}
