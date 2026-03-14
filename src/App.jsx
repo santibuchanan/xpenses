@@ -289,7 +289,15 @@ function AppInner() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const inviteId = params.get("invite");
-    if (inviteId) { setPendingInviteId(inviteId); window.history.replaceState({}, "", window.location.pathname); }
+    if (inviteId) {
+      sessionStorage.setItem("pendingInviteId", inviteId);
+      setPendingInviteId(inviteId);
+      window.history.replaceState({}, "", window.location.pathname);
+    } else {
+      // Recuperar invite guardado si el usuario volvió después de autenticarse
+      const saved = sessionStorage.getItem("pendingInviteId");
+      if (saved) setPendingInviteId(saved);
+    }
   }, []);
 
   useEffect(() => {
@@ -335,6 +343,8 @@ function AppInner() {
       else await setDoc(doc(db, "users", authUser.uid), { setupDone: true }, { merge: true });
       await updateDoc(doc(db, "invites", inviteId), { used: true });
       setClaimData(null);
+      setPendingInviteId(null);
+      sessionStorage.removeItem("pendingInviteId");
       setSelectedAccountId(accountId);
     } catch (err) { console.error("Error al unirse:", err); }
   };
