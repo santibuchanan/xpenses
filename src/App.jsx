@@ -330,7 +330,9 @@ function AppInner() {
       }
       const userSnap = await getDoc(doc(db, "users", authUser.uid));
       const existingIds = userSnap.exists() ? (userSnap.data().accountIds || []) : [];
-      if (!existingIds.includes(accountId)) await setDoc(doc(db, "users", authUser.uid), { accountIds: [...existingIds, accountId] }, { merge: true });
+      // setupDone: true — el usuario llegó por invitación, no necesita onboarding
+      if (!existingIds.includes(accountId)) await setDoc(doc(db, "users", authUser.uid), { accountIds: [...existingIds, accountId], setupDone: true }, { merge: true });
+      else await setDoc(doc(db, "users", authUser.uid), { setupDone: true }, { merge: true });
       await updateDoc(doc(db, "invites", inviteId), { used: true });
       setClaimData(null);
       setSelectedAccountId(accountId);
@@ -401,7 +403,9 @@ function AppInner() {
   if (showWelcome && showEmailAuth) return <EmailAuthScreen onBack={() => setShowEmailAuth(false)} onEnter={() => { setShowEmailAuth(false); setShowWelcome(false); }} />;
   if (showWelcome) return <WelcomeScreen onEnter={() => setShowWelcome(false)} onEmailClick={() => setShowEmailAuth(true)} />;
   if (!authUser) return <AuthScreen />;
-  if (!userProfile?.setupDone) return <ConfigScreen user={authUser} onDone={() => {}} />;
+  // Si hay un invite pendiente, no mostrar ConfigScreen — el usuario llegó por invitación
+  // y va a ser agregado a una cuenta existente, no necesita crear una nueva.
+  if (!userProfile?.setupDone && !pendingInviteId && !claimData) return <ConfigScreen user={authUser} onDone={() => {}} />;
   if (!selectedAccountId) return (
     <AccountSelectorScreen
       user={authUser} userProfile={userProfile} accounts={userAccounts}
