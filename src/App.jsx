@@ -307,8 +307,17 @@ function AppInner() {
         const inviteSnap = await getDoc(doc(db, "invites", pendingInviteId));
         if (!inviteSnap.exists()) return;
         const invite = inviteSnap.data();
-        if (invite.used) return;
         const accountId = invite.accountId;
+        // Si el invite ya fue usado, verificar si el usuario ya es miembro y redirigir
+        if (invite.used) {
+          const accountSnap2 = await getDoc(doc(db, "accounts", accountId));
+          if (accountSnap2.exists() && accountSnap2.data().memberIds?.includes(authUser.uid)) {
+            sessionStorage.removeItem("pendingInviteId");
+            setPendingInviteId(null);
+            setSelectedAccountId(accountId);
+          }
+          return;
+        }
         const accountSnap = await getDoc(doc(db, "accounts", accountId));
         if (!accountSnap.exists()) return;
         const accountData = accountSnap.data();
