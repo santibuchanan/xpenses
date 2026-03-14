@@ -283,7 +283,23 @@ export default function EmailAuthScreen({ onBack, onEnter }) {
               {touched.confirm && confirm !== password && (
                 <p style={{ color: "#e74c3c", fontSize: 12, margin: "0 0 8px" }}>Las contraseñas no coinciden</p>
               )}
-              {error && <p style={{ color: "#ff6b6b", fontSize: 13, margin: "4px 0 12px" }}>{error}</p>}
+              {error && (
+                <div>
+                  <p style={{ color: "#ff6b6b", fontSize: 13, margin: "4px 0 8px" }}>{error}</p>
+                  {error.includes("registrado") && (
+                    resetSent ? (
+                      <p style={{ color: "#2ecc71", fontSize: 13, textAlign: "center", margin: "0 0 12px" }}>
+                        ✓ Te enviamos un email para restablecer tu contraseña
+                      </p>
+                    ) : (
+                      <button onClick={handleReset} disabled={loading}
+                        style={{ background: "none", border: "none", color: "#4F7FFA", fontSize: 13, cursor: "pointer", fontFamily: SF, marginBottom: 12, width: "100%", textAlign: "center" }}>
+                        Restablecer contraseña →
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
               {verifSent ? (
                 <div style={{ background: "rgba(46,204,113,0.1)", border: "1px solid rgba(46,204,113,0.3)", borderRadius: 14, padding: 16, marginTop: 12, textAlign: "center" }}>
                   <p style={{ fontSize: 28, margin: "0 0 8px" }}>✉️</p>
