@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  fetchSignInMethodsForEmail,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -41,23 +40,35 @@ export default function EmailAuthScreen({ onBack, onEnter }) {
   const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
   // ── PASO 1: verificar email ──
+  // fetchSignInMethodsForEmail está deprecado en Firebase y devuelve [] para usuarios existentes.
+  // En su lugar intentamos un signIn con contraseña vacía — si el error es wrong-password
+  // o invalid-credential el usuario existe, si es user-not-found no existe.
   const handleCheckEmail = async () => {
     touch("email");
     if (!isValidEmail(email)) { setError("El email no es válido"); return; }
     setLoading(true);
     setError("");
     try {
-      const methods = await fetchSignInMethodsForEmail(auth, email);
-      if (methods.includes("google.com")) {
-        // Email registrado con Google — redirigir directo
-        setStep("google");
-      } else if (methods.length > 0) {
+      await signInWithEmailAndPassword(auth, email, "__probe__");
+      // Si llega acá (improbable) el usuario existe
+      setStep("login");
+    } catch (e) {
+      if (e.code === "auth/wrong-password" || e.code === "auth/invalid-credential") {
+        // Usuario existe con email/password
         setStep("login");
+      } else if (e.code === "auth/invalid-login-credentials") {
+        // Firebase nuevo SDK — usuario existe
+        setStep("login");
+      } else if (e.code === "auth/user-not-found" || e.code === "auth/invalid-email") {
+        setStep("register");
+      } else if (e.code === "auth/too-many-requests") {
+        // Cuenta existe pero bloqueada por intentos
+        setStep("login");
+        setError(translateError(e.code));
       } else {
+        // Cualquier otro error asumimos que el usuario no existe
         setStep("register");
       }
-    } catch (e) {
-      setError(translateError(e.code));
     } finally {
       setLoading(false);
     }
