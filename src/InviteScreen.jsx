@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { doc, setDoc, query, collection, where, orderBy, limit, getDocs, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
 
@@ -15,32 +15,17 @@ export default function InviteScreen({ account, currentUser, onClose }) {
   }, []);
 
   const generateInvite = async () => {
-    // Primero buscar si ya existe un invite activo y no usado para esta cuenta
-    const existingSnap = await getDocs(
-      query(
-        collection(db, "invites"),
-        where("accountId", "==", account.id),
-        where("used", "==", false),
-        orderBy("createdAt", "desc"),
-        limit(1)
-      )
-    );
-
-    let inviteId;
-    if (!existingSnap.empty) {
-      // Reutilizar el invite existente — evita documentos basura en Firestore
-      inviteId = existingSnap.docs[0].id;
-    } else {
-      inviteId = `${account.id}_${Date.now()}`;
-      await setDoc(doc(db, "invites", inviteId), {
-        accountId: account.id,
-        accountName: account.name || "X-penses",
-        createdBy: currentUser.uid,
-        createdByName: currentUser.displayName,
-        createdAt: serverTimestamp(),
-        used: false,
-      });
-    }
+    // Siempre generar un invite nuevo — evita reutilizar invites de sesiones anteriores
+    // que podrían apuntar a una cuenta equivocada
+    const inviteId = `${account.id}_${Date.now()}`;
+    await setDoc(doc(db, "invites", inviteId), {
+      accountId: account.id,
+      accountName: account.name || "X-penses",
+      createdBy: currentUser.uid,
+      createdByName: currentUser.displayName,
+      createdAt: serverTimestamp(),
+      used: false,
+    });
 
     const link = `${window.location.origin}?invite=${inviteId}`;
     setInviteLink(link);
@@ -54,7 +39,7 @@ export default function InviteScreen({ account, currentUser, onClose }) {
   };
 
   const shareWhatsApp = () => {
-    const text = `¡Te invito a X-penses! 💸\nUná nuestras cuentas del hogar y llevemos los gastos juntos.\n\n👉 ${inviteLink}`;
+    const text = `¡Te invito a unirte a "${account?.name}" en X-penses! 💸\nLlevemos los gastos juntos.\n\n👉 ${inviteLink}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
   };
 
