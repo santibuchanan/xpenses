@@ -301,10 +301,13 @@ function AppInner() {
   }, []);
 
   useEffect(() => {
-    if (!pendingInviteId || !authUser) return;
+    if (!authUser) return;
+    // Leer directamente de localStorage — más confiable que el state
+    const inviteId = pendingInviteId || localStorage.getItem("pendingInviteId");
+    if (!inviteId) return;
     const processInvite = async () => {
       try {
-        const inviteSnap = await getDoc(doc(db, "invites", pendingInviteId));
+        const inviteSnap = await getDoc(doc(db, "invites", inviteId));
         if (!inviteSnap.exists()) return;
         const invite = inviteSnap.data();
         const accountId = invite.accountId;
@@ -324,11 +327,11 @@ function AppInner() {
         const labels = accountData.memberLabels || [];
         const unlinked = labels.filter(l => !l.linkedUid);
         if (unlinked.length > 0) {
-          setClaimData({ inviteId: pendingInviteId, accountId, accountData, memberLabels: unlinked });
+          setClaimData({ inviteId, accountId, accountData, memberLabels: unlinked });
           setPendingInviteId(null);
           return;
         }
-        await finishJoinAccount({ inviteId: pendingInviteId, accountId, accountData, claimedLabelId: null });
+        await finishJoinAccount({ inviteId, accountId, accountData, claimedLabelId: null });
         setPendingInviteId(null);
       } catch (err) { console.error("Error procesando invitación:", err); }
     };
