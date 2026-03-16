@@ -27,7 +27,7 @@ export default function InviteScreen({ account, currentUser, onClose }) {
       used: false,
     });
 
-    const link = `${window.location.origin}?invite=${inviteId}`;
+    const link = `${window.location.origin}/#invite=${inviteId}`;
     setInviteLink(link);
     setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(link)}&color=1a1a2e&bgcolor=f7f8fc`);
   };

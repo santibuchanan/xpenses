@@ -7,6 +7,7 @@ import ConfigScreen from "./ConfigScreen";
 import AccountSelectorScreen from "./AccountSelectorScreen";
 import WelcomeScreen from "./WelcomeScreen";
 import EmailAuthScreen from "./EmailAuthScreen";
+import InviteJoinScreen from "./InviteJoinScreen";
 import EditExpenseModal from "./EditExpenseModal";
 import { NotifProvider, useNotif, NotifCenter } from "./notifications";
 import { useTheme, formatAmount } from "./theme.jsx";
@@ -286,19 +287,21 @@ function AppInner() {
     settlements,
   } = useFirestoreData(account?.id);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const inviteId = params.get("invite");
-    if (inviteId) {
-      localStorage.setItem("pendingInviteId", inviteId);
-      setPendingInviteId(inviteId);
+  // Detectar invite en URL — usa hash (#invite=XXX) para sobrevivir redirects
+  const [inviteIdFromUrl] = useState(() => {
+    // Intentar desde hash primero (más confiable)
+    const hash = window.location.hash;
+    const hashMatch = hash.match(/[#&]invite=([^&]+)/);
+    if (hashMatch) {
       window.history.replaceState({}, "", window.location.pathname);
-    } else {
-      // Recuperar invite guardado si el usuario volvió después de autenticarse
-      const saved = localStorage.getItem("pendingInviteId");
-      if (saved) setPendingInviteId(saved);
+      return hashMatch[1];
     }
-  }, []);
+    // Fallback: query param
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("invite");
+    if (id) window.history.replaceState({}, "", window.location.pathname);
+    return id || null;
+  });
 
   useEffect(() => {
     if (!authUser) return;
@@ -422,6 +425,22 @@ function AppInner() {
   useEffect(() => {
     if (account?.type === "personal" && tab === "saldos") setTab("home");
   }, [account?.type, tab]);
+
+  // Si hay invite en URL, mostrar InviteJoinScreen que maneja todo el flujo
+  if (inviteIdFromUrl) return (
+    <InviteJoinScreen
+      inviteId={inviteIdFromUrl}
+      onJoined={(accountId) => {
+        setSelectedAccountId(accountId);
+        setTab("home");
+      }}
+      onError={(msg) => {
+        console.error("Invite error:", msg);
+        // Redirigir a la app normal si falla
+        window.location.replace(window.location.origin);
+      }}
+    />
+  );
 
   if (initializing) return <Spinner text="Cargando..." />;
   if (authUser === undefined) return <Spinner text="Iniciando X-penses..." />;
