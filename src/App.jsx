@@ -274,7 +274,7 @@ function AppInner() {
   // FIX PROBLEMA RAÍZ B2/B7: seed inmediato del usuario actual en members[]
   // antes de que resuelvan los listeners de Firestore, eliminando la ventana
   // de tiempo en que allMembers llegaba vacío a AddExpenseModal/EditExpenseModal.
-  const { userAccounts, account, members } = useAccountData(
+  const { userAccounts, account, members, accountsLoading } = useAccountData(
     accountIds, selectedAccountId, authUser, userProfile
   );
 
@@ -450,12 +450,14 @@ function AppInner() {
   // Si hay un invite pendiente, no mostrar ConfigScreen — el usuario llegó por invitación
   // y va a ser agregado a una cuenta existente, no necesita crear una nueva.
   if (!userProfile?.setupDone && !pendingInviteId && !claimData && !inviteIdFromUrl) return <ConfigScreen user={authUser} onDone={() => {}} />;
+  if (!selectedAccountId && accountsLoading) return <Spinner text="Cargando cuentas..." />;
   if (!selectedAccountId) return (
     <AccountSelectorScreen
       user={authUser} userProfile={userProfile} accounts={userAccounts}
       onSelect={(id) => { setSelectedAccountId(id); setTab("home"); }}
       onCreated={(id) => { setSelectedAccountId(id); setTab("home"); }}
       onSignOut={handleSignOut}
+      isLoading={accountsLoading}
     />
   );
 

@@ -265,7 +265,7 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
 
 // ── AccountSelectorScreen ─────────────────────────────────────────────────────
 
-export default function AccountSelectorScreen({ user, userProfile, accounts, onSelect, onCreated, onSignOut }) {
+export default function AccountSelectorScreen({ user, userProfile, accounts, onSelect, onCreated, onSignOut, isLoading }) {
   const { colors } = useTheme();
   const { notifications, unreadCount, markRead, markAllRead, deleteNotif } = useNotif();
 
@@ -439,7 +439,18 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
         {/* ── TAB: Cuentas ── */}
         {activeTab === "cuentas" && (
           <>
-            {visibleAccounts.length === 0 && (
+            {/* Skeletons mientras cargan las cuentas */}
+            {isLoading && [1,2,3].map(i => (
+              <div key={i} style={{ background: colors.card, borderRadius: 20, padding: "18px 20px", marginBottom: 12, border: `1px solid ${colors.cardBorder}`, display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 16, background: colors.divider, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ width: "60%", height: 14, borderRadius: 7, background: colors.divider, marginBottom: 8 }} />
+                  <div style={{ width: "40%", height: 11, borderRadius: 6, background: colors.divider }} />
+                </div>
+              </div>
+            ))}
+
+            {!isLoading && visibleAccounts.length === 0 && (
               <div style={{ textAlign: "center", padding: "40px 20px", color: colors.textMuted }}>
                 <p style={{ fontSize: 48, margin: "0 0 12px" }}>📂</p>
                 <p style={{ fontSize: 16, fontWeight: 600, color: colors.text, margin: "0 0 6px", fontFamily: FONT }}>No tenés cuentas todavía</p>

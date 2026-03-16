@@ -23,13 +23,18 @@ export function useAccountData(accountIds, selectedAccountId, authUser, userProf
   const [userAccounts, setUserAccounts] = useState([]);
   const [account,      setAccount]      = useState(null);
   const [members,      setMembers]      = useState([]);
+  const [accountsLoading, setAccountsLoading] = useState(true);
 
   // Listeners de accounts — uno por cada accountId del usuario
   useEffect(() => {
     if (!accountIds.length) {
       setUserAccounts([]);
+      setAccountsLoading(false);
       return;
     }
+    // Marcar loading hasta que todos los listeners hayan respondido al menos una vez
+    setAccountsLoading(true);
+    const resolved = new Set();
     const unsubs = accountIds.map(id =>
       onSnapshot(doc(db, "accounts", id), snap => {
         if (snap.exists()) {
@@ -38,9 +43,11 @@ export function useAccountData(accountIds, selectedAccountId, authUser, userProf
             return [...filtered, { id: snap.id, ...snap.data() }];
           });
         } else {
-          // La cuenta fue eliminada — quitarla de la lista
           setUserAccounts(prev => prev.filter(a => a.id !== id));
         }
+        // Marcar este id como resuelto
+        resolved.add(id);
+        if (resolved.size === accountIds.length) setAccountsLoading(false);
       })
     );
     return () => unsubs.forEach(u => u());
@@ -89,5 +96,5 @@ export function useAccountData(accountIds, selectedAccountId, authUser, userProf
     return () => unsubs.forEach(u => u());
   }, [account?.memberIds?.join(",")]);
 
-  return { userAccounts, account, members };
+  return { userAccounts, account, members, accountsLoading };
 }
