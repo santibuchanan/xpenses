@@ -449,7 +449,7 @@ function AppInner() {
   if (!authUser) return <AuthScreen />;
   // Si hay un invite pendiente, no mostrar ConfigScreen — el usuario llegó por invitación
   // y va a ser agregado a una cuenta existente, no necesita crear una nueva.
-  if (!userProfile?.setupDone && !pendingInviteId && !claimData) return <ConfigScreen user={authUser} onDone={() => {}} />;
+  if (!userProfile?.setupDone && !pendingInviteId && !claimData && !inviteIdFromUrl) return <ConfigScreen user={authUser} onDone={() => {}} />;
   if (!selectedAccountId) return (
     <AccountSelectorScreen
       user={authUser} userProfile={userProfile} accounts={userAccounts}
