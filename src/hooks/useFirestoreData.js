@@ -18,15 +18,15 @@ export function useFirestoreData(accountId) {
   const [customCategories, setCustomCategories] = useState([]);
   const [fixedExpenses,    setFixedExpenses]    = useState([]);
   const [settlements,      setSettlements]      = useState([]);
+  const [expensesLoading,  setExpensesLoading]  = useState(true);
 
-  // FIX #1: Listener de expenses con filtro de 6 meses — evita descargar
-  // todo el historial. GraficosScreen tiene su propio fetch bajo demanda
-  // para historial extendido (ver GraficosScreen.jsx).
   useEffect(() => {
     if (!accountId) {
       setExpenses([]);
+      setExpensesLoading(false);
       return;
     }
+    setExpensesLoading(true);
     const q = query(
       collection(db, "expenses"),
       where("accountId", "==", accountId),
@@ -34,6 +34,7 @@ export function useFirestoreData(accountId) {
     );
     return onSnapshot(q, snap => {
       setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setExpensesLoading(false);
     });
   }, [accountId]);
 
@@ -82,5 +83,6 @@ export function useFirestoreData(accountId) {
     customCategories,
     fixedExpenses,
     settlements,
+    expensesLoading,
   };
 }

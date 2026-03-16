@@ -160,7 +160,7 @@ function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, on
 }
 
 // ── HOME SCREEN ──
-export default function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, customCategories, visibleFixed, onEdit, onDelete, onMarkFixedPaid, settlements }) {
+export default function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, customCategories, visibleFixed, onEdit, onDelete, onMarkFixedPaid, settlements, isLoading }) {
   const { colors } = useTheme();
   const fs = useExpenseFontSize();
   const isPersonal = account?.type === "personal";
@@ -351,7 +351,17 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
           ))}
         </div>
 
-        {sorted.length === 0 && (
+        {isLoading && [1,2,3].map(i => (
+          <div key={i} style={{ background: colors.card, borderRadius: 16, padding: "14px 16px", marginBottom: 8, border: "1px solid " + colors.cardBorder, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: colors.divider, flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ width: "50%", height: 13, borderRadius: 6, background: colors.divider, marginBottom: 8 }} />
+              <div style={{ width: "30%", height: 10, borderRadius: 5, background: colors.divider }} />
+            </div>
+            <div style={{ width: 60, height: 13, borderRadius: 6, background: colors.divider }} />
+          </div>
+        ))}
+        {!isLoading && sorted.length === 0 && (
           <Card style={{ textAlign: "center", color: colors.textMuted, padding: 32 }}>
             <p style={{ fontSize: 32, margin: "0 0 8px" }}>📭</p>
             <p style={{ margin: 0, fontFamily: FONT }}>Sin gastos este mes</p>
