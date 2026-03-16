@@ -200,17 +200,18 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
   // Simplificación de deudas — algoritmo greedy cascada
   const debtPairs = (() => {
+    const r2 = (n) => Math.round(n * 100) / 100;
     const pairs = [];
-    const debtors   = balances.filter(m => m.balance < -0.01).map(m => ({ ...m, remaining: Math.abs(m.balance) })).sort((a, b) => b.remaining - a.remaining);
-    const creditors = balances.filter(m => m.balance > 0.01).map(m => ({ ...m, remaining: m.balance })).sort((a, b) => b.remaining - a.remaining);
+    const debtors   = balances.filter(m => m.balance < -0.005).map(m => ({ ...m, remaining: r2(Math.abs(m.balance)) })).sort((a, b) => b.remaining - a.remaining);
+    const creditors = balances.filter(m => m.balance > 0.005).map(m => ({ ...m, remaining: r2(m.balance) })).sort((a, b) => b.remaining - a.remaining);
     let i = 0, j = 0;
     while (i < debtors.length && j < creditors.length) {
-      const amount = Math.min(debtors[i].remaining, creditors[j].remaining);
-      if (amount > 0.01) pairs.push({ debtorUid: debtors[i].uid, creditorUid: creditors[j].uid, amount: Math.round(amount) });
-      debtors[i].remaining   -= amount;
-      creditors[j].remaining -= amount;
-      if (debtors[i].remaining   < 0.01) i++;
-      if (creditors[j].remaining < 0.01) j++;
+      const amount = r2(Math.min(debtors[i].remaining, creditors[j].remaining));
+      if (amount > 0.005) pairs.push({ debtorUid: debtors[i].uid, creditorUid: creditors[j].uid, amount });
+      debtors[i].remaining   = r2(debtors[i].remaining - amount);
+      creditors[j].remaining = r2(creditors[j].remaining - amount);
+      if (debtors[i].remaining   < 0.005) i++;
+      if (creditors[j].remaining < 0.005) j++;
     }
     return pairs;
   })();
@@ -322,7 +323,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
               {/* Balance */}
               <p style={{ margin: 0, fontWeight: 700, fontSize: 16, fontFamily: FONT, flexShrink: 0,
-                color: s.balance > 0.01 ? colors.success : s.balance < -0.01 ? colors.danger : "#4F7FFA" }}>
+                color: s.balance > 0.005 ? colors.success : s.balance < -0.005 ? colors.danger : "#4F7FFA" }}>
                 {s.balance > 0.005 ? "+" : ""}{fmt(Math.abs(s.balance) < 0.005 ? 0 : s.balance)}
               </p>
 
