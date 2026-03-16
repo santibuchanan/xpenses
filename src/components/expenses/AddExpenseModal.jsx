@@ -104,22 +104,16 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
   const handleAdd = async () => {
     setTouched({ concept: true, amount: true });
     const amount = amountInput.numericValue || 0;
-    console.log("handleAdd fired", { concept: form.concept, amount, form });
-    if (!form.concept || amount <= 0) {
-      console.log("BLOCKED by validation", { concept: form.concept, amount });
-      return;
-    }
+    if (!form.concept || amount <= 0) return;
     setLoading(true);
-    console.log("calling onAdd...");
     try {
       await onAdd({ ...form, amount, month: form.date.slice(0, 7) });
-      console.log("onAdd success");
+      onClose();
     } catch(e) {
       console.error("onAdd error", e);
+      setLoading(false);
     }
-    setLoading(false);
-    onClose();
-};
+  };
 
   const labelStyle = { fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT };
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };

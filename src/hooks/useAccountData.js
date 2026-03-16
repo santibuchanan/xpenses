@@ -65,10 +65,12 @@ export function useAccountData(accountIds, selectedAccountId, authUser, userProf
     const acc = userAccounts.find(a => a.id === selectedAccountId);
     if (acc) {
       setAccount(acc);
-      // Sincronizar fontSize al account
-      const fs = acc.fontSize || "medium";
-      localStorage.setItem("expenseFontSize", fs);
-      window.dispatchEvent(new CustomEvent("expenseFontSizeChange", { detail: fs }));
+      // Sincronizar fontSize solo si la cuenta tiene uno explícito
+      // No sobreescribir la preferencia del usuario si la cuenta no tiene fontSize
+      if (acc.fontSize) {
+        localStorage.setItem("expenseFontSize", acc.fontSize);
+        window.dispatchEvent(new CustomEvent("expenseFontSizeChange", { detail: acc.fontSize }));
+      }
     }
   }, [selectedAccountId, userAccounts]);
 
