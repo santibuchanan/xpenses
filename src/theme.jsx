@@ -99,10 +99,10 @@ export const CURRENCIES = {
 
 export function formatAmount(n, currencyCode = "ARS") {
   const cur = CURRENCIES[currencyCode] || CURRENCIES.ARS;
-  // ARS y otras monedas sin decimales relevantes → 0 decimales
-  // USD, EUR, etc. → 2 decimales
+  // Mostrar decimales si el monto tiene centavos significativos
   const noDecimals = ["ARS", "CLP", "COP", "PYG", "VES"];
-  const decimals = noDecimals.includes(currencyCode) ? 0 : 2;
+  const hasCents = Math.abs((n || 0) % 1) >= 0.005;
+  const decimals = (noDecimals.includes(currencyCode) && !hasCents) ? 0 : 2;
   return new Intl.NumberFormat(cur.locale, {
     style: "currency",
     currency: cur.code,

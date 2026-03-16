@@ -196,8 +196,8 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   // Simplificación de deudas — algoritmo greedy cascada
   const debtPairs = (() => {
     const pairs = [];
-    const debtors   = balances.filter(m => m.balance < -0.01).map(m => ({ ...m, remaining: Math.abs(m.balance) })).sort((a, b) => b.remaining - a.remaining);
-    const creditors = balances.filter(m => m.balance > 0.01).map(m => ({ ...m, remaining: m.balance })).sort((a, b) => b.remaining - a.remaining);
+    const debtors   = balances.filter(m => m.balance < -0.005).map(m => ({ ...m, remaining: Math.abs(m.balance) })).sort((a, b) => b.remaining - a.remaining);
+    const creditors = balances.filter(m => m.balance > 0.005).map(m => ({ ...m, remaining: m.balance })).sort((a, b) => b.remaining - a.remaining);
     let i = 0, j = 0;
     while (i < debtors.length && j < creditors.length) {
       const amount = Math.min(debtors[i].remaining, creditors[j].remaining);
