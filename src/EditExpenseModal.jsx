@@ -3,7 +3,7 @@ import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
 import { useAmountInput } from "./hooks/useAmountInput.js";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
-import { useTheme } from "./theme.jsx";
+import { useTheme, CURRENCIES } from "./theme.jsx";
 import DateInput from "./DateInput";
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 
@@ -23,6 +23,7 @@ function getPerspectiveType(expense, currentUserUid) {
 export default function EditExpenseModal({ expense, members, allMembers, customCategories, currentUser, onClose, onSave }) {
   const { colors } = useTheme();
   const profiles = (allMembers || members || []);
+  const currSymbol = CURRENCIES["ARS"]?.symbol || "$";
 
   // Scroll lock
   useEffect(() => {
@@ -118,10 +119,10 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
   const displayType = getPerspectiveType(form, currentUser?.uid);
 
   const types = [
-    ["hogar",         "🏠 Hogar"],
-    ["personal",      "🎁 Para otro"],
-    ["extraordinary", "✈️ Extra"],
-    ["mio",           "👤 Para mí"],
+    ["hogar",         "🛍️ Ordinario"],
+    ["personal",      "🫵🏽 Para otro"],
+    ["extraordinary", "🏝️ Extraordinario"],
+    ["mio",           "🙋🏼‍♂️ Para mí"],
   ];
 
   const showPaidBy  = form.type !== "mio";
@@ -140,9 +141,8 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
         <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
           <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, paddingTop: 4 }}>
+        <div style={{ marginBottom: 18, paddingTop: 12 }}>
           <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Editar Gasto</span>
-          <button onClick={handleClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: colors.textMuted, lineHeight: 1 }}>×</button>
         </div>
 
         {/* TIPO — muestra perspectiva del usuario */}
@@ -164,11 +164,14 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
         <input value={form.concept} onChange={e => set("concept", e.target.value)} style={inputStyle} />
 
         {/* MONTO */}
-        <p style={labelStyle}>Monto</p>
+        <p style={labelStyle}>Monto ({currSymbol})</p>
         <div style={{ position: "relative", marginBottom: 14 }}>
-          <input type="number" inputMode="decimal" value={amountInput.displayValue}
+          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
+          <input type="text" inputMode="decimal" value={amountInput.displayValue}
             onChange={amountInput.onChange}
-            style={{ ...inputStyle, marginBottom: 0 }} />
+            onFocus={amountInput.onFocus}
+            onBlur={amountInput.onBlur}
+            style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36 }} />
         </div>
         {amountInput.formatted && (
           <p style={{ fontSize: 12, color: "#4F7FFA", fontWeight: 600, margin: "-10px 0 12px 2px", fontFamily: FONT }}>
