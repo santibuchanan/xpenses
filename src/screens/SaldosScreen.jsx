@@ -28,6 +28,7 @@ function SettleModal({ debtor, debts, members, fmt, currencySymbol, colors, onFu
   const [amount, setAmount] = useState("");
   const [date, setDate]     = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
+  const submitting = useRef(false); // previene doble tap en móvil
   const parsed = parseFloat(amount) || 0;
   const valid  = selectedDebt && parsed > 0 && parsed <= selectedDebt.amount;
   const symbolWidth = (currencySymbol || "$").length > 1 ? 38 : 30;
@@ -39,17 +40,21 @@ function SettleModal({ debtor, debts, members, fmt, currencySymbol, colors, onFu
   };
 
   const handleFull = async () => {
-    if (!selectedDebt) return;
+    if (!selectedDebt || submitting.current) return;
+    submitting.current = true;
     setLoading(true);
     await onFullSettle(selectedDebt.debtorUid, selectedDebt.creditorUid, selectedDebt.amount);
     setLoading(false);
+    submitting.current = false;
   };
 
   const handlePartial = async () => {
-    if (!valid) return;
+    if (!valid || submitting.current) return;
+    submitting.current = true;
     setLoading(true);
     await onPartialSettle({ debtorUid: selectedDebt.debtorUid, creditorUid: selectedDebt.creditorUid, amount: parsed, date });
     setLoading(false);
+    submitting.current = false;
   };
 
   return (
@@ -196,12 +201,12 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   // Simplificación de deudas — algoritmo greedy cascada
   const debtPairs = (() => {
     const pairs = [];
-    const debtors   = balances.filter(m => m.balance < -0.005).map(m => ({ ...m, remaining: Math.abs(m.balance) })).sort((a, b) => b.remaining - a.remaining);
-    const creditors = balances.filter(m => m.balance > 0.005).map(m => ({ ...m, remaining: m.balance })).sort((a, b) => b.remaining - a.remaining);
+    const debtors   = balances.filter(m => m.balance < -0.01).map(m => ({ ...m, remaining: Math.abs(m.balance) })).sort((a, b) => b.remaining - a.remaining);
+    const creditors = balances.filter(m => m.balance > 0.01).map(m => ({ ...m, remaining: m.balance })).sort((a, b) => b.remaining - a.remaining);
     let i = 0, j = 0;
     while (i < debtors.length && j < creditors.length) {
       const amount = Math.min(debtors[i].remaining, creditors[j].remaining);
-      const r2 = (n) => Math.round(n * 100) / 100; if (amount > 0.005) pairs.push({ debtorUid: debtors[i].uid, creditorUid: creditors[j].uid, amount: r2(amount) });
+      if (amount > 0.01) pairs.push({ debtorUid: debtors[i].uid, creditorUid: creditors[j].uid, amount: Math.round(amount) });
       debtors[i].remaining   -= amount;
       creditors[j].remaining -= amount;
       if (debtors[i].remaining   < 0.01) i++;
@@ -317,7 +322,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
               {/* Balance */}
               <p style={{ margin: 0, fontWeight: 700, fontSize: 16, fontFamily: FONT, flexShrink: 0,
-                color: s.balance > 0.005 ? colors.success : s.balance < -0.005 ? colors.danger : "#4F7FFA" }}>
+                color: s.balance > 0.01 ? colors.success : s.balance < -0.01 ? colors.danger : "#4F7FFA" }}>
                 {s.balance > 0.005 ? "+" : ""}{fmt(Math.abs(s.balance) < 0.005 ? 0 : s.balance)}
               </p>
 
