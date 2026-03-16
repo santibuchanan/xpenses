@@ -290,12 +290,12 @@ function AppInner() {
     const params = new URLSearchParams(window.location.search);
     const inviteId = params.get("invite");
     if (inviteId) {
-      sessionStorage.setItem("pendingInviteId", inviteId);
+      localStorage.setItem("pendingInviteId", inviteId);
       setPendingInviteId(inviteId);
       window.history.replaceState({}, "", window.location.pathname);
     } else {
       // Recuperar invite guardado si el usuario volvió después de autenticarse
-      const saved = sessionStorage.getItem("pendingInviteId");
+      const saved = localStorage.getItem("pendingInviteId");
       if (saved) setPendingInviteId(saved);
     }
   }, []);
@@ -312,7 +312,7 @@ function AppInner() {
         if (invite.used) {
           const accountSnap2 = await getDoc(doc(db, "accounts", accountId));
           if (accountSnap2.exists() && accountSnap2.data().memberIds?.includes(authUser.uid)) {
-            sessionStorage.removeItem("pendingInviteId");
+            localStorage.removeItem("pendingInviteId");
             setPendingInviteId(null);
             setSelectedAccountId(accountId);
           }
@@ -353,7 +353,7 @@ function AppInner() {
       await updateDoc(doc(db, "invites", inviteId), { used: true });
       setClaimData(null);
       setPendingInviteId(null);
-      sessionStorage.removeItem("pendingInviteId");
+      localStorage.removeItem("pendingInviteId");
       setSelectedAccountId(accountId);
     } catch (err) { console.error("Error al unirse:", err); }
   };
@@ -371,7 +371,7 @@ function AppInner() {
       } else {
         setInitializing(true);
         // Recuperar invite pendiente al autenticarse
-        const saved = sessionStorage.getItem("pendingInviteId");
+        const saved = localStorage.getItem("pendingInviteId");
         if (saved) setPendingInviteId(saved);
       }
     });
