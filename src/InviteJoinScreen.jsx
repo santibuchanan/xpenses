@@ -145,7 +145,8 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
 
       // Limpiar localStorage
       localStorage.removeItem("pendingInviteId");
-      onJoined(account.id);
+      // Recargar la app completa para que React inicialice con el nuevo estado
+      window.location.replace(window.location.origin);
     } catch (e) {
       console.error("Error al unirse:", e);
       setError(e.message === "Invitación ya utilizada"
