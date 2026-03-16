@@ -336,7 +336,7 @@ function AppInner() {
       } catch (err) { console.error("Error procesando invitación:", err); }
     };
     processInvite();
-  }, [pendingInviteId, authUser]);
+  }, [pendingInviteId, authUser, showWelcome]);
 
   const finishJoinAccount = async ({ inviteId, accountId, accountData, claimedLabelId }) => {
     try {
