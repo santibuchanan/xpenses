@@ -30,55 +30,86 @@
  * @param {object[]} settlements    - Settlements del mes actual
  * @returns {object}                - { [uid]: { paid, owes, balance } }
  */
+// Redondea a 2 decimales evitando floating point drift
+const r2 = (n) => Math.round(n * 100) / 100;
+
+// Divide un monto entre miembros con centavos exactos.
+// El centavo residual se asigna al primer miembro de la lista (pagador o primero).
+function splitExact(amount, memberUids, salaryMap, divisionSystem, totalSalary, firstUid) {
+  const n = memberUids.length;
+  if (n === 0) return {};
+  const shares = {};
+  let assigned = 0;
+  memberUids.forEach((uid, i) => {
+    let share;
+    if (divisionSystem === "proportional" && totalSalary > 0) {
+      share = r2(amount * ((salaryMap[uid] || 0) / totalSalary));
+    } else {
+      share = r2(amount / n);
+    }
+    shares[uid] = share;
+    assigned = r2(assigned + share);
+  });
+  // Asignar centavo residual al primero (pagador si está, sino el primero)
+  const residual = r2(amount - assigned);
+  if (Math.abs(residual) >= 0.01) {
+    const target = firstUid && shares[firstUid] !== undefined ? firstUid : memberUids[0];
+    shares[target] = r2(shares[target] + residual);
+  }
+  return shares;
+}
+
 export function calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMonth, settlements) {
   if (!members || members.length === 0) return {};
 
   const result = {};
   members.forEach(m => { result[m.uid] = { paid: 0, owes: 0 }; });
   const totalSalary = members.reduce((s, m) => s + (m.salary || 0), 0);
+  const salaryMap = Object.fromEntries(members.map(m => [m.uid, m.salary || 0]));
+  const memberUids = members.map(m => m.uid);
 
   expenses.forEach(e => {
-    // HOGAR: se divide entre todos
+    // HOGAR: se divide entre todos con centavos exactos
     if (e.type === "hogar") {
-      if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
-      members.forEach(m => {
-        const share = divisionSystem === "proportional" && totalSalary > 0
-          ? e.amount * ((m.salary || 0) / totalSalary)
-          : e.amount / members.length;
-        if (result[m.uid] !== undefined) result[m.uid].owes += share;
+      if (result[e.paidBy] !== undefined) result[e.paidBy].paid = r2(result[e.paidBy].paid + e.amount);
+      const shares = splitExact(e.amount, memberUids, salaryMap, divisionSystem, totalSalary, e.paidBy);
+      memberUids.forEach(uid => {
+        if (result[uid] !== undefined) result[uid].owes = r2(result[uid].owes + (shares[uid] || 0));
       });
     }
 
     // PERSONAL / PARA OTRO: pagador a favor, destinatarios en contra
     if (e.type === "personal") {
-      if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
+      if (result[e.paidBy] !== undefined) result[e.paidBy].paid = r2(result[e.paidBy].paid + e.amount);
       const targets = (Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []))
         .filter(uid => result[uid] !== undefined);
       if (targets.length > 0) {
-        targets.forEach(uid => { result[uid].owes += e.amount / targets.length; });
+        const shares = splitExact(e.amount, targets, salaryMap, "equal", 0, targets[0]);
+        targets.forEach(uid => { result[uid].owes = r2(result[uid].owes + (shares[uid] || 0)); });
       } else if (result[e.paidBy] !== undefined) {
-        result[e.paidBy].owes += e.amount; // fallback neto 0
+        result[e.paidBy].owes = r2(result[e.paidBy].owes + e.amount); // fallback neto 0
       }
     }
 
     // MIO / PARA MÍ: pagador a favor, owner en contra
     if (e.type === "mio") {
-      if (result[e.paidBy] !== undefined) result[e.paidBy].paid += e.amount;
+      if (result[e.paidBy] !== undefined) result[e.paidBy].paid = r2(result[e.paidBy].paid + e.amount);
       const ownerUid = e.owner;
       if (ownerUid && result[ownerUid] !== undefined) {
-        result[ownerUid].owes += e.amount;
+        result[ownerUid].owes = r2(result[ownerUid].owes + e.amount);
       } else if (result[e.paidBy] !== undefined) {
-        result[e.paidBy].owes += e.amount; // fallback neto 0 si owner inválido
+        result[e.paidBy].owes = r2(result[e.paidBy].owes + e.amount); // fallback neto 0 si owner inválido
       }
     }
 
     // EXTRAORDINARIO
     if (e.type === "extraordinary") {
+      const shares = splitExact(e.amount, memberUids, salaryMap, "equal", 0, memberUids[0]);
       members.forEach(m => {
         const paid = e[`paid_${m.uid}`] || 0;
         if (result[m.uid] !== undefined) {
-          result[m.uid].paid += paid;
-          result[m.uid].owes += e.amount / members.length;
+          result[m.uid].paid = r2(result[m.uid].paid + paid);
+          result[m.uid].owes = r2(result[m.uid].owes + (shares[m.uid] || 0));
         }
       });
     }
@@ -91,37 +122,33 @@ export function calcSaldos(expenses, fixedExpenses, members, divisionSystem, cur
     if (isPaid) {
       const paidByUid = payment.paidBy;
       if (f.shared) {
-        if (result[paidByUid] !== undefined) result[paidByUid].paid += f.amount;
-        members.forEach(m => {
-          const share = divisionSystem === "proportional" && totalSalary > 0
-            ? f.amount * ((m.salary || 0) / totalSalary)
-            : f.amount / members.length;
-          if (result[m.uid] !== undefined) result[m.uid].owes += share;
+        if (result[paidByUid] !== undefined) result[paidByUid].paid = r2(result[paidByUid].paid + f.amount);
+        const shares = splitExact(f.amount, memberUids, salaryMap, divisionSystem, totalSalary, paidByUid);
+        memberUids.forEach(uid => {
+          if (result[uid] !== undefined) result[uid].owes = r2(result[uid].owes + (shares[uid] || 0));
         });
       } else {
-        if (result[paidByUid] !== undefined) result[paidByUid].paid += f.amount;
-        if (result[f.createdBy] !== undefined) result[f.createdBy].owes += f.amount;
+        if (result[paidByUid] !== undefined) result[paidByUid].paid = r2(result[paidByUid].paid + f.amount);
+        if (result[f.createdBy] !== undefined) result[f.createdBy].owes = r2(result[f.createdBy].owes + f.amount);
       }
     } else {
       if (f.shared) {
-        members.forEach(m => {
-          const share = divisionSystem === "proportional" && totalSalary > 0
-            ? f.amount * ((m.salary || 0) / totalSalary)
-            : f.amount / members.length;
-          if (result[m.uid] !== undefined) result[m.uid].owes += share;
+        const shares = splitExact(f.amount, memberUids, salaryMap, divisionSystem, totalSalary, memberUids[0]);
+        memberUids.forEach(uid => {
+          if (result[uid] !== undefined) result[uid].owes = r2(result[uid].owes + (shares[uid] || 0));
         });
       } else {
-        if (result[f.createdBy] !== undefined) result[f.createdBy].owes += f.amount;
+        if (result[f.createdBy] !== undefined) result[f.createdBy].owes = r2(result[f.createdBy].owes + f.amount);
       }
     }
   });
 
   // Settlements: el deudor pagó → suma a su paid, el acreedor recibió → suma a su owes
   (settlements || []).forEach(s => {
-    if (result[s.debtorUid] !== undefined) result[s.debtorUid].paid += s.amount;
-    if (result[s.creditorUid] !== undefined) result[s.creditorUid].owes += s.amount;
+    if (result[s.debtorUid] !== undefined) result[s.debtorUid].paid = r2(result[s.debtorUid].paid + s.amount);
+    if (result[s.creditorUid] !== undefined) result[s.creditorUid].owes = r2(result[s.creditorUid].owes + s.amount);
   });
 
-  Object.keys(result).forEach(uid => { result[uid].balance = result[uid].paid - result[uid].owes; });
+  Object.keys(result).forEach(uid => { result[uid].balance = r2(result[uid].paid - result[uid].owes); });
   return result;
 }
