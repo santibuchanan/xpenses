@@ -330,7 +330,7 @@ function AppInner() {
         }
         await finishJoinAccount({ inviteId: pendingInviteId, accountId, accountData, claimedLabelId: null });
         setPendingInviteId(null);
-      } catch (err) { console.error("Error procesando invitación:", err.code, err.message, err); }
+      } catch (err) { console.error("Error procesando invitación:", err); }
     };
     processInvite();
   }, [pendingInviteId, authUser]);
@@ -370,6 +370,9 @@ function AppInner() {
         setShowEmailAuth(false);
       } else {
         setInitializing(true);
+        // Recuperar invite pendiente al autenticarse
+        const saved = sessionStorage.getItem("pendingInviteId");
+        if (saved) setPendingInviteId(saved);
       }
     });
   }, []);
