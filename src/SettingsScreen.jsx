@@ -403,14 +403,23 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const handleSaveMember = async (updated) => {
     const currentLabels = account?.memberLabels || [];
     let newLabels;
-    if (updated.id) {
+    // Buscar por id (label sin vincular) o por linkedUid (usuario vinculado)
+    const existingByLabelId = updated.id && currentLabels.find(l => l.id === updated.id);
+    const existingByUid = updated.uid && currentLabels.find(l => l.linkedUid === updated.uid);
+    if (existingByLabelId) {
       newLabels = currentLabels.map(l => l.id === updated.id ? { ...l, name: updated.name, color: updated.color } : l);
+    } else if (existingByUid) {
+      newLabels = currentLabels.map(l => l.linkedUid === updated.uid ? { ...l, name: updated.name, color: updated.color } : l);
     } else {
       const newId = `label_${Date.now()}`;
       const color = MEMBER_COLORS[currentLabels.length % MEMBER_COLORS.length];
       newLabels = [...currentLabels, { id: newId, name: updated.name, color: updated.color || color, linkedUid: null }];
     }
     await updateDoc(doc(db, "accounts", account.id), { memberLabels: newLabels });
+    // Si es usuario vinculado, también actualizar su nombre en Firestore users
+    if (existingByUid && updated.uid === currentUser.uid) {
+      await setDoc(doc(db, "users", currentUser.uid), { name: updated.name }, { merge: true });
+    }
     setEditingMember(null);
   };
 
