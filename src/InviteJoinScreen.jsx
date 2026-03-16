@@ -123,7 +123,7 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
 
         const existingIds = userSnap.exists() ? (userSnap.data().accountIds || []) : [];
 
-        tx.update(inviteRef, { used: true });
+        // Link reutilizable — nunca se marca como usado (Opción A)
         tx.update(accountRef, { memberIds: arrayUnion(user.uid) });
 
         const userUpdate = {

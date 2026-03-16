@@ -1,41 +1,41 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
+
+const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
 export default function InviteScreen({ account, currentUser, onClose }) {
   const { colors } = useTheme();
   const [inviteLink, setInviteLink] = useState("");
   const [copied, setCopied] = useState(false);
-  const [qrUrl, setQrUrl] = useState("");
-  const canvasRef = useRef(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     generateInvite();
   }, []);
 
   const generateInvite = async () => {
-    // Siempre generar un invite nuevo — evita reutilizar invites de sesiones anteriores
-    // que podrían apuntar a una cuenta equivocada
-    const inviteId = `${account.id}_${Date.now()}`;
+    setLoading(true);
+    // Link reutilizable — un solo invite por cuenta, nunca se marca como usado
+    const inviteId = `${account.id}_permanent`;
     await setDoc(doc(db, "invites", inviteId), {
       accountId: account.id,
       accountName: account.name || "X-penses",
       createdBy: currentUser.uid,
-      createdByName: currentUser.displayName,
       createdAt: serverTimestamp(),
       used: false,
-    });
+    }, { merge: true });
 
     const link = `${window.location.origin}/#invite=${inviteId}`;
     setInviteLink(link);
-    setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(link)}&color=1a1a2e&bgcolor=f7f8fc`);
+    setLoading(false);
   };
 
   const copyLink = async () => {
     await navigator.clipboard.writeText(inviteLink);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const shareWhatsApp = () => {
@@ -43,58 +43,49 @@ export default function InviteScreen({ account, currentUser, onClose }) {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
   };
 
-  const shareApp = () => {
-    const text = `¡Conocé X-penses! 💸\nLa app para llevar las cuentas del hogar entre dos.\n\n👉 ${window.location.origin}`;
+  const shareNative = () => {
     if (navigator.share) {
-      navigator.share({ title: "X-penses", text, url: window.location.origin });
+      navigator.share({ title: `Unirse a ${account?.name}`, text: `¡Te invito a ${account?.name} en X-penses! 💸`, url: inviteLink });
     } else {
-      navigator.clipboard.writeText(window.location.origin);
+      copyLink();
     }
   };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", maxHeight: "90vh", overflowY: "auto" }}>
+      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 48px", maxHeight: "85vh", overflowY: "auto", fontFamily: FONT }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: colors.text }}>Invitar a la cuenta</span>
+        
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Invitar a la cuenta</p>
           <button onClick={onClose} style={{ background: colors.pill, border: "none", borderRadius: 50, width: 32, height: 32, fontSize: 18, cursor: "pointer", color: colors.text }}>×</button>
         </div>
 
-        <p style={{ color: colors.textMuted, fontSize: 14, margin: "0 0 20px", lineHeight: 1.5 }}>
-          Compartí este link o QR con la persona que querés sumar a <strong style={{ color: colors.text }}>{account?.name}</strong>. Cuando lo abra e inicie sesión con Google, quedará vinculada automáticamente.
+        <p style={{ color: colors.textMuted, fontSize: 14, margin: "0 0 24px", lineHeight: 1.5, fontFamily: FONT }}>
+          Compartí este link con quien querés sumar a <strong style={{ color: colors.text }}>{account?.name}</strong>. El link es permanente y puede usarse múltiples veces.
         </p>
 
-        {/* QR */}
-        {qrUrl && (
-          <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <div style={{ display: "inline-block", background: "#fff", borderRadius: 20, padding: 16, boxShadow: colors.shadow }}>
-              <img src={qrUrl} alt="QR" style={{ width: 180, height: 180, display: "block" }} />
-            </div>
-            <p style={{ color: colors.textMuted, fontSize: 12, margin: "10px 0 0" }}>Escaneá con la cámara del iPhone</p>
-          </div>
-        )}
-
         {/* Link */}
-        <div style={{ background: colors.pill, borderRadius: 14, padding: "12px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
-          <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inviteLink || "Generando link..."}</p>
-          <button onClick={copyLink} style={{ background: copied ? "#2ecc71" : "#4F7FFA", border: "none", borderRadius: 10, padding: "6px 14px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+        <div style={{ background: colors.pill, borderRadius: 14, padding: "14px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT }}>
+            {loading ? "Generando link..." : inviteLink}
+          </p>
+          <button onClick={copyLink} disabled={loading}
+            style={{ background: copied ? "#2ecc71" : "#4F7FFA", border: "none", borderRadius: 10, padding: "8px 16px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, flexShrink: 0, opacity: loading ? 0.6 : 1 }}>
             {copied ? "✓ Copiado" : "Copiar"}
           </button>
         </div>
 
-        {/* Compartir por WhatsApp */}
-        <button onClick={shareWhatsApp} style={{ width: "100%", padding: 14, borderRadius: 14, background: "#25D366", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        {/* WhatsApp */}
+        <button onClick={shareWhatsApp} disabled={loading}
+          style={{ width: "100%", padding: 15, borderRadius: 14, background: "#25D366", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.6 : 1 }}>
           <span>💬</span> Invitar por WhatsApp
         </button>
 
-        <div style={{ height: 1, background: colors.divider, margin: "16px 0" }} />
-
-        {/* Compartir la app */}
-        <p style={{ color: colors.textMuted, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 10px" }}>Compartir X-penses con amigos</p>
-        <p style={{ color: colors.textMuted, fontSize: 13, margin: "0 0 12px" }}>¿Querés que otros conozcan la app? Compartila.</p>
-        <button onClick={shareApp} style={{ width: "100%", padding: 14, borderRadius: 14, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <span>📤</span> Compartir X-penses
+        {/* Compartir nativo */}
+        <button onClick={shareNative} disabled={loading}
+          style={{ width: "100%", padding: 15, borderRadius: 14, background: colors.pill, color: colors.text, border: "none", fontSize: 15, fontWeight: 600, cursor: loading ? "default" : "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.6 : 1 }}>
+          <span>📤</span> Compartir link
         </button>
       </div>
     </div>

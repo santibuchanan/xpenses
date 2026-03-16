@@ -356,7 +356,7 @@ function AppInner() {
       // setupDone: true — el usuario llegó por invitación, no necesita onboarding
       if (!existingIds.includes(accountId)) await setDoc(doc(db, "users", authUser.uid), { accountIds: [...existingIds, accountId], setupDone: true }, { merge: true });
       else await setDoc(doc(db, "users", authUser.uid), { setupDone: true }, { merge: true });
-      await updateDoc(doc(db, "invites", inviteId), { used: true });
+      // Link reutilizable — nunca se marca como usado
       setClaimData(null);
       setPendingInviteId(null);
       localStorage.removeItem("pendingInviteId");
