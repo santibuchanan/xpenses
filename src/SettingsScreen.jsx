@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc, onSnapshot } from "firebase/firestore";
+import { useState, useRef } from "react";
+import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme, CURRENCIES as CURRENCIES_MAP } from "./theme.jsx";
 import DateInput from "./DateInput";
@@ -306,18 +306,16 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
   );
 }
 
-export default function SettingsScreen({ currentUser, userProfile, account, members, allMembers, onSignOut, onSwitchAccount }) {
+export default function SettingsScreen({ currentUser, userProfile, account, members, allMembers, customCategories, fixedExpenses, onSignOut, onSwitchAccount }) {
   const { colors } = useTheme();
   const isPersonal = account?.type === "personal";
 
   const [showShareApp,      setShowShareApp]      = useState(false);
   const [showCurrencySheet, setShowCurrencySheet] = useState(false);
   const [editingCategory,   setEditingCategory]   = useState(null);
-  const [customCategories,  setCustomCategories]  = useState([]);
-  const [fixedExpenses,     setFixedExpenses]     = useState([]);
-  const [editingFixed,      setEditingFixed]      = useState(null);
-  const [showNewFixed,      setShowNewFixed]      = useState(false);
-  const [savingProfile,     setSavingProfile]     = useState(false);
+  const [editingFixed,  setEditingFixed]  = useState(null);
+  const [showNewFixed,  setShowNewFixed]  = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [myName,            setMyName]            = useState(userProfile?.name || "");
   const [mySalary,          setMySalary]          = useState(userProfile?.salary?.toString() || "");
   const [selectedCurrency,  setSelectedCurrency]  = useState(account?.currency || "ARS");
@@ -329,17 +327,6 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
 
   const cardStyle = { background: colors.card, borderRadius: 16, padding: "14px 16px", marginBottom: 8, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` };
   const inputStyle = { width: "100%", padding: "11px 13px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 12, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
-
-  useEffect(() => {
-    if (!account?.id) return;
-    const u1 = onSnapshot(collection(db, "accounts", account.id, "categories"), snap => {
-      setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data(), isCustom: true })));
-    });
-    const u2 = onSnapshot(collection(db, "accounts", account.id, "fixedExpenses"), snap => {
-      setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    return () => { u1(); u2(); };
-  }, [account?.id]);
 
   // FIX: mostrar solo las categorías activas de la cuenta
   // Las categorías de la cuenta son: DEFAULT_CATEGORIES no desactivadas + customCategories

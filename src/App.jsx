@@ -490,7 +490,7 @@ function AppInner() {
         <Suspense fallback={<Spinner text="Cargando..." />}>
           {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} visibleFixed={visibleFixed} members={allMembers} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} />}
           {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} />}
-          {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
+          {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} customCategories={customCategories} fixedExpenses={fixedExpenses} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
         </Suspense>
       </div>
 
