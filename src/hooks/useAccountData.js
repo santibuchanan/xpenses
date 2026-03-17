@@ -25,11 +25,18 @@ export function useAccountData(accountIds, selectedAccountId, authUser, userProf
   const [members,      setMembers]      = useState([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
 
+  // Si userProfile ya cargó y accountIds sigue vacío, el usuario no tiene cuentas.
+  // Separado del efecto principal para no re-crear listeners cuando cambia userProfile.
+  useEffect(() => {
+    if (accountIds.length === 0 && userProfile !== null) {
+      setAccountsLoading(false);
+    }
+  }, [accountIds, userProfile]);
+
   // Listeners de accounts — uno por cada accountId del usuario
   useEffect(() => {
     if (!accountIds.length) {
       setUserAccounts([]);
-      setAccountsLoading(false);
       return;
     }
     // Marcar loading hasta que todos los listeners hayan respondido al menos una vez
