@@ -23,7 +23,6 @@ export function useFirestoreData(accountId) {
   useEffect(() => {
     if (!accountId) {
       setExpenses([]);
-      setExpensesLoading(false);
       return;
     }
     setExpensesLoading(true);
