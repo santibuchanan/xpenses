@@ -281,6 +281,11 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   };
 
   const pendingDebts = debtPairs.filter(d => !settledPairs[d.debtorUid + "-" + d.creditorUid]);
+  // Esperar a que todos los members del account hayan llegado de Firestore antes de
+  // mostrar el botón Saldar. Con members incompletos, debtPairs es incorrecto (el
+  // algoritmo greedy necesita todos los balances para distribuir deudas).
+  const allMembersLoaded = !account?.memberIds?.length ||
+    account.memberIds.every(uid => realMembers.some(m => m.uid === uid));
   const totalSalary  = (realMembers || []).reduce((acc, mb) => acc + (mb.salary || 0), 0);
 
   // Historial de settlements del mes (no correctivos)
@@ -327,8 +332,8 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
                 {s.balance > 0.005 ? "+" : ""}{fmt(Math.abs(s.balance) < 0.005 ? 0 : s.balance)}
               </p>
 
-              {/* Botón Saldar — solo si este miembro tiene deuda pendiente */}
-              {myDebts.length > 0 ? (
+              {/* Botón Saldar — solo si este miembro tiene deuda pendiente y todos los members cargaron */}
+              {allMembersLoaded && myDebts.length > 0 ? (
                 <button
                   onClick={() => setSettleModal({ debtorUid: m.uid, debts: myDebts })}
                   style={{ flexShrink: 0, marginLeft: 8, padding: "7px 14px", borderRadius: 20, background: "#2ecc7118", color: "#2ecc71", border: "1px solid #2ecc7144", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
