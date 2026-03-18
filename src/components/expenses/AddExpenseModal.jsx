@@ -104,7 +104,23 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
   // Multi-payer state
   const [multiPayer, setMultiPayer] = useState(false);
   const [paidAmounts, setPaidAmounts] = useState({});
-  const setPaidAmt = (uid, val) => setPaidAmounts(prev => ({ ...prev, [uid]: val }));
+  const [primaryPayer, setPrimaryPayer] = useState(currentUser.uid);
+
+  const r2 = (n) => Math.round(n * 100) / 100;
+
+  const setPaidAmt = (uid, val) => {
+    setPaidAmounts(prev => {
+      const updated = { ...prev, [uid]: val };
+      // Autoajustar al pagador principal: total - suma del resto
+      const total = amountInput.numericValue || 0;
+      const othersTotal = Object.entries(updated)
+        .filter(([u]) => u !== primaryPayer)
+        .reduce((s, [, v]) => s + (parseFloat(v) || 0), 0);
+      updated[primaryPayer] = String(r2(Math.max(0, total - othersTotal)));
+      return updated;
+    });
+  };
+
   const multiPayerTotal = Math.round(
     Object.values(paidAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0) * 100
   ) / 100;
@@ -228,15 +244,31 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
 
         {showPaidBy && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <p style={{ ...labelStyle, margin: 0 }}>Pagó</p>
-              <button
-                onClick={() => setMultiPayer(mp => {
-                  if (!mp) setPaidAmounts({ [form.paidBy]: String(amountInput.numericValue || "") });
-                  return !mp;
-                })}
-                style={{ fontSize: 11, fontWeight: 700, color: "#4F7FFA", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT, letterSpacing: 0.4 }}>
-                {multiPayer ? "Un pagador" : "Pago compartido"}
+            <p style={labelStyle}>Pagó</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+              <button type="button"
+                onClick={() => {
+                  if (multiPayer) setMultiPayer(false);
+                }}
+                style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                  borderColor: !multiPayer ? "#4F7FFA" : colors.inputBorder,
+                  background: !multiPayer ? "#4F7FFA11" : colors.input,
+                  color: !multiPayer ? "#4F7FFA" : colors.textMuted }}>
+                👤 Un pagador
+              </button>
+              <button type="button"
+                onClick={() => {
+                  if (!multiPayer) {
+                    setPrimaryPayer(form.paidBy);
+                    setPaidAmounts({ [form.paidBy]: String(amountInput.numericValue || "") });
+                    setMultiPayer(true);
+                  }
+                }}
+                style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                  borderColor: multiPayer ? "#4F7FFA" : colors.inputBorder,
+                  background: multiPayer ? "#4F7FFA11" : colors.input,
+                  color: multiPayer ? "#4F7FFA" : colors.textMuted }}>
+                👥 Entre varios
               </button>
             </div>
             {!multiPayer ? (
