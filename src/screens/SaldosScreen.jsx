@@ -254,11 +254,14 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
         month: currentMonth, full: true,
         createdAt: new Date().toISOString(),
       });
-      setSettledPairs(p => ({ ...p, [debtorUid + "-" + creditorUid]: true }));
-      // Si el deudor ya no tiene más deudas pendientes, cerrar modal
+      const newSettledPairs = { ...settledPairs, [debtorUid + "-" + creditorUid]: true };
+      setSettledPairs(newSettledPairs);
       setSettleModal(prev => {
         if (!prev) return null;
-        const remaining = prev.debts.filter(d => d.creditorUid !== creditorUid);
+        const remaining = debtPairs.filter(d =>
+          d.debtorUid === prev.debtorUid &&
+          !newSettledPairs[d.debtorUid + "-" + d.creditorUid]
+        );
         return remaining.length === 0 ? null : { ...prev, debts: remaining };
       });
       await sendNotification({
