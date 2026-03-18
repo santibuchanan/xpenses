@@ -37,18 +37,39 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  // Multi-payer state — inicializado desde expense.paidBy si ya es array
+  const [multiPayer, setMultiPayer] = useState(() => Array.isArray(expense.paidBy));
+  const [paidAmounts, setPaidAmounts] = useState(() => {
+    if (Array.isArray(expense.paidBy)) {
+      return Object.fromEntries(expense.paidBy.map(p => [p.uid, String(p.amount)]));
+    }
+    return {};
+  });
+  const setPaidAmt = (uid, val) => setPaidAmounts(prev => ({ ...prev, [uid]: val }));
+  const multiPayerTotal = Math.round(
+    Object.values(paidAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0) * 100
+  ) / 100;
+
   // Amount input con hook
   const amountInput = useAmountInput(expense.amount);
   useEffect(() => { set("amount", amountInput.numericValue || 0); }, [amountInput.numericValue]);
 
   // Dirty tracking + discard modal
   const [showDiscard, setShowDiscard] = useState(false);
+  const paidByDirty = (() => {
+    if (multiPayer !== Array.isArray(expense.paidBy)) return true;
+    if (multiPayer && Array.isArray(expense.paidBy)) {
+      const origMap = Object.fromEntries(expense.paidBy.map(p => [p.uid, p.amount]));
+      return profiles.some(p => Math.abs((parseFloat(paidAmounts[p.uid]) || 0) - (origMap[p.uid] || 0)) >= 0.01);
+    }
+    return form.paidBy !== expense.paidBy;
+  })();
   const isDirty = form.concept !== expense.concept
     || String(form.amount) !== String(expense.amount)
     || form.category !== expense.category
     || form.date !== expense.date
     || form.type !== expense.type
-    || form.paidBy !== expense.paidBy;
+    || paidByDirty;
   const handleClose = () => { if (isDirty) setShowDiscard(true); else onClose(); };
 
   // Swipe-to-close
@@ -84,7 +105,15 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
   // Validación antes de guardar
   const canSave = () => {
     if (!form.concept?.trim() || !form.amount) return false;
-    if (form.type !== "mio" && !form.paidBy) return false;
+    if (form.type !== "mio") {
+      if (multiPayer) {
+        const hasAnyPayer = Object.values(paidAmounts).some(v => (parseFloat(v) || 0) > 0);
+        if (!hasAnyPayer) return false;
+        if (Math.abs(multiPayerTotal - parseFloat(form.amount)) >= 0.01) return false;
+      } else {
+        if (!form.paidBy) return false;
+      }
+    }
     if (form.type === "personal" && (!form.forWhom || form.forWhom.length === 0)) return false;
     if (form.type === "mio" && !form.owner) return false;
     return true;
@@ -93,14 +122,20 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
   const handleSave = async () => {
     if (!canSave()) return;
     setSaving(true);
+    const paidByValue = multiPayer
+      ? Object.entries(paidAmounts)
+          .filter(([, v]) => (parseFloat(v) || 0) > 0)
+          .map(([uid, v]) => ({ uid, amount: parseFloat(v) }))
+      : form.paidBy;
     const { id, ...data } = form;
     await updateDoc(doc(db, "expenses", id), {
       ...data,
+      paidBy: paidByValue,
       amount: parseFloat(data.amount),
       month: data.date?.slice(0, 7) || data.month,
     });
     setSaving(false);
-    if (onSave) await onSave({ ...data, amount: parseFloat(data.amount) });
+    if (onSave) await onSave({ ...data, paidBy: paidByValue, amount: parseFloat(data.amount) });
     else onClose();
   };
 
@@ -201,19 +236,51 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
         {/* PAGÓ */}
         {showPaidBy && (
           <>
-            <p style={labelStyle}>Pagó</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {profiles.map(p => (
-                <button key={p.uid} onClick={() => set("paidBy", p.uid)}
-                  style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                    borderColor: form.paidBy === p.uid ? (p.color || "#4F7FFA") : colors.inputBorder,
-                    background: form.paidBy === p.uid ? (p.color || "#4F7FFA") + "18" : colors.input,
-                    color: form.paidBy === p.uid ? (p.color || "#4F7FFA") : colors.textMuted }}>
-                  {p.name}
-                </button>
-              ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <p style={{ ...labelStyle, margin: 0 }}>Pagó</p>
+              <button
+                onClick={() => setMultiPayer(mp => {
+                  if (!mp) setPaidAmounts({ [form.paidBy]: String(form.amount || "") });
+                  return !mp;
+                })}
+                style={{ fontSize: 11, fontWeight: 700, color: "#4F7FFA", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT, letterSpacing: 0.4 }}>
+                {multiPayer ? "Un pagador" : "Pago compartido"}
+              </button>
             </div>
-            {!form.paidBy && <p style={{ fontSize: 12, color: "#e74c3c", margin: "-10px 0 12px", fontFamily: FONT }}>Seleccioná quién pagó</p>}
+            {!multiPayer ? (
+              <>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                  {profiles.map(p => (
+                    <button key={p.uid} onClick={() => set("paidBy", p.uid)}
+                      style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                        borderColor: form.paidBy === p.uid ? (p.color || "#4F7FFA") : colors.inputBorder,
+                        background: form.paidBy === p.uid ? (p.color || "#4F7FFA") + "18" : colors.input,
+                        color: form.paidBy === p.uid ? (p.color || "#4F7FFA") : colors.textMuted }}>
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+                {!form.paidBy && <p style={{ fontSize: 12, color: "#e74c3c", margin: "-10px 0 12px", fontFamily: FONT }}>Seleccioná quién pagó</p>}
+              </>
+            ) : (
+              <div style={{ marginBottom: 14 }}>
+                {profiles.map(p => (
+                  <div key={p.uid} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ flex: 1, fontWeight: 600, color: colors.text, fontFamily: FONT, fontSize: 14 }}>{p.name}</span>
+                    <span style={{ color: colors.textMuted, fontFamily: FONT, fontSize: 15 }}>{currSymbol}</span>
+                    <input type="text" inputMode="decimal"
+                      value={paidAmounts[p.uid] ?? ""}
+                      onChange={e => setPaidAmt(p.uid, e.target.value)}
+                      placeholder="0"
+                      style={{ width: 90, padding: "8px 10px", borderRadius: 10, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", background: colors.input, color: colors.inputText, boxSizing: "border-box" }} />
+                  </div>
+                ))}
+                <p style={{ fontSize: 12, textAlign: "right", fontFamily: FONT, fontWeight: 600, margin: "2px 0 0",
+                  color: Math.abs(multiPayerTotal - parseFloat(form.amount || 0)) < 0.01 ? "#27ae60" : "#e74c3c" }}>
+                  Total: {currSymbol}{multiPayerTotal.toLocaleString("es-AR")} / {currSymbol}{parseFloat(form.amount || 0).toLocaleString("es-AR")}
+                </p>
+              </div>
+            )}
           </>
         )}
 

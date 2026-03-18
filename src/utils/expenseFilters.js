@@ -31,6 +31,22 @@ export const getMonthExpenses = (expenses, month) =>
   (expenses || []).filter(e => e.month === month && !e.deleted);
 
 /**
+ * Devuelve cuánto pagó `uid` en un gasto dado.
+ * Compatible con paidBy: string (formato viejo) y Array<{uid,amount}> (nuevo).
+ *
+ * @param {object} expense
+ * @param {string} uid
+ * @returns {number}
+ */
+export const getAmountPaidBy = (expense, uid) => {
+  if (Array.isArray(expense.paidBy)) {
+    const entry = expense.paidBy.find(p => p.uid === uid);
+    return entry ? entry.amount : 0;
+  }
+  return expense.paidBy === uid ? expense.amount : 0;
+};
+
+/**
  * Calcula el cutoff de mes para limitar lecturas de Firestore.
  * Por defecto retorna 6 meses atrás.
  *

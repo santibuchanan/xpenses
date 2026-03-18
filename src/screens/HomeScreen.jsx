@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useTheme, formatAmount } from "../theme.jsx";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
 import { calcSaldos } from "../hooks/useBalances.js";
+import { getAmountPaidBy } from "../utils/expenseFilters.js";
 import { SwipeableExpenseRow } from "../components/expenses/SwipeableExpenseRow.jsx";
 import { FONT } from "../constants/ui.js";
 
@@ -252,7 +253,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
               {isPozo && (
                 <p style={{ fontSize: 12, margin: "6px 0 0", fontFamily: FONT, color: "#ffffff88", lineHeight: 1.6 }}>
                   {(allMembers || []).filter(m => !!m.uid).map(m => {
-                    const mTotal = monthExp.filter(e => e.paidBy === m.uid).reduce((s, e) => s + e.amount, 0);
+                    const mTotal = monthExp.reduce((s, e) => s + getAmountPaidBy(e, m.uid), 0);
                     return `${m.name}: ${fmt(mTotal)}`;
                   }).join(" · ")}
                 </p>
@@ -270,7 +271,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
           ) : isPozo ? (
             <>
               {(allMembers || []).filter(m => !!m.uid).map(m => {
-                const mTotal = monthExp.filter(e => e.paidBy === m.uid).reduce((s, e) => s + e.amount, 0);
+                const mTotal = monthExp.reduce((s, e) => s + getAmountPaidBy(e, m.uid), 0);
                 return <StatPill key={m.uid} label={m.name} value={fmt(mTotal)} color={m.color || "#f39c12"} />;
               })}
             </>

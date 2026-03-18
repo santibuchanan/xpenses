@@ -2,7 +2,7 @@
 
 > **Propósito:** Referencia de arquitectura que debe consultarse antes de cada sprint. Evita regresiones en zonas frágiles.
 
-**Última actualización:** Sesión Mar 18, 2026
+**Última actualización:** Sesión Mar 17, 2026 (multi-payer)
 **Deploy:** https://xpenses-seven.vercel.app
 **Firebase project:** xpenses-305ee
 
@@ -166,7 +166,10 @@ Origen: colección `expenses/` (filtrada por `accountId`)
   category:  string,
   date:      string,           // "YYYY-MM-DD"
   month:     string,           // "YYYY-MM"
-  paidBy:    string,           // uid del pagador
+  paidBy:    string | Array<{uid: string, amount: number}>,
+  //   string     → formato viejo (pagador único, uid)
+  //   Array      → multi-pagador; cada entrada = {uid, amount} — suma debe igualar expense.amount
+  //   ⚠️ calcSaldos() y getAmountPaidBy() son retrocompatibles con ambos formatos
   forWhom:   string[],         // uids de destinatarios (type "personal")
   owner:     string,           // uid del dueño (type "mio")
   deleted:   boolean,          // soft delete
@@ -412,6 +415,7 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | Listeners en `AppInner` | `App.jsx` | Sin cleanup correcto → memory leaks o datos duplicados |
 | `account.disabledCategories` | `App.jsx`, `SettingsScreen`, `ConfigScreen` | Lógica diferente en create vs edit |
 | `isPozo` derivado de `account.type` | `App.jsx`, `HomeScreen`, `SaldosScreen`, modales | Cualquier cambio en el contrato de `type` rompe estas 4 capas |
+| `paidBy` dual-format | `useBalances.js`, `expenseFilters.js`, modales | String (viejo) vs Array<{uid,amount}> (nuevo) — usar siempre `getPaidEntries()` / `getAmountPaidBy()` |
 
 ### 🟡 Media prioridad
 
@@ -439,6 +443,7 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | Cálculo de saldos | `hooks/useBalances.js` | `HomeScreen`, `SaldosScreen` |
 | Normalización de members | `utils/normalizeMembers.js` | `App.jsx` → todos los componentes |
 | Filtro de gastos fijos visibles | Inline en `HomeScreen` y `SaldosScreen` (duplicado) | Ambas pantallas |
+| Cuánto pagó un uid por un gasto | `getAmountPaidBy()` en `utils/expenseFilters.js` | `HomeScreen` (isPozo), `SaldosScreen` (isPozo) |
 | Formateo de montos | `formatAmount()` en `theme.jsx` | Todas las pantallas |
 | Operaciones de escritura de gastos | `hooks/useExpenses.js` | `App.jsx` |
 | Input de montos | `hooks/useAmountInput.js` | `AddExpenseModal`, `EditExpenseModal` |
@@ -475,14 +480,17 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 - Default `paidBy` = usuario que carga
 - Default `forWhom` = todos (tipo "hogar")
 - Sin botón X — swipe o confirmar descarte
-- Se cierra correctamente después de guardar
+- Se cierra correctamente después de guardar (Tarea 2 fix)
 - Tipos en cuentas shared: Ordinario / Para otro / Extraordinario / Para mí
 - Tipos en cuentas pozo (`isPozo`): solo Ordinario y Extraordinario
+- Toggle "Pago compartido" → modo multi-pagador: cada miembro ingresa su monto; indicador total en rojo/verde
 
 ### EditExpenseModal ✅
 - Mismos tipos con misma lógica `isPozo` que AddExpenseModal
 - Sin botón X — swipe o confirmar descarte
 - Campo monto con símbolo de moneda
+- Toggle "Pago compartido" → modo multi-pagador; inicializa desde `expense.paidBy` si ya es array
+- `isDirty` y `canSave()` consideran tanto modo single como multi-payer
 
 ### AccountSelectorScreen ✅
 - Skeleton loading mientras `accountsLoading`

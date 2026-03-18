@@ -101,13 +101,27 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
   const [touched, setTouched] = useState({ concept: false, amount: false });
   const touchField = (f) => setTouched(t => ({ ...t, [f]: true }));
 
+  // Multi-payer state
+  const [multiPayer, setMultiPayer] = useState(false);
+  const [paidAmounts, setPaidAmounts] = useState({});
+  const setPaidAmt = (uid, val) => setPaidAmounts(prev => ({ ...prev, [uid]: val }));
+  const multiPayerTotal = Math.round(
+    Object.values(paidAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0) * 100
+  ) / 100;
+
   const handleAdd = async () => {
     setTouched({ concept: true, amount: true });
     const amount = amountInput.numericValue || 0;
     if (!form.concept || amount <= 0) return;
+    if (multiPayer && Math.abs(multiPayerTotal - amount) >= 0.01) return;
     setLoading(true);
+    const paidByValue = multiPayer
+      ? Object.entries(paidAmounts)
+          .filter(([, v]) => (parseFloat(v) || 0) > 0)
+          .map(([uid, v]) => ({ uid, amount: parseFloat(v) }))
+      : form.paidBy;
     try {
-      await onAdd({ ...form, amount, month: form.date.slice(0, 7) });
+      await onAdd({ ...form, paidBy: paidByValue, amount, month: form.date.slice(0, 7) });
     } catch(e) {
       console.error("onAdd error", e);
       setLoading(false);
@@ -214,18 +228,48 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
 
         {showPaidBy && (
           <>
-            <p style={labelStyle}>Pagó</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {memberList.map(m => (
-                <button key={m.uid} onClick={() => set("paidBy", m.uid)}
-                  style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                    borderColor: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder,
-                    background: form.paidBy === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input,
-                    color: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>
-                  {m.name}
-                </button>
-              ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <p style={{ ...labelStyle, margin: 0 }}>Pagó</p>
+              <button
+                onClick={() => setMultiPayer(mp => {
+                  if (!mp) setPaidAmounts({ [form.paidBy]: String(amountInput.numericValue || "") });
+                  return !mp;
+                })}
+                style={{ fontSize: 11, fontWeight: 700, color: "#4F7FFA", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT, letterSpacing: 0.4 }}>
+                {multiPayer ? "Un pagador" : "Pago compartido"}
+              </button>
             </div>
+            {!multiPayer ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                {memberList.map(m => (
+                  <button key={m.uid} onClick={() => set("paidBy", m.uid)}
+                    style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                      borderColor: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder,
+                      background: form.paidBy === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input,
+                      color: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ marginBottom: 14 }}>
+                {memberList.map(m => (
+                  <div key={m.uid} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ flex: 1, fontWeight: 600, color: colors.text, fontFamily: FONT, fontSize: 14 }}>{m.name}</span>
+                    <span style={{ color: colors.textMuted, fontFamily: FONT, fontSize: 15 }}>{currSymbol}</span>
+                    <input type="text" inputMode="decimal"
+                      value={paidAmounts[m.uid] ?? ""}
+                      onChange={e => setPaidAmt(m.uid, e.target.value)}
+                      placeholder="0"
+                      style={{ width: 90, padding: "8px 10px", borderRadius: 10, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", background: colors.input, color: colors.inputText, boxSizing: "border-box" }} />
+                  </div>
+                ))}
+                <p style={{ fontSize: 12, textAlign: "right", fontFamily: FONT, fontWeight: 600, margin: "2px 0 0",
+                  color: Math.abs(multiPayerTotal - (amountInput.numericValue || 0)) < 0.01 ? "#27ae60" : "#e74c3c" }}>
+                  Total: {currSymbol}{multiPayerTotal.toLocaleString("es-AR")} / {currSymbol}{(amountInput.numericValue || 0).toLocaleString("es-AR")}
+                </p>
+              </div>
+            )}
           </>
         )}
 

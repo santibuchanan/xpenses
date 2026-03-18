@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import { useTheme, formatAmount, CURRENCIES } from "../theme.jsx";
 import { useNotif, NOTIF_TYPES } from "../notifications";
 import { calcSaldos } from "../hooks/useBalances.js";
+import { getAmountPaidBy } from "../utils/expenseFilters.js";
 import DateInput from "../DateInput.jsx";
 import { FONT } from "../constants/ui.js";
 
@@ -325,7 +326,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     .filter(c => c.total > 0)
     .sort((a, b) => b.total - a.total);
   const memberTotals = realMembers
-    .map(m => ({ ...m, total: monthExp.filter(e => e.paidBy === m.uid).reduce((s, e) => s + e.amount, 0) }))
+    .map(m => ({ ...m, total: monthExp.reduce((s, e) => s + getAmountPaidBy(e, m.uid), 0) }))
     .sort((a, b) => b.total - a.total);
 
   // ── HISTORIAL — mes independiente de currentMonth ──
