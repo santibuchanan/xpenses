@@ -136,14 +136,20 @@ export function calcSaldos(expenses, fixedExpenses, members, divisionSystem, cur
 
     // EXTRAORDINARIO: se divide entre los destinatarios (forWhom). Si forWhom está
     // vacío o ausente, se divide entre todos los miembros (comportamiento legacy).
+    // Para el paid: usa campos paid_${uid} si existen (UI de múltiples pagadores),
+    // sino cae a paidBy como pagador total (retrocompatibilidad con gastos viejos).
     if (e.type === "extraordinary") {
       const forWhomUids = (Array.isArray(e.forWhom) && e.forWhom.length > 0)
         ? e.forWhom.filter(uid => result[uid] !== undefined)
         : memberUids;
       const splitUids = forWhomUids.length > 0 ? forWhomUids : memberUids;
       const shares = splitExact(e.amount, splitUids, salaryMap, "equal", 0, splitUids[0]);
+      const hasPaidFields = members.some(m => (e[`paid_${m.uid}`] || 0) > 0);
+      const fallbackEntries = hasPaidFields ? [] : getPaidEntries(e.paidBy, e.amount);
       members.forEach(m => {
-        const paid = e[`paid_${m.uid}`] || 0;
+        const paid = hasPaidFields
+          ? (e[`paid_${m.uid}`] || 0)
+          : (fallbackEntries.find(p => p.uid === m.uid)?.amount || 0);
         if (result[m.uid] !== undefined) {
           result[m.uid].paid = r2(result[m.uid].paid + paid);
           result[m.uid].owes = r2(result[m.uid].owes + (shares[m.uid] || 0));
