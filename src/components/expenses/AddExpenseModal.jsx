@@ -108,11 +108,13 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
     setLoading(true);
     try {
       await onAdd({ ...form, amount, month: form.date.slice(0, 7) });
-      onClose();
     } catch(e) {
       console.error("onAdd error", e);
       setLoading(false);
+      return;
     }
+    // onAdd succeeded — siempre cerrar aunque onClose() lance
+    try { onClose(); } catch {}
   };
 
   const labelStyle = { fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT };
