@@ -232,15 +232,24 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
         </div>
         <div style={{ background: meColor, borderRadius: 22, padding: 20 }}>
           <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Gastos — {monthLabel}</p>
-          <p style={{ color: "#fff", fontSize: 36, fontWeight: 700, margin: "0 0 4px", letterSpacing: -1, fontFamily: FONT }}>{fmt(totalMonthExp)}</p>
-          {!isPersonal && (() => {
-            const displayBalance = Math.abs(myBalance) < 0.5 ? 0 : myBalance;
-            return (
-              <p style={{ fontSize: 13, margin: "6px 0 0", fontFamily: FONT, color: displayBalance > 0 ? "#2ecc71" : displayBalance < 0 ? "#ff6b6b" : "#ffffff66", fontWeight: 600 }}>
-                {displayBalance > 0 ? `+${fmt(displayBalance)} a favor` : displayBalance < 0 ? `-${fmt(Math.abs(displayBalance))} a pagar` : "Saldado ✓"}
-              </p>
-            );
-          })()}
+          {isLoading ? (
+            <>
+              <div style={{ width: 140, height: 36, borderRadius: 10, background: "#ffffff33", marginBottom: 4 }} />
+              <div style={{ width: 100, height: 13, borderRadius: 6, background: "#ffffff33", marginTop: 8 }} />
+            </>
+          ) : (
+            <>
+              <p style={{ color: "#fff", fontSize: 36, fontWeight: 700, margin: "0 0 4px", letterSpacing: -1, fontFamily: FONT }}>{fmt(totalMonthExp)}</p>
+              {!isPersonal && (() => {
+                const displayBalance = Math.abs(myBalance) < 0.5 ? 0 : myBalance;
+                return (
+                  <p style={{ fontSize: 13, margin: "6px 0 0", fontFamily: FONT, color: displayBalance > 0 ? "#2ecc71" : displayBalance < 0 ? "#ff6b6b" : "#ffffff66", fontWeight: 600 }}>
+                    {displayBalance > 0 ? `+${fmt(displayBalance)} a favor` : displayBalance < 0 ? `-${fmt(Math.abs(displayBalance))} a pagar` : "Saldado ✓"}
+                  </p>
+                );
+              })()}
+            </>
+          )}
         </div>
       </div>
 
