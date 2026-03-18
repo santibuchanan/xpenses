@@ -2,7 +2,7 @@
 
 > **Propósito:** Referencia de arquitectura que debe consultarse antes de cada sprint. Evita regresiones en zonas frágiles.
 
-**Última actualización:** Sesión Mar 17, 2026 (multi-payer + onboarding)
+**Última actualización:** Sesión Mar 17, 2026
 **Deploy:** https://xpenses-seven.vercel.app
 **Firebase project:** xpenses-305ee
 
@@ -478,13 +478,14 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 - Excluye gastos `deleted: true`
 
 ### AddExpenseModal ✅
-- Default `paidBy` = usuario que carga
+- Default `paidBy` = usuario que carga (string uid); en modo multi-pagador escribe `Array<{uid,amount}>`
 - Default `forWhom` = todos (tipo "hogar")
 - Sin botón X — swipe o confirmar descarte
-- Se cierra correctamente después de guardar (Tarea 2 fix)
+- Se cierra correctamente después de guardar: `onClose()` fuera del try/catch de `onAdd()` (fix Mar 17)
 - Tipos en cuentas shared: Ordinario / Para otro / Extraordinario / Para mí
 - Tipos en cuentas pozo (`isPozo`): solo Ordinario y Extraordinario
-- Toggle "Pago compartido" → modo multi-pagador: cada miembro ingresa su monto; indicador total en rojo/verde
+- Toggle "Pago compartido" → modo multi-pagador: inputs por miembro, indicador total rojo/verde
+- Validación: bloquea submit si total multi-payer ≠ monto del gasto (diff ≥ 0.01)
 
 ### EditExpenseModal ✅
 - Mismos tipos con misma lógica `isPozo` que AddExpenseModal
@@ -533,6 +534,9 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | `visibleFixed` duplicado en HomeScreen/SaldosScreen | Baja | Deuda técnica |
 | Scroll lock de sheets no centralizado | Baja | Deuda técnica |
 | MenuPanel: label "Cuenta personal" no contempla pozo | Baja | Cosmético pendiente |
+| `SwipeableExpenseRow`: `allMembers.find(m => m.uid === e.paidBy)` rompe con multi-payer (muestra vacío) | Media | Deuda técnica Mar 17 |
+| `useExpenses.js`: `delta[expense.paidBy]` no maneja paidBy array en lógica de notificaciones | Media | Deuda técnica Mar 17 |
+| `removeMember.js`: `e.paidBy === memberUid` no maneja array → no detecta pagador en multi-payer | Baja | Deuda técnica Mar 17 |
 
 ### ✅ Resueltos en sesiones anteriores
 
