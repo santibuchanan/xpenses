@@ -96,7 +96,7 @@ export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, col
   const PEEK = 80;
 
   const getTypeInfo = () => {
-    if (e.type === "hogar") return { label: "Hogar", color: "#4F7FFA" };
+    if (e.type === "hogar") return { label: "Ordinario", color: "#4F7FFA" };
     if (e.type === "extraordinary") return { label: "Extraordinario", color: "#f39c12" };
     const destUids = e.type === "mio" ? (e.owner ? [e.owner] : []) : forWhomUids;
     const iAmDest = destUids.includes(currentUser?.uid);

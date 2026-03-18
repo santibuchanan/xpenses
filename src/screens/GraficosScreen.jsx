@@ -40,9 +40,9 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
 
   const barDataTipoMonth = [{
     mes: barMonth ? new Date(barMonth + "-02").toLocaleString("es-AR", { month: "short", year: "2-digit" }) : "-",
-    Hogar:    activeExpenses.filter(e => e.month === barMonth && e.type === "hogar").reduce((s, e) => s + e.amount, 0),
-    Personal: activeExpenses.filter(e => e.month === barMonth && e.type === "mio").reduce((s, e) => s + e.amount, 0),
-    Extra:    activeExpenses.filter(e => e.month === barMonth && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0),
+    Ordinario:     activeExpenses.filter(e => e.month === barMonth && e.type === "hogar").reduce((s, e) => s + e.amount, 0),
+    "Para mí":     activeExpenses.filter(e => e.month === barMonth && e.type === "mio").reduce((s, e) => s + e.amount, 0),
+    Extraordinario: activeExpenses.filter(e => e.month === barMonth && e.type === "extraordinary").reduce((s, e) => s + e.amount, 0),
     Fijos: (fixedExpenses || []).filter(f => {
       const start = (f.startDate || "2000-01").slice(0, 7);
       return barMonth >= start;
@@ -103,9 +103,9 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
                 {barView === "total"
                   ? <Bar dataKey="Total" fill="#4F7FFA" radius={[6,6,0,0]} />
                   : <>
-                      <Bar dataKey="Hogar"    fill="#4F7FFA" radius={[6,6,0,0]} />
-                      <Bar dataKey="Personal" fill="#2ecc71" radius={[6,6,0,0]} />
-                      <Bar dataKey="Extra"    fill="#f39c12" radius={[6,6,0,0]} />
+                      <Bar dataKey="Ordinario"      fill="#4F7FFA" radius={[6,6,0,0]} />
+                      <Bar dataKey="Para mí"        fill="#2ecc71" radius={[6,6,0,0]} />
+                      <Bar dataKey="Extraordinario" fill="#f39c12" radius={[6,6,0,0]} />
                       <Bar dataKey="Fijos"    fill="#9b59b6" radius={[6,6,0,0]} />
                     </>
                 }
@@ -114,7 +114,7 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
         }
         {barView === "por_tipo" && (
           <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>
-            {[["#4F7FFA","Hogar"],["#2ecc71","Personal"],["#f39c12","Extra"],["#9b59b6","Fijos"]].map(([col, lbl]) => (
+            {[["#4F7FFA","Ordinario"],["#2ecc71","Para mí"],["#f39c12","Extraordinario"],["#9b59b6","Fijos"]].map(([col, lbl]) => (
               <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <div style={{ width: 10, height: 10, borderRadius: 3, background: col }} />
                 <span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span>
