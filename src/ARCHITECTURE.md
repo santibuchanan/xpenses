@@ -2,7 +2,7 @@
 
 > **Propósito:** Referencia de arquitectura que debe consultarse antes de cada sprint. Evita regresiones en zonas frágiles.
 
-**Última actualización:** Sesión Mar 17, 2026 (multi-payer)
+**Última actualización:** Sesión Mar 17, 2026 (multi-payer + onboarding)
 **Deploy:** https://xpenses-seven.vercel.app
 **Firebase project:** xpenses-305ee
 
@@ -29,6 +29,7 @@ src/
 ├── InviteJoinScreen.jsx             ← Flujo de invite autónomo (auth + join en un componente)
 ├── InviteScreen.jsx                 ← Modal de generación de invite (link permanente reutilizable)
 ├── AccountSelectorScreen.jsx        ← Selector de cuentas con skeleton loading
+├── OnboardingScreen.jsx             ← Bienvenida inicial (3 slides), mostrado una vez por dispositivo
 ├── ConfigScreen.jsx                 ← Onboarding inicial al crear primera cuenta
 ├── SettingsScreen.jsx               ← Ajustes de cuenta existente
 ├── EditExpenseModal.jsx             ← Modal editar gasto
@@ -512,6 +513,14 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 - Al guardar con `divisionSystem = "pozo"`: escribe `type: "pozo"` en Firestore (regla de derivación)
 - "Pozo Común" reemplaza "Gastos en común" (`"informativo"`) — migración forward-only
 
+### OnboardingScreen ✅
+- 3 slides con emoji, título y descripción; mostrado UNA vez por dispositivo antes de `ConfigScreen`
+- Detectado via `localStorage.getItem("xpenses-onboarding-done")` → string "1"
+- Solo se muestra cuando `!userProfile?.setupDone && !inviteFlow`
+- Slide 1: personalizado con nombre del usuario (`user.displayName.split(" ")[0]`)
+- CTA "Saltar" disponible en slides 1 y 2 (va directo a ConfigScreen)
+- CTA "Crear mi cuenta →" en slide 3 llama a `onDone()` que setea el flag en localStorage
+
 ---
 
 ## 8. Pendientes técnicos
@@ -535,6 +544,9 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | Tipo de cuenta "Pozo Común" — `type: "pozo"` en Firestore, UI en 6 componentes | Mar 18 |
 | CLAUDE.md con instrucciones git y stack para Claude Code | Mar 18 |
 | allMembersLoaded guard en SaldosScreen (evita debtPairs prematuros) | Mar 17 |
+| AddExpenseModal frizado en "Guardando..." — fix Tarea 2 | Mar 17 |
+| Multi-pagador por gasto — paidBy: string\|Array<{uid,amount}> retrocompat | Mar 17 |
+| Onboarding básico 3 slides antes de ConfigScreen | Mar 17 |
 | SettleModal auto-avanza al siguiente acreedor | Mar 17 |
 
 ---

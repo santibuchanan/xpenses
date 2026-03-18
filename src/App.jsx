@@ -4,6 +4,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
 import AuthScreen from "./AuthScreen";
 import ConfigScreen from "./ConfigScreen";
+import OnboardingScreen from "./OnboardingScreen";
 import AccountSelectorScreen from "./AccountSelectorScreen";
 import WelcomeScreen from "./WelcomeScreen";
 import EmailAuthScreen from "./EmailAuthScreen";
@@ -267,6 +268,8 @@ function AppInner() {
   const [pendingInviteId, setPendingInviteId] = useState(null);
   const [claimData, setClaimData]       = useState(null);
   const [accountIds, setAccountIds]     = useState([]);
+  // Onboarding: se muestra una vez por dispositivo a usuarios nuevos (antes de ConfigScreen)
+  const [onboardingDone, setOnboardingDone] = useState(() => !!localStorage.getItem("xpenses-onboarding-done"));
   const currentMonth = getCurrentMonth();
 
   // ── Hooks de datos — reemplazan todos los useEffects inline de App.jsx ──
@@ -450,7 +453,15 @@ function AppInner() {
   if (!authUser) return <AuthScreen />;
   // Si hay un invite pendiente, no mostrar ConfigScreen — el usuario llegó por invitación
   // y va a ser agregado a una cuenta existente, no necesita crear una nueva.
-  if (!userProfile?.setupDone && !pendingInviteId && !claimData && !inviteIdFromUrl) return <ConfigScreen user={authUser} onDone={() => {}} />;
+  if (!userProfile?.setupDone && !pendingInviteId && !claimData && !inviteIdFromUrl) {
+    if (!onboardingDone) return (
+      <OnboardingScreen
+        user={authUser}
+        onDone={() => { localStorage.setItem("xpenses-onboarding-done", "1"); setOnboardingDone(true); }}
+      />
+    );
+    return <ConfigScreen user={authUser} onDone={() => {}} />;
+  }
   if (!selectedAccountId && accountsLoading) return <Spinner text="Cargando cuentas..." />;
   if (!selectedAccountId) return (
     <AccountSelectorScreen
