@@ -530,7 +530,7 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 |------|-----------|--------|
 | Listeners duplicados SettingsScreen (T1) | Media | Pendiente |
 | Push notifications (FCM) | Alta | Pendiente |
-| Eliminación de cuenta backend | Media | Pendiente decisión |
+| Eliminación de cuenta usuario | Media | En debugging Mar 17 — reglas Firestore corregidas, logs agregados |
 | `visibleFixed` duplicado en HomeScreen/SaldosScreen | Baja | Deuda técnica |
 | Scroll lock de sheets no centralizado | Baja | Deuda técnica |
 | MenuPanel: label "Cuenta personal" no contempla pozo | Baja | Cosmético pendiente |
