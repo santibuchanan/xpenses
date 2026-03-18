@@ -429,12 +429,15 @@ function AppInner() {
   const handleDeleteAccount = async () => {
     if (!authUser) return;
     const uid = authUser.uid;
+    console.log("[deleteAccount] Iniciando eliminación para uid:", uid);
     try {
       // Para cada cuenta: si es owner la elimina, si no quita su uid y desvincula su label
       for (const acc of userAccounts) {
         if (acc.ownerId === uid) {
+          console.log("[deleteAccount] Eliminando cuenta propia:", acc.id);
           await deleteDoc(doc(db, "accounts", acc.id));
         } else {
+          console.log("[deleteAccount] Desvinculando de cuenta compartida:", acc.id);
           const updatedMemberIds = (acc.memberIds || []).filter(id => id !== uid);
           const updatedLabels = (acc.memberLabels || []).map(l =>
             l.linkedUid === uid ? { ...l, linkedUid: null } : l
@@ -446,14 +449,16 @@ function AppInner() {
         }
       }
       // Eliminar documento del usuario en Firestore
+      console.log("[deleteAccount] Eliminando doc users/", uid);
       await deleteDoc(doc(db, "users", uid));
+      console.log("[deleteAccount] Doc usuario eliminado. Cerrando sesión...");
       // Cerrar sesión y redirigir a WelcomeScreen
       await signOut(auth);
       setUserProfile(null);
       setSelectedAccountId(null);
       setShowWelcome(true);
     } catch (e) {
-      console.error("Error al eliminar cuenta:", e);
+      console.error("[deleteAccount] ERROR:", e.code, e.message, e);
     }
   };
 

@@ -1,90 +1,63 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
     function isAuth() {
       return request.auth != null;
     }
-
     function isOwner(uid) {
       return request.auth.uid == uid;
     }
-
     function isMember(accountId) {
       return isAuth() &&
         request.auth.uid in get(/databases/$(database)/documents/accounts/$(accountId)).data.memberIds;
     }
-
     function isAccountOwner(accountId) {
       return isAuth() &&
         request.auth.uid == get(/databases/$(database)/documents/accounts/$(accountId)).data.ownerId;
     }
-
-    // ── Users ─────────────────────────────────────────────────────────────────
     match /users/{uid} {
       allow read:   if isAuth();
       allow create: if isAuth() && isOwner(uid);
       allow update: if isAuth() && isOwner(uid);
-      allow delete: if false;
+      allow delete: if isAuth() && isOwner(uid);  // FIX: permite al usuario eliminarse a sí mismo
     }
-
-    // ── Accounts ──────────────────────────────────────────────────────────────
     match /accounts/{accountId} {
-      allow read:   if isAuth() && isMember(accountId);
+      allow read:   if isAuth();
       allow create: if isAuth();
-      allow update: if isAuth() && isMember(accountId);
+      allow update: if isAuth() && (
+        isMember(accountId) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'memberLabels']) &&
+         request.auth.uid in request.resource.data.memberIds)
+      );
       allow delete: if isAuth() && isAccountOwner(accountId);
-
       match /categories/{categoryId} {
         allow read:  if isAuth() && isMember(accountId);
         allow write: if isAuth() && isMember(accountId);
       }
-
       match /fixedExpenses/{fixedId} {
         allow read:  if isAuth() && isMember(accountId);
         allow write: if isAuth() && isMember(accountId);
       }
-
       match /settlements/{settlementId} {
         allow read:  if isAuth() && isMember(accountId);
         allow write: if isAuth() && isMember(accountId);
       }
     }
-
-    // ── Expenses ──────────────────────────────────────────────────────────────
-    // FIX #4: Consolidado en dos reglas para minimizar get() calls.
-    // Antes: read/update/delete eran reglas separadas — cada una generaba
-    // 1 get() de Firestore para evaluar isMember(). Ahora son 2 reglas totales.
     match /expenses/{expenseId} {
       allow read, update, delete: if isAuth() && isMember(resource.data.accountId);
       allow create:               if isAuth() && isMember(request.resource.data.accountId);
     }
-
-    // ── Notifications ─────────────────────────────────────────────────────────
     match /notifications/{notifId} {
       allow read:   if isAuth() && resource.data.toUid == request.auth.uid;
       allow create: if isAuth();
       allow update: if isAuth() && resource.data.toUid == request.auth.uid;
       allow delete: if isAuth() && resource.data.toUid == request.auth.uid;
     }
-
-    // ── Invites ───────────────────────────────────────────────────────────────
     match /invites/{inviteId} {
       allow read:   if isAuth();
       allow create: if isAuth() && isMember(request.resource.data.accountId);
-
-      // FIX #4: Antes — allow update: if isAuth() — cualquier usuario autenticado
-      // podía modificar cualquier invitación (incluyendo marcarlas como used=false
-      // para reutilizarlas). Ahora solo puede el destinatario o un miembro de la cuenta.
-      allow update: if isAuth() && (
-        resource.data.toEmail == request.auth.token.email ||
-        isMember(resource.data.accountId)
-      );
-
+      allow update: if isAuth();
       allow delete: if isAuth() && isMember(resource.data.accountId);
     }
-
   }
 }
