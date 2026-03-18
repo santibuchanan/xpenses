@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef } from "react";
-import { collection, addDoc } from "firebase/firestore";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { collection, addDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useTheme, formatAmount, CURRENCIES } from "../theme.jsx";
 import { useNotif, NOTIF_TYPES } from "../notifications";
@@ -29,6 +29,18 @@ function SettleModal({ debtor, debts, members, fmt, currencySymbol, colors, onFu
   const [date, setDate]     = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
   const submitting = useRef(false); // previene doble tap en móvil
+
+  // Cuando un acreedor es saldado, debts prop se actualiza (sin ese acreedor).
+  // selectedDebt es estado local y no se sincroniza solo: avanzar al siguiente.
+  useEffect(() => {
+    if (!selectedDebt) return;
+    if (!debts.find(d => d.creditorUid === selectedDebt.creditorUid)) {
+      setSelectedDebt(debts.length === 1 ? debts[0] : null);
+      setMode(null);
+      setAmount("");
+    }
+  }, [debts]);
+
   const parsed = parseFloat(amount) || 0;
   const valid  = selectedDebt && parsed > 0 && parsed <= selectedDebt.amount;
   const symbolWidth = (currencySymbol || "$").length > 1 ? 38 : 30;
@@ -184,11 +196,15 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   const isSubmitting = useRef(false);
 
   const monthExp = expenses.filter(e => e.month === currentMonth && !e.deleted);
-  const realMembers = (members || []).filter(m => !!m.uid).sort((a, b) => {
-    if (a.uid === currentUser.uid) return -1;
-    if (b.uid === currentUser.uid) return 1;
-    return 0;
-  });
+  // Memoizado: evita que saldos useMemo recalcule en cada render por referencia nueva de array.
+  const realMembers = useMemo(
+    () => (members || []).filter(m => !!m.uid).sort((a, b) => {
+      if (a.uid === currentUser.uid) return -1;
+      if (b.uid === currentUser.uid) return 1;
+      return 0;
+    }),
+    [members, currentUser.uid]
+  );
   const monthSettlements = (settlements || []).filter(s => s.month === currentMonth);
 
   const saldos = useMemo(
@@ -220,6 +236,11 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   const [showPassDebt, setShowPassDebt] = useState(false);
   const [settledPairs, setSettledPairs] = useState({});
   const [historyOpen, setHistoryOpen]   = useState(false);
+  const [historyMonth, setHistoryMonth] = useState(currentMonth);
+  const [confirmDelete, setConfirmDelete] = useState(null); // settlement a eliminar
+
+  // Sincronizar historyMonth cuando el usuario navega de mes en la app
+  useEffect(() => { setHistoryMonth(currentMonth); }, [currentMonth]);
 
   const handleFullSettle = async (debtorUid, creditorUid, amount) => {
     if (isSubmitting.current) return;
@@ -258,7 +279,11 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       debtorUid, creditorUid, amount, date, month: currentMonth, full: false,
       createdAt: new Date().toISOString(),
     });
-    setSettleModal(null);
+    setSettleModal(prev => {
+      if (!prev) return null;
+      const remaining = prev.debts.filter(d => d.creditorUid !== creditorUid);
+      return remaining.length === 0 ? null : { ...prev, debts: remaining };
+    });
   };
 
   const nextMonth = (() => {
@@ -284,13 +309,50 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   // Esperar a que todos los members del account hayan llegado de Firestore antes de
   // mostrar el botón Saldar. Con members incompletos, debtPairs es incorrecto (el
   // algoritmo greedy necesita todos los balances para distribuir deudas).
-  const allMembersLoaded = !account?.memberIds?.length ||
+  // IMPORTANTE: usar Array.isArray() en lugar de !length — si account.memberIds aún
+  // no llegó (undefined), el check anterior devolvía true prematuramente.
+  const allMembersLoaded = Array.isArray(account?.memberIds) &&
     account.memberIds.every(uid => realMembers.some(m => m.uid === uid));
   const totalSalary  = (realMembers || []).reduce((acc, mb) => acc + (mb.salary || 0), 0);
 
-  // Historial de settlements del mes (no correctivos)
-  const historyItems = monthSettlements.filter(s => !s.isCorrection && s.amount > 0)
-    .sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""));
+  // ── HISTORIAL — mes independiente de currentMonth ──
+  const shiftMonth = (base, delta) => {
+    const [y, m] = base.split("-").map(Number);
+    return new Date(y, m - 1 + delta, 1).toISOString().slice(0, 7);
+  };
+  const todayMonth        = new Date().toISOString().slice(0, 7);
+  const canGoNext         = shiftMonth(historyMonth, 1) <= todayMonth;
+  const historyMonthLabel = (() => {
+    const raw = new Date(historyMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  })();
+
+  const historyItems = (settlements || [])
+    .filter(s => s.month === historyMonth && !s.isCorrection && s.amount > 0)
+    .sort((a, b) => {
+      const dc = (b.date || "").localeCompare(a.date || "");
+      return dc !== 0 ? dc : (b.createdAt || "").localeCompare(a.createdAt || "");
+    });
+
+  // Agrupar por fecha preservando el orden de historyItems
+  const historyDates  = [];
+  const historyByDate = {};
+  historyItems.forEach(s => {
+    const d = fmtDate(s.date || "");
+    if (!historyByDate[d]) { historyByDate[d] = []; historyDates.push(d); }
+    historyByDate[d].push(s);
+  });
+
+  const hasAnySettlements   = (settlements || []).some(s => !s.isCorrection && s.amount > 0);
+  const canDeleteSettlement = (s) =>
+    s.debtorUid  === currentUser.uid ||
+    s.createdBy  === currentUser.uid ||
+    account?.ownerId === currentUser.uid;
+
+  const handleDeleteSettlement = async (s) => {
+    await deleteDoc(doc(db, "accounts", account.id, "settlements", s.id));
+    setConfirmDelete(null);
+  };
 
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
@@ -376,44 +438,120 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
         </div>
       )}
 
-      {/* Historial colapsable */}
-      {historyItems.length > 0 && (
+      {/* Historial colapsable con navegación por mes */}
+      {hasAnySettlements && (
         <div style={{ background: colors.card, borderRadius: 20, overflow: "hidden", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
+
+          {/* Header toggle */}
           <button onClick={() => setHistoryOpen(o => !o)}
             style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "none", border: "none", cursor: "pointer", fontFamily: FONT }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>
-              Pagos registrados ({historyItems.length})
+              Pagos registrados{historyItems.length > 0 ? ` (${historyItems.length})` : ""}
             </p>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
               style={{ transform: historyOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
               <path d="M6 9l6 6 6-6"/>
             </svg>
           </button>
-          {historyOpen && historyItems.map((s, idx) => {
-            const debtor   = realMembers.find(m => m.uid === s.debtorUid);
-            const creditor = realMembers.find(m => m.uid === s.creditorUid);
-            return (
-              <div key={s.id} style={{ padding: "12px 16px", borderTop: `1px solid ${colors.divider}`,
-                display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>🫱🏼‍🫲🏾</span>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>
-                      {debtor?.name} → {creditor?.name}
-                    </p>
-                    <p style={{ margin: "2px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>
-                      {fmtDate(s.date)} · {s.full ? "Saldo total" : "Saldo parcial"}
-                    </p>
-                  </div>
-                </div>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: colors.success, fontFamily: FONT }}>{fmt(s.amount)}</p>
+
+          {historyOpen && (
+            <>
+              {/* Navegación por mes */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderTop: `1px solid ${colors.divider}` }}>
+                <button
+                  onClick={() => setHistoryMonth(shiftMonth(historyMonth, -1))}
+                  style={{ background: colors.pill, border: "none", borderRadius: 10, padding: "6px 14px", fontSize: 16, cursor: "pointer", color: colors.text, lineHeight: 1 }}>
+                  ←
+                </button>
+                <span style={{ fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{historyMonthLabel}</span>
+                <button
+                  onClick={() => canGoNext && setHistoryMonth(shiftMonth(historyMonth, 1))}
+                  disabled={!canGoNext}
+                  style={{ background: canGoNext ? colors.pill : "transparent", border: "none", borderRadius: 10, padding: "6px 14px", fontSize: 16, cursor: canGoNext ? "pointer" : "default", color: canGoNext ? colors.text : colors.textMuted, lineHeight: 1, opacity: canGoNext ? 1 : 0.3 }}>
+                  →
+                </button>
               </div>
-            );
-          })}
+
+              {/* Sin items en el mes seleccionado */}
+              {historyDates.length === 0 && (
+                <div style={{ padding: "20px 16px", textAlign: "center", borderTop: `1px solid ${colors.divider}` }}>
+                  <p style={{ margin: 0, fontSize: 13, color: colors.textMuted, fontFamily: FONT }}>Sin pagos registrados</p>
+                </div>
+              )}
+
+              {/* Grupos por fecha */}
+              {historyDates.map(date => (
+                <div key={date}>
+                  {/* Separador de fecha */}
+                  <div style={{ padding: "5px 16px", background: colors.pill, borderTop: `1px solid ${colors.divider}` }}>
+                    <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.5, fontFamily: FONT }}>{date}</p>
+                  </div>
+
+                  {historyByDate[date].map(s => {
+                    const debtor   = realMembers.find(m => m.uid === s.debtorUid);
+                    const creditor = realMembers.find(m => m.uid === s.creditorUid);
+                    const isMeDebtor   = s.debtorUid   === currentUser.uid;
+                    const isMeCreditor = s.creditorUid === currentUser.uid;
+                    const isMe  = isMeDebtor || isMeCreditor;
+                    const canDel = canDeleteSettlement(s);
+                    return (
+                      <div key={s.id} style={{
+                        padding: "11px 16px", borderTop: `1px solid ${colors.divider}`,
+                        display: "flex", alignItems: "center", gap: 10,
+                        background: isMe ? colors.pill : "transparent",
+                      }}>
+                        <span style={{ fontSize: 18, flexShrink: 0 }}>🫱🏼‍🫲🏾</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>
+                            {debtor?.name}{isMeDebtor ? <span style={{ color: "#4F7FFA", fontWeight: 700 }}> · Vos</span> : ""}
+                            {" → "}
+                            {creditor?.name}{isMeCreditor ? <span style={{ color: "#4F7FFA", fontWeight: 700 }}> · Vos</span> : ""}
+                          </p>
+                          <p style={{ margin: "2px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>
+                            {s.full ? "Saldo total" : "Saldo parcial"}
+                          </p>
+                        </div>
+                        <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: colors.success, fontFamily: FONT, flexShrink: 0 }}>{fmt(s.amount)}</p>
+                        {canDel && (
+                          <button onClick={() => setConfirmDelete(s)}
+                            style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontSize: 16, lineHeight: 1, flexShrink: 0, opacity: 0.55 }}>
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 
       <div style={{ height: 120 }} />
+
+      {/* Confirmación de eliminación de settlement */}
+      {confirmDelete && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+          <div style={{ background: colors.card, borderRadius: 20, padding: 24, width: "100%", maxWidth: 340, fontFamily: FONT }}>
+            <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>¿Eliminar pago?</p>
+            <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>
+              {realMembers.find(m => m.uid === confirmDelete.debtorUid)?.name}
+              {" → "}
+              {realMembers.find(m => m.uid === confirmDelete.creditorUid)?.name}
+              {" · "}{fmt(confirmDelete.amount)}
+            </p>
+            <button onClick={() => handleDeleteSettlement(confirmDelete)}
+              style={{ width: "100%", padding: 13, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+              Eliminar
+            </button>
+            <button onClick={() => setConfirmDelete(null)}
+              style={{ width: "100%", padding: 13, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 14, cursor: "pointer", fontFamily: FONT }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {settleModal && (
         <SettleModal
