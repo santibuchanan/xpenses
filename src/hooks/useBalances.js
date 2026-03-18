@@ -80,15 +80,20 @@ export function calcSaldos(expenses, fixedExpenses, members, divisionSystem, cur
   const memberUids = members.map(m => m.uid);
 
   expenses.forEach(e => {
-    // HOGAR: se divide entre todos con centavos exactos
+    // HOGAR: se divide entre los destinatarios (forWhom). Si forWhom está vacío
+    // o ausente, se divide entre todos los miembros (comportamiento legacy).
     if (e.type === "hogar") {
       const paidEntries = getPaidEntries(e.paidBy, e.amount);
       paidEntries.forEach(({ uid, amount }) => {
         if (result[uid] !== undefined) result[uid].paid = r2(result[uid].paid + amount);
       });
       const primaryPayer = paidEntries[0]?.uid || null;
-      const shares = splitExact(e.amount, memberUids, salaryMap, divisionSystem, totalSalary, primaryPayer);
-      memberUids.forEach(uid => {
+      const forWhomUids = (Array.isArray(e.forWhom) && e.forWhom.length > 0)
+        ? e.forWhom.filter(uid => result[uid] !== undefined)
+        : memberUids;
+      const splitUids = forWhomUids.length > 0 ? forWhomUids : memberUids;
+      const shares = splitExact(e.amount, splitUids, salaryMap, divisionSystem, totalSalary, primaryPayer);
+      splitUids.forEach(uid => {
         if (result[uid] !== undefined) result[uid].owes = r2(result[uid].owes + (shares[uid] || 0));
       });
     }
@@ -129,9 +134,14 @@ export function calcSaldos(expenses, fixedExpenses, members, divisionSystem, cur
       }
     }
 
-    // EXTRAORDINARIO
+    // EXTRAORDINARIO: se divide entre los destinatarios (forWhom). Si forWhom está
+    // vacío o ausente, se divide entre todos los miembros (comportamiento legacy).
     if (e.type === "extraordinary") {
-      const shares = splitExact(e.amount, memberUids, salaryMap, "equal", 0, memberUids[0]);
+      const forWhomUids = (Array.isArray(e.forWhom) && e.forWhom.length > 0)
+        ? e.forWhom.filter(uid => result[uid] !== undefined)
+        : memberUids;
+      const splitUids = forWhomUids.length > 0 ? forWhomUids : memberUids;
+      const shares = splitExact(e.amount, splitUids, salaryMap, "equal", 0, splitUids[0]);
       members.forEach(m => {
         const paid = e[`paid_${m.uid}`] || 0;
         if (result[m.uid] !== undefined) {
