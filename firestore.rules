@@ -15,14 +15,6 @@ service cloud.firestore {
       return isAuth() &&
         request.auth.uid == get(/databases/$(database)/documents/accounts/$(accountId)).data.ownerId;
     }
-    // Permite que un usuario se desvincula a sí mismo de una cuenta:
-    // solo puede modificar memberIds (quitándose) y memberLabels (nulleando su linkedUid)
-    function isSelfRemoval(accountId) {
-      return isAuth() &&
-        request.auth.uid in resource.data.memberIds &&
-        !request.resource.data.memberIds.hasAny([request.auth.uid]) &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'memberLabels']);
-    }
     match /users/{uid} {
       allow read:   if isAuth();
       allow create: if isAuth() && isOwner(uid);
@@ -34,9 +26,12 @@ service cloud.firestore {
       allow create: if isAuth();
       allow update: if isAuth() && (
         isMember(accountId) ||
-        isSelfRemoval(accountId) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'memberLabels']) &&
-         request.auth.uid in request.resource.data.memberIds)
+        isAccountOwner(accountId) ||
+        // Self-removal: usuario autenticado que estaba en memberIds y se quita a sí mismo
+        (
+          request.auth.uid in resource.data.memberIds &&
+          !(request.auth.uid in request.resource.data.memberIds)
+        )
       );
       allow delete: if isAuth() && isAccountOwner(accountId);
       match /categories/{categoryId} {
