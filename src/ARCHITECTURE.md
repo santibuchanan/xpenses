@@ -2,7 +2,7 @@
 
 > **Propósito:** Referencia de arquitectura que debe consultarse antes de cada sprint. Evita regresiones en zonas frágiles.
 
-**Última actualización:** Sesión Mar 17, 2026
+**Última actualización:** Sesión Mar 18, 2026
 **Deploy:** https://xpenses-seven.vercel.app
 **Firebase project:** xpenses-305ee
 
@@ -135,8 +135,12 @@ Origen: colección `accounts/{id}`
   id:                  string,
   name:                string,
   emoji:               string,
-  type:                "personal" | "shared",
-  divisionSystem:      "proportional" | "50_50" | "informativo",
+  type:                "personal" | "shared" | "pozo",
+  //   "personal" → cuenta individual, sin saldos, sin tab Saldos
+  //   "shared"   → cuenta compartida con saldos entre miembros
+  //   "pozo"     → fondo común; solo tipos hogar/extraordinary; sin saldos entre miembros
+  divisionSystem:      "proportional" | "50_50" | "pozo",
+  //   "pozo" reemplaza "informativo" (migración forward-only)
   ownerId:             string,
   memberIds:           string[],    // UIDs de usuarios reales vinculados
   memberLabels:        MemberLabel[],
@@ -145,6 +149,8 @@ Origen: colección `accounts/{id}`
   createdAt:           string,      // ISO date string
 }
 ```
+
+> **Regla de derivación:** `type = divisionSystem === "pozo" ? "pozo" : accountType` al crear en `CreateAccountScreen`. Una cuenta con `divisionSystem = "pozo"` guarda `type = "pozo"` en Firestore.
 
 ### 2.5 Expense
 
@@ -207,8 +213,12 @@ Origen: subcolección `accounts/{id}/settlements/`
   month:        string,    // "YYYY-MM"
   full:         boolean,   // true = saldo total, false = parcial
   isCorrection: boolean,   // true = generado automáticamente al eliminar un gasto
+  createdBy:    string,    // uid del usuario que registró el pago
+  createdAt:    string,    // ISO date string
 }
 ```
+
+> **Permisos de eliminación:** puede eliminar un settlement el deudor (`debtorUid`), quien lo creó (`createdBy`) o el owner de la cuenta. Ver `canDeleteSettlement()` en `SaldosScreen`.
 
 ### 2.8 Category
 
@@ -355,6 +365,7 @@ Construye `allMembers` combinando usuarios reales + labels no vinculados. Garant
 Pantalla previa a entrar a una cuenta. Tres tabs: Cuentas, Notificaciones, Perfil.
 - Skeleton loading mientras `isLoading` es true
 - Estado vacío "No tenés cuentas" solo cuando `!isLoading && accounts.length === 0`
+- Íconos y labels por tipo: Personal 👤 verde, Compartida 👥 azul, Pozo Común 🪣 ámbar
 
 Props:
 ```js
@@ -400,6 +411,7 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | `inviteIdFromUrl` | `App.jsx` | Lee hash al montar — no re-ejecuta si cambia |
 | Listeners en `AppInner` | `App.jsx` | Sin cleanup correcto → memory leaks o datos duplicados |
 | `account.disabledCategories` | `App.jsx`, `SettingsScreen`, `ConfigScreen` | Lógica diferente en create vs edit |
+| `isPozo` derivado de `account.type` | `App.jsx`, `HomeScreen`, `SaldosScreen`, modales | Cualquier cambio en el contrato de `type` rompe estas 4 capas |
 
 ### 🟡 Media prioridad
 
@@ -409,6 +421,7 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | `visibleFixed` | `HomeScreen` y `SaldosScreen` | Lógica duplicada — cambiar en uno no cambia el otro |
 | Listeners duplicados | `SettingsScreen.jsx` | Lecturas innecesarias de Firestore |
 | `forWhom` inicial | `AddExpenseModal.jsx` | Si allMembers llega tarde, forWhom queda vacío |
+| `historyMonth` vs `currentMonth` | `SaldosScreen.jsx` | Son estados independientes; `useEffect` sincroniza al cambiar mes |
 
 ### 🟢 Baja prioridad
 
@@ -438,19 +451,19 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 ## 7. Estado conocido por pantalla
 
 ### HomeScreen ✅
-- Hero muestra total del mes y balance personal
-- Skeleton loading mientras `isLoading` (pendiente fix — no funciona correctamente aún)
+- Hero muestra total del mes con skeleton `#ffffff33` mientras `isLoading` (width:140/h:36 total, width:100/h:13 balance)
+- Para cuentas compartidas (`!isPersonal && !isPozo`): muestra balance personal (a favor / a pagar / Saldado ✓)
+- Para Pozo Común (`isPozo`): muestra línea con gastos de cada integrante en el hero; stat pills con gasto por integrante en color del miembro
 - Pills de filtro muestran emoji de categoría
 - Gastos fijos con subsecciones Hogar/Personal
-- Settlements del mes al final de la lista
 
 ### SaldosScreen ✅
-- Balance neto por miembro con precisión de 2 decimales
-- Algoritmo greedy simplifica deudas
-- Botón Saldar con guard `useRef` anti-doble-tap
-- Saldar total y parcialmente
-- Pasar saldo al mes siguiente
-- Historial colapsable de pagos registrados
+- **Cuentas shared:** balance neto por miembro, algoritmo greedy, botón Saldar, pasar mes siguiente
+  - Botón Saldar con guard `useRef` anti-doble-tap; al saldar total usa `debtPairs` frescos (no estado del modal)
+  - Settle modal avanza al siguiente acreedor automáticamente o se cierra si no quedan deudas
+  - Historial colapsable con navegación por mes independiente de `currentMonth`
+  - Historial agrupado por fecha, distinción visual para filas del usuario actual, eliminación con confirmación
+- **Cuentas pozo:** muestra "Resumen del Pozo" con ranking de gastos por integrante + desglose por categoría en ámbar
 - No disponible en cuentas personales
 
 ### GraficosScreen ✅
@@ -463,16 +476,18 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 - Default `forWhom` = todos (tipo "hogar")
 - Sin botón X — swipe o confirmar descarte
 - Se cierra correctamente después de guardar
-- Tipos: Ordinario / Para otro / Extraordinario / Para mí
+- Tipos en cuentas shared: Ordinario / Para otro / Extraordinario / Para mí
+- Tipos en cuentas pozo (`isPozo`): solo Ordinario y Extraordinario
 
 ### EditExpenseModal ✅
-- Mismos tipos e íconos que AddExpenseModal
+- Mismos tipos con misma lógica `isPozo` que AddExpenseModal
 - Sin botón X — swipe o confirmar descarte
 - Campo monto con símbolo de moneda
 
 ### AccountSelectorScreen ✅
 - Skeleton loading mientras `accountsLoading`
 - Estado vacío solo cuando `!isLoading && accounts.length === 0`
+- Pozo Común: fondo ámbar `#f39c1218`, emoji 🪣, label "Pozo Común"
 
 ### SettingsScreen ✅
 - Salario visible solo en cuentas compartidas proporcionales
@@ -484,19 +499,35 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 - `localStorage` como `expenseFontSize`
 - No sobreescribe preferencia al cambiar de cuenta (fix aplicado)
 
+### CreateAccountScreen ✅
+- Tipo de división: Proporcional / Partes iguales / Pozo Común 🪣
+- Al guardar con `divisionSystem = "pozo"`: escribe `type: "pozo"` en Firestore (regla de derivación)
+- "Pozo Común" reemplaza "Gastos en común" (`"informativo"`) — migración forward-only
+
 ---
 
 ## 8. Pendientes técnicos
 
 | Item | Prioridad | Estado |
 |------|-----------|--------|
-| HomeScreen skeleton loading | Alta | Bug — no funciona correctamente |
 | Listeners duplicados SettingsScreen (T1) | Media | Pendiente |
-| Settlement history completo | Alta | Pendiente |
 | Push notifications (FCM) | Alta | Pendiente |
 | Eliminación de cuenta backend | Media | Pendiente decisión |
 | `visibleFixed` duplicado en HomeScreen/SaldosScreen | Baja | Deuda técnica |
 | Scroll lock de sheets no centralizado | Baja | Deuda técnica |
+| MenuPanel: label "Cuenta personal" no contempla pozo | Baja | Cosmético pendiente |
+
+### ✅ Resueltos en sesiones anteriores
+
+| Item | Sesión |
+|------|--------|
+| HomeScreen hero skeleton (width:140/h:36, width:100/h:13) | Mar 18 |
+| Settlement history — navegación por mes, distinción visual, eliminación, agrupamiento | Mar 18 |
+| Settle modal usa `debtPairs` frescos en lugar de estado previo del modal | Mar 18 |
+| Tipo de cuenta "Pozo Común" — `type: "pozo"` en Firestore, UI en 6 componentes | Mar 18 |
+| CLAUDE.md con instrucciones git y stack para Claude Code | Mar 18 |
+| allMembersLoaded guard en SaldosScreen (evita debtPairs prematuros) | Mar 17 |
+| SettleModal auto-avanza al siguiente acreedor | Mar 17 |
 
 ---
 
