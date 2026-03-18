@@ -265,7 +265,7 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
 
 // ── AccountSelectorScreen ─────────────────────────────────────────────────────
 
-export default function AccountSelectorScreen({ user, userProfile, accounts, onSelect, onCreated, onSignOut, isLoading }) {
+export default function AccountSelectorScreen({ user, userProfile, accounts, onSelect, onCreated, onSignOut, onDeleteAccount, isLoading }) {
   const { colors } = useTheme();
   const { notifications, unreadCount, markRead, markAllRead, deleteNotif } = useNotif();
 
@@ -431,7 +431,7 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
             user={user}
             userProfile={userProfile}
             onSignOut={onSignOut}
-            onDeleteAccount={handleDeleteAccount}
+            onDeleteAccount={onDeleteAccount}
             colors={colors}
           />
         )}
