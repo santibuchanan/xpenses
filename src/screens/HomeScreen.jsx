@@ -164,6 +164,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const { colors } = useTheme();
   const fs = useExpenseFontSize();
   const isPersonal = account?.type === "personal";
+  const isPozo = account?.type === "pozo";
   const currency = account?.currency || "ARS";
   const fmt = (n) => formatAmount(n, currency);
   const me = allMembers?.find(m => m.uid === currentUser.uid);
@@ -240,7 +241,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
           ) : (
             <>
               <p style={{ color: "#fff", fontSize: 36, fontWeight: 700, margin: "0 0 4px", letterSpacing: -1, fontFamily: FONT }}>{fmt(totalMonthExp)}</p>
-              {!isPersonal && (() => {
+              {!isPersonal && !isPozo && (() => {
                 const displayBalance = Math.abs(myBalance) < 0.5 ? 0 : myBalance;
                 return (
                   <p style={{ fontSize: 13, margin: "6px 0 0", fontFamily: FONT, color: displayBalance > 0 ? "#2ecc71" : displayBalance < 0 ? "#ff6b6b" : "#ffffff66", fontWeight: 600 }}>
@@ -248,6 +249,14 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
                   </p>
                 );
               })()}
+              {isPozo && (
+                <p style={{ fontSize: 12, margin: "6px 0 0", fontFamily: FONT, color: "#ffffff88", lineHeight: 1.6 }}>
+                  {(allMembers || []).filter(m => !!m.uid).map(m => {
+                    const mTotal = monthExp.filter(e => e.paidBy === m.uid).reduce((s, e) => s + e.amount, 0);
+                    return `${m.name}: ${fmt(mTotal)}`;
+                  }).join(" · ")}
+                </p>
+              )}
             </>
           )}
         </div>
@@ -258,6 +267,13 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
           {isPersonal ? (
             <StatPill label="Total gastos" value={fmt(totalMonthExp)} color={meColor} />
+          ) : isPozo ? (
+            <>
+              {(allMembers || []).filter(m => !!m.uid).map(m => {
+                const mTotal = monthExp.filter(e => e.paidBy === m.uid).reduce((s, e) => s + e.amount, 0);
+                return <StatPill key={m.uid} label={m.name} value={fmt(mTotal)} color={m.color || "#f39c12"} />;
+              })}
+            </>
           ) : (
             <>
               <StatPill label="Compartido" value={fmt(sharedExp.reduce((s, e) => s + e.amount, 0))} color="#4F7FFA" />

@@ -9,7 +9,7 @@ import DateInput from "../../DateInput.jsx";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
-export default function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, customCategories, isPersonal, accountId }) {
+export default function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, customCategories, isPersonal, isPozo, accountId }) {
   const { colors } = useTheme();
 
   // Scroll lock
@@ -119,6 +119,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
 
   const types = [["hogar","🛍️ Ordinario"],["personal","🫵🏽 Para otro"],["extraordinary","🏝️ Extraordinario"],["mio","🙋🏼‍♂️ Para mí"]];
+  const visibleTypes = isPozo ? types.filter(([val]) => val === "hogar" || val === "extraordinary") : types;
   // FIX B2: removida dependencia de memberList.length — las secciones se
   // muestran siempre en cuentas compartidas, incluso si allMembers aún no cargó,
   // porque memberList ya garantiza que el usuario actual está presente.
@@ -155,7 +156,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
           <>
             <p style={labelStyle}>Tipo</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-              {types.map(([val, lbl]) => (
+              {visibleTypes.map(([val, lbl]) => (
                 <button key={val} onClick={() => setType(val)}
                   style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
                     borderColor: form.type === val ? "#4F7FFA" : colors.inputBorder,

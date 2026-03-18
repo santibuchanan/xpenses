@@ -20,7 +20,7 @@ function getPerspectiveType(expense, currentUserUid) {
   return iAmDest ? "mio" : "personal";
 }
 
-export default function EditExpenseModal({ expense, members, allMembers, customCategories, currentUser, onClose, onSave }) {
+export default function EditExpenseModal({ expense, members, allMembers, customCategories, currentUser, isPozo, onClose, onSave }) {
   const { colors } = useTheme();
   const profiles = (allMembers || members || []);
   const currSymbol = CURRENCIES["ARS"]?.symbol || "$";
@@ -124,6 +124,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
     ["extraordinary", "🏝️ Extraordinario"],
     ["mio",           "🙋🏼‍♂️ Para mí"],
   ];
+  const visibleTypes = isPozo ? types.filter(([val]) => val === "hogar" || val === "extraordinary") : types;
 
   const showPaidBy  = form.type !== "mio";
   const showForWhom = (form.type === "personal" || form.type === "hogar" || form.type === "extraordinary");
@@ -148,7 +149,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
         {/* TIPO — muestra perspectiva del usuario */}
         <p style={labelStyle}>Tipo</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-          {types.map(([val, lbl]) => (
+          {visibleTypes.map(([val, lbl]) => (
             <button key={val} onClick={() => setTypeFromPerspective(val)}
               style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
                 borderColor: displayType === val ? "#4F7FFA" : colors.inputBorder,

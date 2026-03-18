@@ -189,7 +189,7 @@ function PassDebtModal({ debts, members, nextMonth, fmt, colors, onConfirm, onCl
 }
 
 // ── SALDOS SCREEN ──
-export default function SaldosScreen({ expenses, visibleFixed, members, account, currentMonth, currentUser, onAddExpense, settlements }) {
+export default function SaldosScreen({ expenses, visibleFixed, members, account, currentMonth, currentUser, onAddExpense, settlements, customCategories }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
@@ -318,6 +318,16 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     account.memberIds.every(uid => realMembers.some(m => m.uid === uid));
   const totalSalary  = (realMembers || []).reduce((acc, mb) => acc + (mb.salary || 0), 0);
 
+  const isPozo = account?.type === "pozo";
+  const allCategories = customCategories || [];
+  const catTotals = allCategories
+    .map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) }))
+    .filter(c => c.total > 0)
+    .sort((a, b) => b.total - a.total);
+  const memberTotals = realMembers
+    .map(m => ({ ...m, total: monthExp.filter(e => e.paidBy === m.uid).reduce((s, e) => s + e.amount, 0) }))
+    .sort((a, b) => b.total - a.total);
+
   // ── HISTORIAL — mes independiente de currentMonth ──
   const shiftMonth = (base, delta) => {
     const [y, m] = base.split("-").map(Number);
@@ -359,10 +369,62 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
-      <SectionTitle>Saldos del mes</SectionTitle>
+      <SectionTitle>{isPozo ? "Resumen del Pozo" : "Saldos del mes"}</SectionTitle>
+
+      {/* Vista Pozo Común — ranking por integrante + categorías */}
+      {isPozo && (
+        <>
+          <div style={{ background: colors.card, borderRadius: 20, overflow: "hidden", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.divider}` }}>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Gastos por integrante</p>
+            </div>
+            {memberTotals.length === 0 ? (
+              <div style={{ padding: "20px 16px", textAlign: "center" }}>
+                <p style={{ margin: 0, fontSize: 13, color: colors.textMuted, fontFamily: FONT }}>Sin gastos este mes</p>
+              </div>
+            ) : memberTotals.map((m, idx) => (
+              <div key={m.uid} style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "13px 16px",
+                borderBottom: idx < memberTotals.length - 1 ? `1px solid ${colors.divider}` : "none",
+                background: m.uid === currentUser.uid ? colors.pill : "transparent",
+              }}>
+                {m.photo
+                  ? <img src={m.photo} style={{ width: 38, height: 38, borderRadius: 19, flexShrink: 0 }} alt="" />
+                  : <div style={{ width: 38, height: 38, borderRadius: 19, background: (m.color || "#f39c12") + "22", border: `2px solid ${(m.color || "#f39c12") + "44"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: m.color || "#f39c12", flexShrink: 0, fontFamily: FONT }}>
+                      {m.name?.[0]?.toUpperCase() || "?"}
+                    </div>}
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT, flex: 1 }}>
+                  {m.name}{m.uid === currentUser.uid ? " (vos)" : ""}
+                </p>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: "#f39c12", fontFamily: FONT }}>{fmt(m.total)}</p>
+              </div>
+            ))}
+          </div>
+
+          {catTotals.length > 0 && (
+            <div style={{ background: colors.card, borderRadius: 20, padding: 16, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
+              <p style={{ margin: "0 0 12px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Por categoría</p>
+              {catTotals.map(c => (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <span style={{ fontSize: 20, width: 28, flexShrink: 0 }}>{c.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</span>
+                    </div>
+                    <div style={{ background: colors.divider, borderRadius: 4, height: 4 }}>
+                      <div style={{ background: "#f39c12", borderRadius: 4, height: 4, width: `${Math.min(100, (c.total / catTotals[0].total) * 100)}%` }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Lista compacta estilo Tricount */}
-      <div style={{ background: colors.card, borderRadius: 20, overflow: "hidden", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
+      {!isPozo && <div style={{ background: colors.card, borderRadius: 20, overflow: "hidden", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
         {realMembers?.map((m, idx) => {
           const s = saldos[m.uid] || { paid: 0, owes: 0, balance: 0 };
           const isMe = m.uid === currentUser.uid;
@@ -410,10 +472,10 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {/* Resumen de quién le debe a quién */}
-      {debtPairs.length > 0 && (
+      {!isPozo && debtPairs.length > 0 && (
         <div style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, margin: "0 0 10px", fontFamily: FONT }}>Quién le debe a quién</p>
           {debtPairs.filter(pair => pair.amount > 0).map(pair => {
@@ -442,7 +504,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       )}
 
       {/* Historial colapsable con navegación por mes */}
-      {hasAnySettlements && (
+      {!isPozo && hasAnySettlements && (
         <div style={{ background: colors.card, borderRadius: 20, overflow: "hidden", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
 
           {/* Header toggle */}

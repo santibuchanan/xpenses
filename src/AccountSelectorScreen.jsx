@@ -63,15 +63,15 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
       >
         <div style={{
           width: 48, height: 48, borderRadius: 16,
-          background: acc.type === "shared" ? "#4F7FFA18" : "#2ecc7118",
+          background: acc.type === "pozo" ? "#f39c1218" : acc.type === "shared" ? "#4F7FFA18" : "#2ecc7118",
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0,
         }}>
-          {acc.emoji || (acc.type === "shared" ? "👥" : "👤")}
+          {acc.emoji || (acc.type === "pozo" ? "🪣" : acc.type === "shared" ? "👥" : "👤")}
         </div>
         <div style={{ flex: 1 }}>
           <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 16, color: colors.text, fontFamily: FONT }}>{acc.name}</p>
           <p style={{ margin: 0, fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
-            {acc.type === "shared" ? "Compartida" : "Personal"} · {totalMembers} miembro{totalMembers !== 1 ? "s" : ""}
+            {acc.type === "pozo" ? "Pozo Común" : acc.type === "shared" ? "Compartida" : "Personal"} · {totalMembers} miembro{totalMembers !== 1 ? "s" : ""}
           </p>
         </div>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

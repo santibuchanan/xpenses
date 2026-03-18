@@ -28,7 +28,7 @@ const EMOJI_OPTIONS = [
 const DIVISION_SYSTEMS = [
   { id: "proportional", label: "Proporcional al ingreso", icon: "📊", desc: "Ideal para parejas que conviven. Cada uno aporta según su sueldo." },
   { id: "50_50",        label: "Partes iguales",          icon: "⚖️", desc: "Cada uno paga exactamente la mitad." },
-  { id: "informativo",  label: "Gastos en común",         icon: "🤝", desc: "Registrá y gestioná gastos sin calcular quién le debe a quién." },
+  { id: "pozo",         label: "Pozo Común",              icon: "🪣", desc: "Registrá gastos de un fondo común. Sin saldos entre miembros." },
 ];
 
 const MEMBER_COLORS = ["#4F7FFA","#FA4F7F","#2ecc71","#f39c12","#9b59b6","#1abc9c"];
@@ -283,7 +283,7 @@ export default function CreateAccountScreen({
 
       const batch = writeBatch(db);
       batch.set(accountRef, {
-        id: accountId, name: accountName, emoji: selectedEmoji, type: accountType,
+        id: accountId, name: accountName, emoji: selectedEmoji, type: divisionSystem === "pozo" ? "pozo" : accountType,
         divisionSystem, ownerId: user.uid, memberIds: [user.uid], currency: selectedCurrency,
         createdAt: new Date().toISOString(),
         disabledCategories: DEFAULT_CATEGORIES.filter(c => !selectedCategories.includes(c.id)).map(c => c.id),
@@ -339,7 +339,7 @@ export default function CreateAccountScreen({
     }))];
 
     const ref = await addDoc(collection(db, "accounts"), {
-      name: accountName, emoji: selectedEmoji, type: accountType,
+      name: accountName, emoji: selectedEmoji, type: divisionSystem === "pozo" ? "pozo" : accountType,
       divisionSystem, ownerId: user.uid, memberIds: [user.uid],
       memberLabels, currency: selectedCurrency,
       disabledCategories: DEFAULT_CATEGORIES.filter(c => !selectedCategories.includes(c.id)).map(c => c.id),
