@@ -301,23 +301,35 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
   const handleDeleteAccount = async () => {
     try {
       const { deleteUser, getAuth } = await import("firebase/auth");
-      await import("firebase/firestore").then(async ({ doc: docFn, deleteDoc: deleteFn }) => {
-        await deleteFn(docFn(db, "users", user.uid));
-      });
+      const { updateDoc, deleteDoc: deleteFn, doc: docFn } = await import("firebase/firestore");
+
+      // PASO 1: actualizar/eliminar cuentas ANTES de borrar el usuario
+      // (las reglas de Firestore requieren auth activo)
       for (const acc of accounts) {
-        const labels = acc.memberLabels || [];
-        if (labels.some(l => l.linkedUid === user.uid)) {
-          const { updateDoc, doc: docFn } = await import("firebase/firestore");
+        if (acc.ownerId === user.uid) {
+          // Si es owner, eliminar la cuenta completa
+          await deleteFn(docFn(db, "accounts", acc.id));
+        } else if ((acc.memberIds || []).includes(user.uid)) {
+          // Si es miembro, quitarse de memberIds y desvincular label si existe
+          const labels = acc.memberLabels || [];
           await updateDoc(docFn(db, "accounts", acc.id), {
-            memberLabels: labels.map(l => l.linkedUid === user.uid ? { ...l, linkedUid: null } : l),
-            memberIds: (acc.memberIds || []).filter(id => id !== user.uid),
+            memberIds: acc.memberIds.filter(id => id !== user.uid),
+            memberLabels: labels.map(l =>
+              l.linkedUid === user.uid ? { ...l, linkedUid: null } : l
+            ),
           });
         }
       }
+
+      // PASO 2: eliminar documento del usuario en Firestore
+      await deleteFn(docFn(db, "users", user.uid));
+
+      // PASO 3: eliminar usuario de Firebase Auth
       const auth = getAuth();
       if (auth.currentUser) await deleteUser(auth.currentUser);
+
     } catch (err) {
-      console.error("Error eliminando cuenta:", err);
+      console.error("[deleteAccount] ERROR:", err.code, err.message, err);
     }
   };
 
