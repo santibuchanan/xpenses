@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
-import { doc, getDoc, updateDoc, setDoc, arrayUnion, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, arrayUnion, onSnapshot, deleteDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
 import AuthScreen from "./AuthScreen";
@@ -426,6 +426,37 @@ function AppInner() {
 
   const handleSignOut = async () => { await signOut(auth); setUserProfile(null); setShowWelcome(true); };
 
+  const handleDeleteAccount = async () => {
+    if (!authUser) return;
+    const uid = authUser.uid;
+    try {
+      // Para cada cuenta: si es owner la elimina, si no quita su uid y desvincula su label
+      for (const acc of userAccounts) {
+        if (acc.ownerId === uid) {
+          await deleteDoc(doc(db, "accounts", acc.id));
+        } else {
+          const updatedMemberIds = (acc.memberIds || []).filter(id => id !== uid);
+          const updatedLabels = (acc.memberLabels || []).map(l =>
+            l.linkedUid === uid ? { ...l, linkedUid: null } : l
+          );
+          await updateDoc(doc(db, "accounts", acc.id), {
+            memberIds: updatedMemberIds,
+            memberLabels: updatedLabels,
+          });
+        }
+      }
+      // Eliminar documento del usuario en Firestore
+      await deleteDoc(doc(db, "users", uid));
+      // Cerrar sesión y redirigir a WelcomeScreen
+      await signOut(auth);
+      setUserProfile(null);
+      setSelectedAccountId(null);
+      setShowWelcome(true);
+    } catch (e) {
+      console.error("Error al eliminar cuenta:", e);
+    }
+  };
+
   useEffect(() => {
     if (account?.type === "personal" && tab === "saldos") setTab("home");
   }, [account?.type, tab]);
@@ -469,6 +500,7 @@ function AppInner() {
       onSelect={(id) => { setSelectedAccountId(id); setTab("home"); }}
       onCreated={(id) => { setSelectedAccountId(id); setTab("home"); }}
       onSignOut={handleSignOut}
+      onDeleteAccount={handleDeleteAccount}
       isLoading={accountsLoading}
     />
   );
@@ -531,7 +563,7 @@ function AppInner() {
       {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={activeCategories} isPersonal={isPersonal} isPozo={account?.type === "pozo"} accountId={account?.id} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={activeCategories} currentUser={authUser} isPozo={account?.type === "pozo"} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
-      {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} colors={colors} />}
+      {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} onDeleteAccount={handleDeleteAccount} colors={colors} />}
 
       {deleteWarning && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
