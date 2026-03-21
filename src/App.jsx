@@ -211,6 +211,75 @@ function MenuPanel({ onClose, currentUser, userProfile, members, account, onSign
   );
 }
 
+// ── INSTALL BANNER (Android/Chrome only) ──
+function InstallBanner() {
+  const [prompt, setPrompt] = useState(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    // No mostrar si ya está instalada como PWA
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+    // No mostrar si el usuario ya la descartó
+    if (localStorage.getItem('xpenses-install-dismissed')) return;
+
+    const handler = (e) => {
+      e.preventDefault();
+      setPrompt(e);
+      setVisible(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  if (!visible) return null;
+
+  const handleInstall = async () => {
+    if (!prompt) return;
+    prompt.prompt();
+    const { outcome } = await prompt.userChoice;
+    if (outcome === 'accepted') setVisible(false);
+    setPrompt(null);
+  };
+
+  const handleDismiss = () => {
+    setVisible(false);
+    localStorage.setItem('xpenses-install-dismissed', '1');
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 80, left: 0, right: 0, zIndex: 200,
+      display: 'flex', justifyContent: 'center', padding: '0 16px',
+      pointerEvents: 'none',
+    }}>
+      <div style={{
+        background: '#1a1b21', border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 16, padding: '12px 16px', display: 'flex',
+        alignItems: 'center', gap: 12, maxWidth: 360, width: '100%',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.4)', pointerEvents: 'auto',
+      }}>
+        <img src="/logo.png" alt="" style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: FONT }}>Instalar X-penses</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#ffffff77', fontFamily: FONT }}>Accedé rápido desde tu pantalla de inicio</p>
+        </div>
+        <button onClick={handleInstall} style={{
+          background: '#4F7FFA', border: 'none', borderRadius: 10, padding: '8px 14px',
+          color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, flexShrink: 0,
+        }}>
+          Instalar
+        </button>
+        <button onClick={handleDismiss} style={{
+          background: 'none', border: 'none', color: '#ffffff55', cursor: 'pointer',
+          fontSize: 18, lineHeight: 1, padding: '4px', flexShrink: 0,
+        }}>
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── CLAIM IDENTITY MODAL ──
 function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
   const { memberLabels, accountData } = claimData;
@@ -591,6 +660,8 @@ function AppInner() {
           </div>
         </div>
       )}
+
+      <InstallBanner />
 
       {claimData && (
         <ClaimIdentityModal claimData={claimData} colors={colors}
