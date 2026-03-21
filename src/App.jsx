@@ -429,16 +429,17 @@ function AppInner() {
   const handleDeleteAccount = async () => {
     if (!authUser) return;
     const uid = authUser.uid;
-    console.log("[deleteAccount] Iniciando eliminación para uid:", uid);
     try {
-      // Para cada cuenta: si es owner la elimina, si no quita su uid y desvincula su label
       for (const acc of userAccounts) {
-        if (acc.ownerId === uid) {
-          console.log("[deleteAccount] Eliminando cuenta propia:", acc.id);
+        const isOwner  = acc.ownerId === uid;
+        const isMember = (acc.memberIds || []).includes(uid);
+
+        if (isOwner) {
           await deleteDoc(doc(db, "accounts", acc.id));
-        } else {
-          console.log("[deleteAccount] Desvinculando de cuenta compartida:", acc.id);
-          const updatedMemberIds = (acc.memberIds || []).filter(id => id !== uid);
+        } else if (isMember) {
+          // Solo intentar updateDoc si realmente somos miembro — evita permission-denied
+          // en cuentas huérfanas que quedaron en accountIds sin relación real
+          const updatedMemberIds = acc.memberIds.filter(id => id !== uid);
           const updatedLabels = (acc.memberLabels || []).map(l =>
             l.linkedUid === uid ? { ...l, linkedUid: null } : l
           );
@@ -447,12 +448,9 @@ function AppInner() {
             memberLabels: updatedLabels,
           });
         }
+        // Si no somos ni owner ni member: cuenta huérfana, se saltea silenciosamente
       }
-      // Eliminar documento del usuario en Firestore
-      console.log("[deleteAccount] Eliminando doc users/", uid);
       await deleteDoc(doc(db, "users", uid));
-      console.log("[deleteAccount] Doc usuario eliminado. Cerrando sesión...");
-      // Cerrar sesión y redirigir a WelcomeScreen
       await signOut(auth);
       setUserProfile(null);
       setSelectedAccountId(null);
