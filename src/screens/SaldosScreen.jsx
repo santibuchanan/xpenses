@@ -237,6 +237,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   const [showPassDebt, setShowPassDebt] = useState(false);
   const [settledPairs, setSettledPairs] = useState({});
   const [historyOpen, setHistoryOpen]   = useState(false);
+  const [showSaldosTooltip, setShowSaldosTooltip] = useState(() => !localStorage.getItem('onboarding_seen_saldos'));
   const [historyMonth, setHistoryMonth] = useState(currentMonth);
   const [confirmDelete, setConfirmDelete] = useState(null); // settlement a eliminar
 
@@ -371,6 +372,17 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
       <SectionTitle>{isPozo ? "Resumen del Pozo" : "Saldos del mes"}</SectionTitle>
+
+      {showSaldosTooltip && (
+        <div style={{ background: "#4F7FFA18", border: "1px solid #4F7FFA44", borderRadius: 16, padding: "12px 14px", marginBottom: 12, display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>
+          <p style={{ flex: 1, margin: 0, fontSize: 13, color: colors.text, fontFamily: FONT, lineHeight: 1.5 }}>
+            Acá ves quién le debe a quién. Cuando alguien paga, tocá Saldar para registrarlo.
+          </p>
+          <button type="button" onClick={() => { localStorage.setItem('onboarding_seen_saldos', 'true'); setShowSaldosTooltip(false); }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted, fontSize: 20, lineHeight: 1, padding: 0, flexShrink: 0, fontFamily: FONT }}>×</button>
+        </div>
+      )}
 
       {/* Vista Pozo Común — ranking por integrante + categorías */}
       {isPozo && (

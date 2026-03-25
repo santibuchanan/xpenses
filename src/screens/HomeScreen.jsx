@@ -218,6 +218,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const [fixedSharedExpanded,   setFixedSharedExpanded]   = useState(false);
   const [fixedPersonalExpanded, setFixedPersonalExpanded] = useState(false);
   const [payingFixed, setPayingFixed] = useState(null);
+  const [showHomeTooltip, setShowHomeTooltip] = useState(() => !localStorage.getItem('onboarding_seen_home'));
 
   return (
     <div style={{ fontFamily: FONT }}>
@@ -264,6 +265,16 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
       </div>
 
       <div style={{ padding: "0 20px" }}>
+        {showHomeTooltip && (
+          <div style={{ background: "#4F7FFA18", border: "1px solid #4F7FFA44", borderRadius: 16, padding: "12px 14px", margin: "12px 0 4px", display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>
+            <p style={{ flex: 1, margin: 0, fontSize: 13, color: colors.text, fontFamily: FONT, lineHeight: 1.5 }}>
+              Acá ves todos los gastos del mes y tu balance personal. Tocá + para agregar tu primer gasto.
+            </p>
+            <button type="button" onClick={() => { localStorage.setItem('onboarding_seen_home', 'true'); setShowHomeTooltip(false); }}
+              style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted, fontSize: 20, lineHeight: 1, padding: 0, flexShrink: 0, fontFamily: FONT }}>×</button>
+          </div>
+        )}
         <SectionTitle>Resumen del mes</SectionTitle>
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
           {isPersonal ? (

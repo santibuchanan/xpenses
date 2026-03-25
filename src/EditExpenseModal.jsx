@@ -9,6 +9,13 @@ import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
+const TYPE_DESCRIPTIONS = [
+  { icon: "🛍️", name: "Ordinario", desc: "Un gasto habitual que se divide entre todos los miembros. Por ejemplo: supermercado, servicios, limpieza." },
+  { icon: "🫵🏽", name: "Para otro", desc: "Pagaste algo para uno o varios miembros específicos. Elegís para quién fue el gasto." },
+  { icon: "🏝️", name: "Extraordinario", desc: "Un gasto especial que no se repite. Podés dividir el pago entre varios y asignar cuánto puso cada uno." },
+  { icon: "🙋🏼‍♂️", name: "Para mí", desc: "Un gasto tuyo que no se comparte con nadie. No afecta los saldos del grupo." },
+];
+
 // Calcula el tipo desde la perspectiva del usuario que mira
 function getPerspectiveType(expense, currentUserUid) {
   if (expense.type === "hogar" || expense.type === "extraordinary") return expense.type;
@@ -56,6 +63,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
 
   // Dirty tracking + discard modal
   const [showDiscard, setShowDiscard] = useState(false);
+  const [showTypeHelp, setShowTypeHelp] = useState(false);
   const paidByDirty = (() => {
     if (multiPayer !== Array.isArray(expense.paidBy)) return true;
     if (multiPayer && Array.isArray(expense.paidBy)) {
@@ -182,7 +190,11 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
         </div>
 
         {/* TIPO — muestra perspectiva del usuario */}
-        <p style={labelStyle}>Tipo</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <p style={{ ...labelStyle, marginBottom: 0 }}>Tipo</p>
+          <button type="button" onClick={() => setShowTypeHelp(true)}
+            style={{ width: 18, height: 18, borderRadius: 9, background: colors.pill, border: `1px solid ${colors.inputBorder}`, cursor: "pointer", fontSize: 10, fontWeight: 700, color: colors.textMuted, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontFamily: FONT }}>?</button>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
           {visibleTypes.map(([val, lbl]) => (
             <button key={val} onClick={() => setTypeFromPerspective(val)}
@@ -330,6 +342,29 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
             <button onClick={() => setShowDiscard(false)}
               style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
               Seguir editando
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showTypeHelp && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
+          onClick={() => setShowTypeHelp(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "20px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+            <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+            <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Tipos de gasto</p>
+            {TYPE_DESCRIPTIONS.map(t => (
+              <div key={t.name} style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                <span style={{ fontSize: 22, flexShrink: 0 }}>{t.icon}</span>
+                <div>
+                  <p style={{ margin: "0 0 2px", fontWeight: 700, fontSize: 14, color: colors.text, fontFamily: FONT }}>{t.name}</p>
+                  <p style={{ margin: 0, fontSize: 13, color: colors.textMuted, lineHeight: 1.5, fontFamily: FONT }}>{t.desc}</p>
+                </div>
+              </div>
+            ))}
+            <button type="button" onClick={() => setShowTypeHelp(false)}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginTop: 4 }}>
+              Cerrar
             </button>
           </div>
         </div>

@@ -263,14 +263,88 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
   );
 }
 
+// ── OnboardingSlides ──────────────────────────────────────────────────────────
+
+const SLIDES = [
+  { emoji: "👋", title: "¡Bienvenido a X-penses!", text: "X-penses te ayuda a llevar los gastos compartidos sin drama. Todo en tiempo real, sin hojas de cálculo." },
+  { emoji: "👤", title: "Cuenta Personal", text: "Solo para vos. Registrá tus propios gastos y gastos fijos sin compartir con nadie." },
+  { emoji: "👥", title: "Cuenta Compartida (Partes iguales)", text: "Para grupos donde todos pagan lo mismo. Ideal para convivencia, viajes, grupos de amigos. Cada gasto se divide en partes iguales automáticamente." },
+  { emoji: "📊", title: "Cuenta Compartida (Proporcional)", text: "Para parejas o grupos donde cada uno aporta según sus ingresos. Cada miembro configura su salario y los gastos se dividen en proporción. Ej: si Santi gana el doble que Jime, Santi paga el doble." },
+  { emoji: "🤝", title: "Miembros", text: "Podés agregar miembros aunque no tengan cuenta. Después pueden unirse con un link de invitación y ver todo el historial desde el primer día." },
+  { emoji: "📋", title: "Gastos fijos", text: "Los gastos que se repiten cada mes (alquiler, expensas, suscripciones) van en Gastos Fijos. La app los muestra todos los meses y te avisa cuáles faltan pagar." },
+];
+
+function OnboardingSlides({ onDone }) {
+  const { colors } = useTheme();
+  const [current, setCurrent] = useState(0);
+  const startX = useRef(null);
+
+  const goNext = () => { if (current < SLIDES.length - 1) setCurrent(c => c + 1); };
+  const goPrev = () => { if (current > 0) setCurrent(c => c - 1); };
+
+  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; };
+  const onTouchEnd = (e) => {
+    if (startX.current === null) return;
+    const diff = startX.current - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) { if (diff > 0) goNext(); else goPrev(); }
+    startX.current = null;
+  };
+
+  const slide = SLIDES[current];
+  const isLast = current === SLIDES.length - 1;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: colors.bg, zIndex: 300, display: "flex", flexDirection: "column", fontFamily: FONT }}>
+      <div
+        style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 28px", textAlign: "center" }}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        <div style={{ fontSize: 72, marginBottom: 24 }}>{slide.emoji}</div>
+        <p style={{ fontSize: 22, fontWeight: 800, color: colors.text, margin: "0 0 16px", lineHeight: 1.3, fontFamily: FONT }}>{slide.title}</p>
+        <p style={{ fontSize: 15, color: colors.textMuted, lineHeight: 1.6, margin: 0, fontFamily: FONT }}>{slide.text}</p>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, paddingBottom: 24 }}>
+        {SLIDES.map((_, i) => (
+          <div key={i} style={{ width: i === current ? 20 : 8, height: 8, borderRadius: 4, background: i === current ? "#4F7FFA" : colors.divider, transition: "all 0.2s" }} />
+        ))}
+      </div>
+
+      <div style={{ padding: "0 24px", paddingBottom: "calc(env(safe-area-inset-bottom) + 32px)" }}>
+        {isLast ? (
+          <button type="button" onClick={onDone}
+            style={{ width: "100%", padding: 16, borderRadius: 16, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
+            Empezar →
+          </button>
+        ) : (
+          <div style={{ display: "flex", gap: 10 }}>
+            {current > 0 && (
+              <button type="button" onClick={goPrev}
+                style={{ flex: 1, padding: 16, borderRadius: 16, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>
+                ← Anterior
+              </button>
+            )}
+            <button type="button" onClick={goNext}
+              style={{ flex: 2, padding: 16, borderRadius: 16, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
+              Siguiente →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── AccountSelectorScreen ─────────────────────────────────────────────────────
 
 export default function AccountSelectorScreen({ user, userProfile, accounts, onSelect, onCreated, onSignOut, onDeleteAccount, isLoading }) {
   const { colors } = useTheme();
   const { notifications, unreadCount, markRead, markAllRead, deleteNotif } = useNotif();
 
-  const [showCreate,    setShowCreate]    = useState(false);
-  const [activeTab,     setActiveTab]     = useState("cuentas");
+  const [showCreate,           setShowCreate]           = useState(false);
+  const [showOnboardingSlides, setShowOnboardingSlides] = useState(false);
+  const [activeTab,            setActiveTab]            = useState("cuentas");
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deletedIds,    setDeletedIds]    = useState([]);
 
@@ -332,6 +406,19 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
       console.error("[deleteAccount] ERROR:", err.code, err.message, err);
     }
   };
+
+  // ── Slides de onboarding (primera vez) ──
+  if (showOnboardingSlides) {
+    return (
+      <OnboardingSlides
+        onDone={() => {
+          localStorage.setItem('onboarding_slides_seen', 'true');
+          setShowOnboardingSlides(false);
+          setShowCreate(true);
+        }}
+      />
+    );
+  }
 
   // ── Si está en modo creación, mostrar CreateAccountScreen ──
   if (showCreate) {
@@ -522,7 +609,13 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
         <div style={{
           position: "fixed", bottom: "calc(env(safe-area-inset-bottom) + 72px)", left: 20, right: 20, zIndex: 55,
         }}>
-          <button type="button" onClick={() => setShowCreate(true)}
+          <button type="button" onClick={() => {
+            if (!localStorage.getItem('onboarding_slides_seen')) {
+              setShowOnboardingSlides(true);
+            } else {
+              setShowCreate(true);
+            }
+          }}
             style={{ width: "100%", padding: 16, borderRadius: 16, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 20px rgba(79,127,250,0.5)" }}>
             <span style={{ fontSize: 20 }}>+</span> Nueva cuenta
           </button>
