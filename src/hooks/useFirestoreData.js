@@ -31,10 +31,13 @@ export function useFirestoreData(accountId) {
       where("accountId", "==", accountId),
       orderBy("date", "desc")
     );
-    return onSnapshot(q, snap => {
-      setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setExpensesLoading(false);
-    });
+    return onSnapshot(q,
+      snap => {
+        setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setExpensesLoading(false);
+      },
+      err => { console.error("[useFirestoreData] expenses:", err); setExpensesLoading(false); }
+    );
   }, [accountId]);
 
   // Listener de categorías custom
@@ -45,7 +48,8 @@ export function useFirestoreData(accountId) {
     }
     return onSnapshot(
       collection(db, "accounts", accountId, "categories"),
-      snap => setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      snap => setCustomCategories(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.error("[useFirestoreData] categories:", err)
     );
   }, [accountId]);
 
@@ -57,7 +61,8 @@ export function useFirestoreData(accountId) {
     }
     return onSnapshot(
       collection(db, "accounts", accountId, "fixedExpenses"),
-      snap => setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      snap => setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.error("[useFirestoreData] fixedExpenses:", err)
     );
   }, [accountId]);
 
@@ -72,7 +77,8 @@ export function useFirestoreData(accountId) {
         collection(db, "accounts", accountId, "settlements"),
         orderBy("date", "desc")
       ),
-      snap => setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      snap => setSettlements(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.error("[useFirestoreData] settlements:", err)
     );
   }, [accountId]);
 

@@ -93,17 +93,17 @@ export function useAccountData(accountIds, selectedAccountId, authUser, userProf
     const ids = [...account.memberIds];
     const unsubs = ids.map(uid =>
       onSnapshot(doc(db, "users", uid), snap => {
-        if (snap.exists()) {
-          setMembers(prev => [
-            // Reemplaza el seed o cualquier entrada previa del mismo uid
-            ...prev.filter(m => m.uid !== uid),
-            { uid, ...snap.data() },
-          ]);
-        }
+        setMembers(prev => [
+          // Reemplaza el seed o cualquier entrada previa del mismo uid
+          ...prev.filter(m => m.uid !== uid),
+          snap.exists()
+            ? { uid, ...snap.data() }
+            : { uid, name: "Usuario desconocido", color: "#999" },
+        ]);
       })
     );
     return () => unsubs.forEach(u => u());
-  }, [account?.memberIds?.join(",")]);
+  }, [[...(account?.memberIds || [])].sort().join(",")]);
 
   return { userAccounts, account, members, accountsLoading };
 }

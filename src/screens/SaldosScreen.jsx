@@ -206,7 +206,10 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     }),
     [members, currentUser.uid]
   );
-  const monthSettlements = (settlements || []).filter(s => s.month === currentMonth);
+  const monthSettlements = useMemo(
+    () => (settlements || []).filter(s => s.month === currentMonth),
+    [settlements, currentMonth]
+  );
 
   const saldos = useMemo(
     () => calcSaldos(monthExp, visibleFixed, realMembers, account?.divisionSystem, currentMonth, monthSettlements),
@@ -216,7 +219,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   const balances = realMembers.map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
 
   // Simplificación de deudas — algoritmo greedy cascada
-  const debtPairs = (() => {
+  const debtPairs = useMemo(() => {
     const r2 = (n) => Math.round(n * 100) / 100;
     const pairs = [];
     const debtors   = balances.filter(m => m.balance < -0.005).map(m => ({ ...m, remaining: r2(Math.abs(m.balance)) })).sort((a, b) => b.remaining - a.remaining);
@@ -231,7 +234,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       if (creditors[j].remaining < 0.005) j++;
     }
     return pairs;
-  })();
+  }, [balances]);
 
   const [settleModal, setSettleModal]   = useState(null); // { debtorUid, creditorUid, amount }
   const [showPassDebt, setShowPassDebt] = useState(false);
@@ -280,15 +283,21 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   };
 
   const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => {
-    await addDoc(collection(db, "accounts", account.id, "settlements"), {
-      debtorUid, creditorUid, amount, date, month: currentMonth, full: false,
-      createdAt: new Date().toISOString(),
-    });
-    setSettleModal(prev => {
-      if (!prev) return null;
-      const remaining = prev.debts.filter(d => d.creditorUid !== creditorUid);
-      return remaining.length === 0 ? null : { ...prev, debts: remaining };
-    });
+    if (isSubmitting.current) return;
+    isSubmitting.current = true;
+    try {
+      await addDoc(collection(db, "accounts", account.id, "settlements"), {
+        debtorUid, creditorUid, amount, date, month: currentMonth, full: false,
+        createdAt: new Date().toISOString(),
+      });
+      setSettleModal(prev => {
+        if (!prev) return null;
+        const remaining = prev.debts.filter(d => d.creditorUid !== creditorUid);
+        return remaining.length === 0 ? null : { ...prev, debts: remaining };
+      });
+    } finally {
+      isSubmitting.current = false;
+    }
   };
 
   const nextMonth = (() => {

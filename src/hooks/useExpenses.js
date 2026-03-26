@@ -102,8 +102,19 @@ export function useExpenses({
         const delta = {};
         realMembers.forEach(m => { delta[m.uid] = 0; });
 
+        // Normaliza paidBy — puede ser string uid o Array<{uid,amount}>
+        const applyPaidBy = (paidBy, totalAmount) => {
+          if (Array.isArray(paidBy)) {
+            paidBy.forEach(({ uid, amount }) => {
+              if (delta[uid] !== undefined) delta[uid] += amount;
+            });
+          } else {
+            if (delta[paidBy] !== undefined) delta[paidBy] += totalAmount;
+          }
+        };
+
         if (expense.type === "hogar") {
-          if (delta[expense.paidBy] !== undefined) delta[expense.paidBy] += expense.amount;
+          applyPaidBy(expense.paidBy, expense.amount);
           realMembers.forEach(m => {
             const share = account?.divisionSystem === "proportional" && totalSalary > 0
               ? expense.amount * ((m.salary || 0) / totalSalary)
@@ -111,12 +122,12 @@ export function useExpenses({
             if (delta[m.uid] !== undefined) delta[m.uid] -= share;
           });
         } else if (expense.type === "personal") {
-          if (delta[expense.paidBy] !== undefined) delta[expense.paidBy] += expense.amount;
+          applyPaidBy(expense.paidBy, expense.amount);
           const targets = (Array.isArray(expense.forWhom) ? expense.forWhom : [expense.forWhom])
             .filter(uid => delta[uid] !== undefined);
           targets.forEach(uid => { delta[uid] -= expense.amount / (targets.length || 1); });
         } else if (expense.type === "mio") {
-          if (delta[expense.paidBy] !== undefined) delta[expense.paidBy] += expense.amount;
+          applyPaidBy(expense.paidBy, expense.amount);
           if (expense.owner && delta[expense.owner] !== undefined)
             delta[expense.owner] -= expense.amount;
         }

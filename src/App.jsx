@@ -470,7 +470,10 @@ function AppInner() {
   // ── allMembers normalizado — fuente única via buildAllMembers() ──
   // Todos los componentes que reciben allMembers pueden confiar en que
   // cada elemento tiene { uid, name, color, _isLabel } garantizados.
-  const allMembers = buildAllMembers(members, account?.memberLabels);
+  const allMembers = useMemo(
+    () => buildAllMembers(members, account?.memberLabels),
+    [members, account?.memberLabels]
+  );
 
   // Categorías activas = DEFAULT sin las desactivadas + custom de la subcolección
   const activeCategories = useMemo(() => {
@@ -488,7 +491,7 @@ function AppInner() {
   const [deleteWarning, setDeleteWarning] = useState(null);
   const { sendNotification } = useNotif();
   const { addExpense, handleEditSave, deleteExpense, doDeleteExpense, markFixedPaid } = useExpenses({
-    authUser, account, members, expenses,
+    authUser, account, members, expenses, settlements,
     currentMonth, setExpenses, setEditingExpense,
     setDeleteWarning, sendNotification,
   });
@@ -601,7 +604,7 @@ function AppInner() {
       <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
-        {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} visibleFixed={visibleFixed} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} isLoading={expensesLoading} />}
+        {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={activeCategories} visibleFixed={visibleFixed} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} isLoading={expensesLoading} />}
         <Suspense fallback={<Spinner text="Cargando..." />}>
           {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} visibleFixed={visibleFixed} members={allMembers} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} customCategories={activeCategories} />}
           {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} />}
