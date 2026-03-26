@@ -535,13 +535,23 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | Scroll lock de sheets no centralizado | Baja | Deuda técnica |
 | MenuPanel: label "Cuenta personal" no contempla pozo | Baja | Cosmético pendiente |
 | `SwipeableExpenseRow`: `allMembers.find(m => m.uid === e.paidBy)` rompe con multi-payer (muestra vacío) | Media | Deuda técnica Mar 17 |
-| `useExpenses.js`: `delta[expense.paidBy]` no maneja paidBy array en lógica de notificaciones | Media | Deuda técnica Mar 17 |
+| `useExpenses.js`: `delta[expense.paidBy]` no maneja paidBy array en lógica de notificaciones | Media | Parcialmente resuelto Mar 26 — doDeleteExpense usa applyPaidBy(); faltan notificaciones |
 | `removeMember.js`: `e.paidBy === memberUid` no maneja array → no detecta pagador en multi-payer | Baja | Deuda técnica Mar 17 |
 
 ### ✅ Resueltos en sesiones anteriores
 
 | Item | Sesión |
 |------|--------|
+| `settlements` faltaba en llamada a `useExpenses()` — warning de borrado nunca se mostraba | Mar 26 |
+| `doDeleteExpense`: settlement correctivo omitido en gastos multi-payer — `applyPaidBy()` | Mar 26 |
+| HomeScreen ignoraba `disabledCategories` — categorías desactivadas aparecían en filtros | Mar 26 |
+| `handlePartialSettle` sin guard `isSubmitting` — susceptible a double-tap | Mar 26 |
+| `monthSettlements` y `debtPairs` sin `useMemo` en SaldosScreen | Mar 26 |
+| `useAccountData`: miembro sin doc Firestore se descartaba silenciosamente — placeholder | Mar 26 |
+| `useFirestoreData`: 4 `onSnapshot` sin error callback — fallos silenciosos | Mar 26 |
+| `allMembers` y `activeCategories` sin `useMemo` en App.jsx | Mar 26 |
+| `memberIds.join()` order-sensitive en useAccountData — ahora sorted | Mar 26 |
+| Onboarding slides (6) en AccountSelectorScreen + tooltips en Home/Saldos + "?" en modales | Mar 26 |
 | HomeScreen hero skeleton (width:140/h:36, width:100/h:13) | Mar 18 |
 | Settlement history — navegación por mes, distinción visual, eliminación, agrupamiento | Mar 18 |
 | Settle modal usa `debtPairs` frescos en lugar de estado previo del modal | Mar 18 |
