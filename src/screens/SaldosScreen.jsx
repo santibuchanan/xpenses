@@ -277,7 +277,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
         title: "¡Cuentas saldadas! 🎉",
         body: `${debtor?.name} saldó ${fmt(amount)} con ${creditor?.name}`,
         fromName: debtor?.name || "Un miembro",
-        toUids: realMembers.filter(m => m.uid !== debtorUid).map(m => m.uid),
+        toUids: [creditorUid],
         accountId: account?.id, accountName: account?.name,
       });
     } finally {
@@ -285,10 +285,12 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     }
   };
 
-  const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => {
+const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => {
     if (isSubmitting.current) return;
     isSubmitting.current = true;
     try {
+      const debtor   = realMembers.find(m => m.uid === debtorUid);
+      const creditor = realMembers.find(m => m.uid === creditorUid);
       await addDoc(collection(db, "accounts", account.id, "settlements"), {
         debtorUid, creditorUid, amount, date, month: currentMonth, full: false,
         createdAt: new Date().toISOString(),
@@ -298,10 +300,19 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
         const remaining = prev.debts.filter(d => d.creditorUid !== creditorUid);
         return remaining.length === 0 ? null : { ...prev, debts: remaining };
       });
+      await sendNotification({
+        type: NOTIF_TYPES.ACCOUNT_SETTLED,
+        title: "Pago parcial registrado",
+        body: `${debtor?.name} te pagó ${fmt(amount)}`,
+        fromName: debtor?.name || "Un miembro",
+        toUids: [creditorUid],
+        accountId: account?.id, accountName: account?.name,
+      });
     } finally {
       isSubmitting.current = false;
     }
   };
+
 
   const nextMonth = (() => {
     const [y, m] = currentMonth.split("-").map(Number);

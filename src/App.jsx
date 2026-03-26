@@ -491,7 +491,7 @@ function AppInner() {
   const [deleteWarning, setDeleteWarning] = useState(null);
   const { sendNotification } = useNotif();
   const { addExpense, handleEditSave, deleteExpense, doDeleteExpense, markFixedPaid } = useExpenses({
-    authUser, account, members, expenses, settlements,
+    authUser, account, allMembers, members, expenses, settlements,
     currentMonth, setExpenses, setEditingExpense,
     setDeleteWarning, sendNotification,
   });

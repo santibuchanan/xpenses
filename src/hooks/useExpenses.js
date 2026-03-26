@@ -20,6 +20,7 @@ import { NOTIF_TYPES } from "../notifications.jsx";
 export function useExpenses({
   authUser,
   account,
+  allMembers,
   members,
   expenses,
   settlements,      // FIX #2: recibe settlements del estado, no los lee de Firestore
@@ -29,10 +30,27 @@ export function useExpenses({
   setDeleteWarning,
   sendNotification,
 }) {
-  const myName      = () => members?.find(m => m.uid === authUser?.uid)?.name || "Alguien";
-  const otherMembers = () => members?.filter(m => !m._isLabel && m.uid !== authUser?.uid) || [];
-  const currency    = account?.currency || "ARS";
-  const fmt         = (n) => formatAmount(n, currency);
+  const myName   = () => members?.find(m => m.uid === authUser?.uid)?.name || "Alguien";
+  const currency = account?.currency || "ARS";
+  const fmt      = (n) => formatAmount(n, currency);
+
+  const getNotificationRecipients = (expense) => {
+    const all = allMembers || members || [];
+    const real = all.filter(m => !m._isLabel);
+    switch (expense?.type) {
+      case "hogar":
+      case "extraordinary":
+        return real.filter(m => m.uid !== authUser?.uid);
+      case "personal": {
+        const forWhom = Array.isArray(expense.forWhom) ? expense.forWhom : [expense.forWhom];
+        return real.filter(m => forWhom.includes(m.uid) && m.uid !== authUser?.uid);
+      }
+      case "mio":
+        return [];
+      default:
+        return real.filter(m => m.uid !== authUser?.uid);
+    }
+  };
 
   // FIX #6: ref para evitar double-submit en operaciones destructivas
   const isSubmitting = useRef(false);
@@ -45,7 +63,7 @@ export function useExpenses({
       createdAt: new Date().toISOString(),
     });
 
-    const others = otherMembers();
+    const others = getNotificationRecipients(expense);
     if (others.length > 0) {
       await sendNotification({
         type: NOTIF_TYPES.EXPENSE_ADDED,
@@ -56,10 +74,10 @@ export function useExpenses({
         accountId: account?.id,
       });
     }
-  }, [authUser, account, members, sendNotification]);
+  }, [authUser, account, allMembers, members, sendNotification]);
 
   const handleEditSave = useCallback(async (updatedExpense) => {
-    const others = otherMembers();
+    const others = getNotificationRecipients(updatedExpense);
     if (others.length > 0) {
       await sendNotification({
         type: NOTIF_TYPES.EXPENSE_EDITED,
@@ -71,7 +89,7 @@ export function useExpenses({
       });
     }
     setEditingExpense(null);
-  }, [authUser, account, members, sendNotification, setEditingExpense]);
+  }, [authUser, account, allMembers, members, sendNotification, setEditingExpense]);
 
   const doDeleteExpense = useCallback(async (expense, addCorrectiveSettlement) => {
     // FIX #6: evitar double-submit
@@ -159,7 +177,7 @@ export function useExpenses({
       }
 
       // 3. Notificar a otros miembros
-      const others = otherMembers();
+      const others = getNotificationRecipients(expense);
       if (others.length > 0) {
         await sendNotification({
           type: NOTIF_TYPES.EXPENSE_DELETED,
@@ -175,7 +193,7 @@ export function useExpenses({
     } finally {
       isSubmitting.current = false;
     }
-  }, [authUser, account, members, currentMonth, sendNotification, setExpenses, setDeleteWarning]);
+  }, [authUser, account, allMembers, members, currentMonth, sendNotification, setExpenses, setDeleteWarning]);
 
   /**
    * deleteExpense — punto de entrada desde la UI.
