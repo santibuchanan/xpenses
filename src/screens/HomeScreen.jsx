@@ -170,7 +170,11 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const fmt = (n) => formatAmount(n, currency);
   const me = allMembers?.find(m => m.uid === currentUser.uid);
   const meColor = me?.color || "#4F7FFA";
-  const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
+  const disabled = account?.disabledCategories || [];
+  const allCategories = [
+    ...DEFAULT_CATEGORIES.filter(c => !disabled.includes(c.id)),
+    ...(customCategories || []),
+  ];
 
   const monthExp    = expenses.filter(e => e.month === currentMonth && !e.deleted);
   const monthExpAll = expenses.filter(e => e.month === currentMonth);

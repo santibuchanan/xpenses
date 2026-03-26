@@ -219,11 +219,14 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   const balances = realMembers.map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
 
   // Simplificación de deudas — algoritmo greedy cascada
+  // Dep sobre saldos y realMembers (fuentes estables memoizadas) en lugar de
+  // balances[], que crea nueva referencia en cada render aunque los valores no cambien.
   const debtPairs = useMemo(() => {
     const r2 = (n) => Math.round(n * 100) / 100;
     const pairs = [];
-    const debtors   = balances.filter(m => m.balance < -0.005).map(m => ({ ...m, remaining: r2(Math.abs(m.balance)) })).sort((a, b) => b.remaining - a.remaining);
-    const creditors = balances.filter(m => m.balance > 0.005).map(m => ({ ...m, remaining: r2(m.balance) })).sort((a, b) => b.remaining - a.remaining);
+    const bs = realMembers.map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
+    const debtors   = bs.filter(m => m.balance < -0.005).map(m => ({ ...m, remaining: r2(Math.abs(m.balance)) })).sort((a, b) => b.remaining - a.remaining);
+    const creditors = bs.filter(m => m.balance > 0.005).map(m => ({ ...m, remaining: r2(m.balance) })).sort((a, b) => b.remaining - a.remaining);
     let i = 0, j = 0;
     while (i < debtors.length && j < creditors.length) {
       const amount = r2(Math.min(debtors[i].remaining, creditors[j].remaining));
@@ -234,7 +237,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       if (creditors[j].remaining < 0.005) j++;
     }
     return pairs;
-  }, [balances]);
+  }, [saldos, realMembers]);
 
   const [settleModal, setSettleModal]   = useState(null); // { debtorUid, creditorUid, amount }
   const [showPassDebt, setShowPassDebt] = useState(false);

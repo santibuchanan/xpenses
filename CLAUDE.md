@@ -1,10 +1,166 @@
-# Instrucciones para Claude Code
+# Instrucciones para Claude Code — X-penses
+
 ## Git
 - Siempre trabajar en la rama `main`
 - Antes de empezar cualquier tarea: `git checkout main && git pull origin main`
-- Al terminar cualquier tarea: `git add` de los archivos modificados, `git commit` con mensaje descriptivo y `git push origin main`
+- Al terminar: `git add -A && git commit -m "tipo: descripción" && git push origin main`
 - Nunca dejar commits sin pushear
+- Prefijos: `feat:` / `fix:` / `refactor:` / `chore:`
+
 ## Proyecto
-- Stack: React + Vite + Firebase + Vercel
-- Deploy automático desde main via Vercel
-- Leer src/ARCHITECTURE.md antes de modificar zonas frágiles
+- **Repo local:** `/Users/santi/xpenses`
+- **Deploy:** https://xpenses-seven.vercel.app (automático desde Vercel al pushear a main)
+- **Firebase project:** xpenses-305ee
+- **Stack:** React + Vite + Firebase (Firestore + Auth) + VitePWA
+
+## Reglas OBLIGATORIAS antes de tocar cualquier archivo
+1. Leer `src/ARCHITECTURE.md` antes de modificar zonas frágiles
+2. Leer cada archivo antes de editarlo — NUNCA editar desde memoria
+3. `type="button"` en todos los botones no-submit
+4. Textos de UI siempre en español rioplatense, sin tecnicismos
+5. Nunca colores hardcodeados — usar `colors` de `useTheme()`
+
+---
+
+## Zonas frágiles — leer ARCHITECTURE.md antes de tocar
+
+| Archivo | Zona | Riesgo |
+|---------|------|--------|
+| `utils/normalizeMembers.js` | `buildAllMembers()` | Rompe AddExpenseModal, SaldosScreen, HomeScreen |
+| `hooks/useBalances.js` | `calcSaldos()` | Afecta saldos en HomeScreen y SaldosScreen |
+| `App.jsx` | `inviteIdFromUrl`, listeners | Lee hash al montar — no re-ejecuta |
+| `constants/categories.js` | `DEFAULT_CATEGORIES` | Cambiar afecta toda la app |
+| `vite.config.js` | workbox config | Puede romper Firebase Auth con PWA |
+
+---
+
+## Contratos de datos críticos
+
+### allMembers (el más importante)
+```js
+{ uid: string, name: string, color: string, _isLabel: boolean }
+// uid SIEMPRE presente — para labels es l.id
+// Usar _isLabel solo para excluir de notificaciones, NO de cálculos de saldo
+// NUNCA usar m.id directamente — siempre m.uid
+```
+
+### Expense
+```js
+{ id, accountId, concept, amount, type, category, date, month,
+  paidBy, forWhom[], owner, deleted, createdBy, createdAt }
+// Soft delete SIEMPRE: deleted: true — nunca borrado físico
+// Montos con precisión r2: Math.round(n * 100) / 100
+```
+
+### Account
+```js
+{ id, name, emoji, type, divisionSystem, ownerId, memberIds[],
+  memberLabels[], currency, disabledCategories[], createdAt }
+```
+
+---
+
+## Reglas de notificaciones
+
+- `hogar` (Ordinario) → todos los miembros de la cuenta MENOS el creador
+- `personal` (Para otro) → solo `forWhom` MENOS el creador
+- `mio` (Para mí) → nadie
+- `extraordinary` → todos los miembros MENOS el creador
+- `settlement` → solo el acreedor (`creditorUid`)
+- **NUNCA cruzar cuentas** — filtrar siempre por `accountId`
+- Labels (`_isLabel: true`) NO reciben notificaciones
+
+---
+
+## Patrones Firebase obligatorios
+
+```js
+// Siempre cleanup en listeners
+useEffect(() => {
+  const unsub = onSnapshot(ref, handler);
+  return () => unsub();
+}, [dep]);
+
+// Queries siempre filtradas por accountId
+query(collection(db, 'expenses'),
+  where('accountId', '==', accountId),
+  where('deleted', '!=', true)
+)
+
+// Operaciones atómicas con runTransaction
+await runTransaction(db, async (tx) => { ... });
+
+// updatedAt al modificar cuentas
+updatedAt: new Date().toISOString()
+```
+
+---
+
+## Patrones UI mobile obligatorios
+
+```js
+// Bottom sheets — siempre con useSwipeSheet
+const { sheetRef, handleTouchStart, handleTouchMove, handleTouchEnd } = useSwipeSheet(onClose);
+
+// Scroll lock en modales
+document.body.style.overflow = 'hidden';   // al abrir
+document.body.style.overflow = '';          // al cerrar
+
+// Anti-doble-tap en operaciones críticas
+const isSubmitting = useRef(false);
+if (isSubmitting.current) return;
+isSubmitting.current = true;
+// ... operación
+isSubmitting.current = false;
+
+// touch-action en zonas con swipe
+style={{ touchAction: 'pan-y' }}
+```
+
+---
+
+## Checklist pre-push (verificar antes de cada push)
+
+### Auth
+- [ ] Solo `signInWithPopup` — nunca `signInWithRedirect`
+- [ ] `vite.config.js` tiene `navigateFallbackDenylist: [/^\/__\/auth\//]` en workbox
+
+### Miembros
+- [ ] `buildAllMembers()` no modificado sin revisar ARCHITECTURE.md
+- [ ] Todos los `allMembers` tienen `uid`, `name`, `color`
+- [ ] Labels participan en cálculos pero NO en notificaciones
+
+### Gastos y saldos
+- [ ] Soft delete (`deleted: true`), nunca borrado físico
+- [ ] Montos con precisión r2
+- [ ] `formatAmount()` de theme.jsx para mostrar montos
+
+### Notificaciones
+- [ ] Reglas de destinatarios correctas por tipo de gasto
+- [ ] Filtro por `accountId` — nunca cruzar cuentas
+
+### UI
+- [ ] `type="button"` en todos los botones no-submit
+- [ ] Modales con scroll lock
+- [ ] Bottom sheets con `useSwipeSheet`
+- [ ] Textos en español rioplatense
+
+### Firebase
+- [ ] Todos los listeners tienen cleanup (`return unsub`)
+- [ ] Queries filtran por `accountId`
+
+---
+
+## Errores conocidos
+
+- **"Unable to process request due to missing initial state"** → VitePWA interfiriendo con Firebase Auth. Fix: `navigateFallbackDenylist: [/^\/__\/auth\//]` en workbox de vite.config.js
+- **Modal se queda en "Guardando..."** → `onClose()` no se llama después de guardar. Siempre llamar onClose en el finally.
+- **Claude Code no puede pushear** → Iniciar siempre con `cd /Users/santi/xpenses && claude`
+
+---
+
+## Pendientes técnicos activos
+
+- HomeScreen skeleton loading no funciona correctamente
+- Listeners duplicados en SettingsScreen (T1)
+- Íconos PWA no se muestran
