@@ -2,7 +2,7 @@
 
 > **Propósito:** Referencia de arquitectura que debe consultarse antes de cada sprint. Evita regresiones en zonas frágiles.
 
-**Última actualización:** Sesión Mar 17, 2026
+**Última actualización:** Sesión Mar 26, 2026
 **Deploy:** https://xpenses-seven.vercel.app
 **Firebase project:** xpenses-305ee
 
@@ -121,8 +121,8 @@ Origen: `account.memberLabels[]`
 **Componentes que reciben `allMembers`:**
 - `HomeScreen` → filtra `!!m.uid` para `realMembers` en `calcSaldos`
 - `SaldosScreen` → NO filtra — incluye labels porque tienen uid estable
-- `useExpenses.otherMembers()` → filtra `_isLabel` (notificaciones no van a labels)
-- `useExpenses.deleteExpense` → NO filtra en settlement correctivo
+- `useExpenses.getNotificationRecipients(expense)` → switch por tipo: hogar/extraordinary → todos menos creador; personal → solo forWhom menos creador; mio → nadie; filtra `_isLabel`
+- `useExpenses.doDeleteExpense` → usa `members` (no allMembers) en settlement correctivo — labels con uid estable participan
 - `AddExpenseModal` → normaliza internamente con `.uid = m.uid || m.id`
 - `EditExpenseModal` → usa para mostrar nombres en paidBy/forWhom
 - `SwipeableExpenseRow` → usa para mostrar nombre del pagador
@@ -354,8 +354,11 @@ calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMonth, settl
 
 ### `hooks/useExpenses.js`
 
-- `addExpense(data)` — escribe en Firestore + envía notificación
-- `handleEditSave(expense)` — actualiza gasto existente
+Recibe `allMembers` (además de `members`) para determinar destinatarios de notificaciones.
+
+- `getNotificationRecipients(expense)` — retorna array de members a notificar según `expense.type`
+- `addExpense(data)` — escribe en Firestore + notifica según tipo
+- `handleEditSave(expense)` — actualiza gasto existente + notifica según tipo
 - `deleteExpense(expense)` — soft delete con detección de settlements
 - `doDeleteExpense(expense, adjustSettlements)` — delete real
 - `markFixedPaid(fixedId, paidByUid, month)` — registra pago de fijo
@@ -535,7 +538,9 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | Scroll lock de sheets no centralizado | Baja | Deuda técnica |
 | MenuPanel: label "Cuenta personal" no contempla pozo | Baja | Cosmético pendiente |
 | `SwipeableExpenseRow`: `allMembers.find(m => m.uid === e.paidBy)` rompe con multi-payer (muestra vacío) | Media | Deuda técnica Mar 17 |
-| `useExpenses.js`: `delta[expense.paidBy]` no maneja paidBy array en lógica de notificaciones | Media | Parcialmente resuelto Mar 26 — doDeleteExpense usa applyPaidBy(); faltan notificaciones |
+| Notificaciones con destinatarios incorrectos — `getNotificationRecipients(expense)` reemplaza `otherMembers()` genérico; switch por tipo (hogar/personal/mio/extraordinary/settlement) | Mar 26 |
+| `handleFullSettle` notificaba a todos los miembros en lugar de solo al acreedor | Mar 26 |
+| `handlePartialSettle` no enviaba notificación — ahora notifica solo al acreedor | Mar 26 |
 | `removeMember.js`: `e.paidBy === memberUid` no maneja array → no detecta pagador en multi-payer | Baja | Deuda técnica Mar 17 |
 
 ### ✅ Resueltos en sesiones anteriores
