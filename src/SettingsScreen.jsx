@@ -652,6 +652,21 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         </>
       )}
 
+      {/* LEGAL Y SOPORTE */}
+      <SectionHeader title="Legal y soporte" colors={colors} />
+      <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+        {[
+          { icon: "🔒", label: "Política de Privacidad", href: "/privacy.html" },
+        ].map((item, i, arr) => (
+          <a key={item.href} href={item.href} target="_blank" rel="noopener noreferrer"
+            style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", textDecoration: "none", borderBottom: i < arr.length - 1 ? `1px solid ${colors.divider}` : "none" }}>
+            <span style={{ fontSize: 20, width: 28, textAlign: "center" }}>{item.icon}</span>
+            <span style={{ flex: 1, fontSize: 15, fontWeight: 500, color: colors.text, fontFamily: FONT }}>{item.label}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textSubtle} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </a>
+        ))}
+      </div>
+
       <div style={{ height: 100 }} />
 
       {/* MODAL PRESUPUESTO */}

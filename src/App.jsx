@@ -624,9 +624,7 @@ function AppInner() {
               <span style={{ fontSize: 9, fontWeight: tab === n.id ? 700 : 500, letterSpacing: 0.2, color: tab === n.id ? "#4F7FFA" : colors.textSubtle, textTransform: "uppercase", fontFamily: FONT }}>{n.label}</span>
             </button>
           ))}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{ fontSize: 8, color: colors.textSubtle, textDecoration: "none", fontFamily: FONT, opacity: 0.7 }}>Privacidad</a>
-          </div>
+          <div style={{ flex: 1 }} />
           {NAV_RIGHT.map(n => (
             <button key={n.id} onClick={() => setTab(n.id)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: FONT, padding: "2px 0" }}>
               <NavIcon id={n.id} active={tab === n.id} color="#4F7FFA" />
