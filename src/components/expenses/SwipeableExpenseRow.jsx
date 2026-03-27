@@ -78,7 +78,7 @@ export function DeleteConfirmPopup({ expense, fmt, allCategories, colors, onConf
 export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, onEdit, onDelete, isPersonal, currentUser }) {
   const [showDelete, setShowDelete] = useState(false);
 
-  const { offsetX, peekProgress, handlers, reset, wasDragging } = useSwipeRow({
+  const { offsetX, isSettling, peekProgress, handlers, reset, wasDragging } = useSwipeRow({
     peekDistance: 80,
     fullDistance: 180,
     onFull: () => setShowDelete(true),
@@ -158,7 +158,7 @@ export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, col
             background: colors.card, borderRadius: 20, padding: "14px 16px",
             border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow,
             transform: `translateX(-${offsetX}px)`,
-            transition: offsetX === 0 ? "transform 0.25s ease" : "none",
+            transition: isSettling ? "transform 0.25s ease" : "none",
             position: "relative", zIndex: 1, cursor: "pointer",
           }}
         >

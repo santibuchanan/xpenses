@@ -52,10 +52,12 @@ export function useSwipeRow({ peekDistance = 80, fullDistance = 180, onFull } = 
   const [offsetX, setOffsetX] = useState(0);
   const startX = useRef(null);
   const isDragging = useRef(false);
+  const [isSettling, setIsSettling] = useState(false);
 
   const onTouchStart = (e) => {
     startX.current = e.touches[0].clientX;
     isDragging.current = false;
+    setIsSettling(false);
   };
 
   const onTouchMove = (e) => {
@@ -67,22 +69,22 @@ export function useSwipeRow({ peekDistance = 80, fullDistance = 180, onFull } = 
   };
 
   const onTouchEnd = () => {
+    setIsSettling(true);
     if (offsetX >= fullDistance) {
       setOffsetX(0);
       onFull?.();
-    } else if (offsetX > peekDistance / 2) {
-      setOffsetX(peekDistance);
     } else {
       setOffsetX(0);
     }
     startX.current = null;
   };
 
-  const reset = () => setOffsetX(0);
+  const reset = () => { setIsSettling(true); setOffsetX(0); };
   const wasDragging = () => isDragging.current;
 
   return {
     offsetX,
+    isSettling,
     peekProgress: Math.min(1, offsetX / fullDistance),
     handlers: { onTouchStart, onTouchMove, onTouchEnd },
     reset,
