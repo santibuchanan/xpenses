@@ -30,10 +30,11 @@ export function useSwipeSheet({ onClose, threshold = 120, handleOnly = false } =
   };
 
   const onTouchEnd = () => {
-    if (dragY > threshold) onClose();
-    else setDragY(0);
+    const exceeded = dragY > threshold;
+    setDragY(0);
     startY.current = null;
     setIsDragging(false);
+    if (exceeded) onClose();
   };
 
   const handlers = { onTouchStart, onTouchMove, onTouchEnd };
