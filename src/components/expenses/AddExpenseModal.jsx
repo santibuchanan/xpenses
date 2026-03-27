@@ -341,7 +341,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
           onClick={handleAdd}
           disabled={loading}
           style={{ width: "100%", padding: 16, borderRadius: 16, background: loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 600, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginTop: 4 }}>
-          {loading ? "Guardando..." : "Agregar ✓"}
+          {loading ? "Guardando..." : "Agregar"}
         </button>
       </div>
 
