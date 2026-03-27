@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { collection, addDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useTheme, formatAmount, CURRENCIES } from "../theme.jsx";
-import { useSwipeSheet } from "../hooks/useSwipeSheet.js";
+import { useSwipeSheet, useSwipeRow } from "../hooks/useSwipeSheet.js";
 import { useNotif, NOTIF_TYPES } from "../notifications";
 import { calcSaldos } from "../hooks/useBalances.js";
 import { getAmountPaidBy } from "../utils/expenseFilters.js";
@@ -187,6 +187,73 @@ function PassDebtModal({ debts, members, nextMonth, fmt, colors, onConfirm, onCl
           {loading ? "Generando..." : "Confirmar y generar gastos"}
         </button>
         <button onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+// ── SWIPEABLE SETTLEMENT ROW ──
+function SwipeableSettlementRow({ s, debtor, creditor, isMeDebtor, isMeCreditor, isMe, fmt, colors, canDel, onDelete }) {
+  const { offsetX, isSettling, peekProgress, handlers } = useSwipeRow({
+    peekDistance: 80,
+    fullDistance: 180,
+    onFull: () => onDelete(s),
+  });
+  const PEEK = 80;
+
+  const content = (
+    <>
+      <span style={{ fontSize: 18, flexShrink: 0 }}>🫱🏼‍🫲🏾</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>
+          {debtor?.name}{isMeDebtor ? <span style={{ color: "#4F7FFA", fontWeight: 700 }}> · Vos</span> : ""}
+          {" → "}
+          {creditor?.name}{isMeCreditor ? <span style={{ color: "#4F7FFA", fontWeight: 700 }}> · Vos</span> : ""}
+        </p>
+        <p style={{ margin: "2px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>
+          {s.full ? "Saldo total" : "Saldo parcial"}
+        </p>
+      </div>
+      <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: colors.success, fontFamily: FONT, flexShrink: 0 }}>{fmt(s.amount)}</p>
+    </>
+  );
+
+  if (!canDel) {
+    return (
+      <div style={{ padding: "11px 16px", borderTop: `1px solid ${colors.divider}`, display: "flex", alignItems: "center", gap: 10, background: isMe ? colors.pill : "transparent" }}>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: "relative", overflow: "hidden", borderTop: `1px solid ${colors.divider}` }}>
+      <div style={{
+        position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4h6v2"/>
+          </svg>
+          <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+        </div>
+      </div>
+      <div
+        {...handlers}
+        style={{
+          padding: "11px 16px", display: "flex", alignItems: "center", gap: 10,
+          background: isMe ? colors.pill : colors.card,
+          transform: `translateX(-${offsetX}px)`,
+          transition: isSettling ? "transform 0.25s ease" : "none",
+          position: "relative", zIndex: 1,
+        }}
+      >
+        {content}
       </div>
     </div>
   );
@@ -681,30 +748,19 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
                     const isMe  = isMeDebtor || isMeCreditor;
                     const canDel = canDeleteSettlement(s);
                     return (
-                      <div key={s.id} style={{
-                        padding: "11px 16px", borderTop: `1px solid ${colors.divider}`,
-                        display: "flex", alignItems: "center", gap: 10,
-                        background: isMe ? colors.pill : "transparent",
-                      }}>
-                        <span style={{ fontSize: 18, flexShrink: 0 }}>🫱🏼‍🫲🏾</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>
-                            {debtor?.name}{isMeDebtor ? <span style={{ color: "#4F7FFA", fontWeight: 700 }}> · Vos</span> : ""}
-                            {" → "}
-                            {creditor?.name}{isMeCreditor ? <span style={{ color: "#4F7FFA", fontWeight: 700 }}> · Vos</span> : ""}
-                          </p>
-                          <p style={{ margin: "2px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>
-                            {s.full ? "Saldo total" : "Saldo parcial"}
-                          </p>
-                        </div>
-                        <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: colors.success, fontFamily: FONT, flexShrink: 0 }}>{fmt(s.amount)}</p>
-                        {canDel && (
-                          <button onClick={() => setConfirmDelete(s)}
-                            style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontSize: 16, lineHeight: 1, flexShrink: 0, opacity: 0.55 }}>
-                            🗑️
-                          </button>
-                        )}
-                      </div>
+                      <SwipeableSettlementRow
+                        key={s.id}
+                        s={s}
+                        debtor={debtor}
+                        creditor={creditor}
+                        isMeDebtor={isMeDebtor}
+                        isMeCreditor={isMeCreditor}
+                        isMe={isMe}
+                        fmt={fmt}
+                        colors={colors}
+                        canDel={canDel}
+                        onDelete={(settlement) => setConfirmDelete(settlement)}
+                      />
                     );
                   })}
                 </div>
