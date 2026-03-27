@@ -99,6 +99,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
 
   // Swipe-to-close — solo desde el handle
   const sheetRef = useRef(null);
+  const amountRef = useRef(null);
   const { dragY, isDragging, handlers: swipeHandlers } = useSwipeSheet({ onClose: handleClose });
 
   const onTouchStart = (e) => {
@@ -214,12 +215,13 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
         )}
 
         <p style={labelStyle}>Concepto</p>
-        <input value={form.concept} onChange={e => set("concept", e.target.value)} onFocus={() => touchField("concept")} placeholder="Ej: Supermercado" style={{ ...inputStyle, borderColor: touched.concept && !form.concept ? "#ff6b6b" : colors.inputBorder }} />
+        <input value={form.concept} onChange={e => set("concept", e.target.value)} onFocus={() => touchField("concept")} onKeyDown={e => e.key === "Enter" && amountRef.current?.focus()} placeholder="Ej: Supermercado" style={{ ...inputStyle, borderColor: touched.concept && !form.concept ? "#ff6b6b" : colors.inputBorder }} />
 
         <p style={labelStyle}>Monto ({currSymbol})</p>
         <div style={{ position: "relative", marginBottom: 14 }}>
           <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
           <input
+            ref={amountRef}
             type="text"
             inputMode="decimal"
             value={amountInput.displayValue}
