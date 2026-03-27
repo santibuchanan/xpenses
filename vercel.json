@@ -9,6 +9,10 @@
       "dest": "/privacy.html"
     },
     {
+      "src": "^/(logo\\.png|apple-touch-icon\\.png|pwa-192x192\\.png|pwa-512x512\\.png|favicon\\.ico|manifest\\.webmanifest|sw\\.js|workbox-.*\\.js)$",
+      "dest": "/$1"
+    },
+    {
       "src": "^/(.*)",
       "dest": "/index.html"
     }
