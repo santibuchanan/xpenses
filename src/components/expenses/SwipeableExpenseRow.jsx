@@ -59,7 +59,7 @@ export function DeleteConfirmPopup({ expense, fmt, allCategories, colors, onConf
           disabled={loading}
           style={{ width: "100%", padding: 15, borderRadius: 14, background: loading ? "#aaa" : "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10 }}
         >
-          {loading ? "Eliminando..." : "🗑️ Eliminar"}
+          {loading ? "Eliminando..." : "Eliminar"}
         </button>
         <button
           onClick={onCancel}
@@ -137,10 +137,15 @@ export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, col
         <div style={{
           position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
           borderRadius: "0 20px 20px 0", display: "flex", alignItems: "center", justifyContent: "center",
-          background: `rgba(231,76,60,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
+          background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
         }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
-            <span style={{ fontSize: 20 }}>🗑️</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14H6L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+                <path d="M9 6V4h6v2"/>
+              </svg>
             <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
           </div>
         </div>
