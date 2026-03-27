@@ -510,7 +510,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       <SectionHeader title="Configuracion de Cuenta" colors={colors} />
       <div style={cardStyle}>
         <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT }}>{account?.name || "Sin cuenta"}</p>
-        <p style={{ margin: "0 0 14px", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{isPersonal ? "Personal" : "Compartida"} · {account?.memberIds?.length || 1} miembro{(account?.memberIds?.length || 1) !== 1 ? "s" : ""}</p>
+        <p style={{ margin: "0 0 14px", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>{isPersonal ? "Personal" : "Compartida"} · {((account?.memberIds?.length || 0) + (account?.memberLabels?.length || 0)) || 1} miembro{(((account?.memberIds?.length || 0) + (account?.memberLabels?.length || 0)) || 1) !== 1 ? "s" : ""}</p>
         <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 8, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Moneda</p>
         <button onClick={() => setShowCurrencySheet(true)}
           style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, background: colors.input, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: FONT }}>
