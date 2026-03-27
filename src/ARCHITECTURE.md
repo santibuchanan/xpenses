@@ -147,6 +147,7 @@ Origen: colección `accounts/{id}`
   memberLabels:        MemberLabel[],
   currency:            string,      // Código ISO, ej: "ARS"
   disabledCategories:  string[],    // IDs de DEFAULT_CATEGORIES desactivadas
+  categoryBudgets:     { _total?: number, [catId: string]: number },  // Fase 2 — solo en cuentas pozo
   createdAt:           string,      // ISO date string
 }
 ```
@@ -472,13 +473,20 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
   - Settle modal avanza al siguiente acreedor automáticamente o se cierra si no quedan deudas
   - Historial colapsable con navegación por mes independiente de `currentMonth`
   - Historial agrupado por fecha, distinción visual para filas del usuario actual, eliminación con confirmación
-- **Cuentas pozo:** muestra "Resumen del Pozo" con ranking de gastos por integrante + desglose por categoría en ámbar
+- **Cuentas pozo:** muestra "Resumen del Pozo":
+  - Card de total del mes con delta % vs mes anterior
+  - Alerta de presupuesto (⚠️ ≥80%, 🚨 ≥100%) si `categoryBudgets._total` configurado
+  - Ranking por integrante con % del total
+  - Ranking por categoría con delta vs mes anterior, alerta de presupuesto por categoría, barra de progreso
+  - Acepta prop `categoryBudgets` desde `account.categoryBudgets`
 - No disponible en cuentas personales
 
 ### GraficosScreen ✅
 - Toggle "Por mes" / "Por tipo"
 - Torta por categoría con selector de mes
 - Excluye gastos `deleted: true`
+- Sección "Presupuesto" (solo si `categoryBudgets` con categorías configuradas): card total del mes con barra de progreso + alertas, cards por categoría con barra de progreso individual
+- Acepta prop `categoryBudgets` desde `account.categoryBudgets`
 
 ### AddExpenseModal ✅
 - Default `paidBy` = usuario que carga (string uid); en modo multi-pagador escribe `Array<{uid,amount}>`
@@ -506,6 +514,7 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 - Salario visible solo en cuentas compartidas proporcionales
 - Fix de edición de miembro: busca por `id` (labels) o `linkedUid` (vinculados)
 - No duplica miembros al editar
+- Sección "Presupuesto" (solo cuentas pozo): muestra total configurado, botón "Configurar/Editar" abre bottom sheet con input total + inputs por categoría; guarda en `account.categoryBudgets` vía `updateDoc`
 
 ### MenuPanel ✅
 - Tamaño de letra: Pequeño / Mediano / Grande
