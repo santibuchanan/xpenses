@@ -183,6 +183,13 @@ export default function WelcomeScreen({ onEnter, onEmailClick }) {
             <div style={{ width:6, height:6, borderRadius:3, background:"#2ecc71", animation:"pulse 2s ease infinite" }} />
             <p style={{ margin:0, fontSize:12, color:"#ffffff33" }}>Gratis · Sin publicidad · Tus datos son tuyos</p>
           </div>
+
+          <div style={{ textAlign:"center", marginTop:16 }}>
+            <a href="/privacy.html" target="_blank" rel="noopener noreferrer"
+              style={{ fontSize:11, color:"#ffffff22", textDecoration:"none", fontFamily:SF }}>
+              Política de Privacidad
+            </a>
+          </div>
         </div>
       </div>
     </div>
