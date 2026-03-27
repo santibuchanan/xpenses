@@ -276,7 +276,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
               Acá ves todos los gastos del mes y tu balance personal. Tocá + para agregar tu primer gasto.
             </p>
             <button type="button" onClick={() => { localStorage.setItem('onboarding_seen_home', 'true'); setShowHomeTooltip(false); }}
-              style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted, fontSize: 20, lineHeight: 1, padding: 0, flexShrink: 0, fontFamily: FONT }}>×</button>
+              style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted, fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, fontFamily: FONT }}>×</button>
           </div>
         )}
         <SectionTitle>Resumen del mes</SectionTitle>
