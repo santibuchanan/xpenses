@@ -123,8 +123,8 @@ export default function WelcomeScreen({ onEnter, onEmailClick }) {
 
         {/* Headline */}
         <div style={{ opacity:visible?1:0, animation:visible?"fadeUp 0.7s ease 0.05s forwards":"none", marginBottom:28 }}>
-          <p style={{ fontSize:13, fontWeight:600, letterSpacing:2.5, textTransform:"uppercase", color:"#4F7FFA", margin:"0 0 12px" }}>Finanzas claras, cortito y al pie</p>
-          <h1 style={{ fontSize:34, fontWeight:800, color:"#fff", margin:"0 0 12px", lineHeight:1.1, letterSpacing:-1.5 }}>Que la plata no sea<br />motivo de pelea</h1>
+          <p style={{ fontSize:13, fontWeight:600, letterSpacing:2.5, textTransform:"uppercase", color:"#4F7FFA", margin:"0 0 12px", textAlign:"center" }}>Cuentas claras conservan todo!</p>
+          <h1 style={{ fontSize:34, fontWeight:800, color:"#fff", margin:"0 0 12px", lineHeight:1.1, letterSpacing:-1.5, textAlign:"center" }}>Que la plata no sea<br />motivo de pelea</h1>
           <p style={{ fontSize:14, color:"#ffffff66", lineHeight:1.6, margin:0 }}>Gastos compartidos de manera simple y ordenada, justa y automática.</p>
         </div>
 
