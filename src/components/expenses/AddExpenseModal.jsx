@@ -195,7 +195,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
         {!isPersonal && (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-              <p style={{ ...labelStyle, marginBottom: 0 }}>Tipo</p>
+              <p style={{ ...labelStyle, margin: 0 }}>Tipo</p>
               <button type="button" onClick={() => setShowTypeHelp(true)}
                 style={{ width: 18, height: 18, borderRadius: 9, background: colors.pill, border: `1px solid ${colors.inputBorder}`, cursor: "pointer", fontSize: 10, fontWeight: 700, color: colors.textMuted, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontFamily: FONT }}>?</button>
             </div>
