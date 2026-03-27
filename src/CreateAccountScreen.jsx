@@ -15,6 +15,7 @@ import { doc, setDoc, addDoc, collection, writeBatch } from "firebase/firestore"
 import { db } from "./firebase.js";
 import { useTheme, CURRENCIES as CURRENCIES_MAP } from "./theme.jsx";
 import { ALL_CATEGORIES, DEFAULT_CATEGORIES } from "./constants/categories.js";
+import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 const SF_PRO = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif`;
@@ -62,6 +63,7 @@ function SectionLabel({ children, colors, error = false }) {
 // ── Modales reutilizables ─────────────────────────────────────────────────────
 
 function EmojiSheet({ selected, onSelect, onClose, colors }) {
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose });
   return (
     <div
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
@@ -69,7 +71,8 @@ function EmojiSheet({ selected, onSelect, onClose, colors }) {
       onTouchMove={e => e.preventDefault()}
     >
       <div
-        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}
+        {...handlers}
+        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}
         onClick={e => e.stopPropagation()}
         onTouchMove={e => e.stopPropagation()}
       >
@@ -91,16 +94,16 @@ function EmojiSheet({ selected, onSelect, onClose, colors }) {
 }
 
 function CurrencySheet({ selected, onSelect, onClose, colors }) {
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose });
   return (
     <div
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
       onClick={onClose}
-      onTouchMove={e => e.preventDefault()}
     >
       <div
-        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "70vh", overflowY: "auto" }}
+        {...handlers}
+        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "70vh", overflowY: "auto", transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}
         onClick={e => e.stopPropagation()}
-        onTouchMove={e => e.stopPropagation()}
       >
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
         <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Divisa</p>
@@ -125,6 +128,11 @@ function CurrencySheet({ selected, onSelect, onClose, colors }) {
 function NewCategoryModal({ onAdd, onClose, colors }) {
   const [label, setLabel] = useState("");
   const [icon, setIcon]   = useState("📦");
+  const [showDiscard, setShowDiscard] = useState(false);
+
+  const isDirty = label !== "" || icon !== "📦";
+  const handleClose = () => { if (isDirty) { setShowDiscard(true); return; } onClose(); };
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose: handleClose });
 
   const handleAdd = () => {
     const trimmed = label.trim();
@@ -134,41 +142,53 @@ function NewCategoryModal({ onAdd, onClose, colors }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
-        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-        <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>Nueva categoría</p>
+    <>
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
+        <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto", transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
+          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+          <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>Nueva categoría</p>
 
-        <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
-        <input
-          value={label} onChange={e => setLabel(e.target.value)}
-          placeholder="Ej: Mascotas" autoFocus
-          style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 16, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
-        />
+          <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
+          <input
+            value={label} onChange={e => setLabel(e.target.value)}
+            placeholder="Ej: Mascotas" autoFocus
+            style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 16, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+          />
 
-        <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Icono</p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-          {EMOJI_OPTIONS.map(e => (
-            <button type="button" key={e} onClick={() => setIcon(e)}
-              style={{ width: 44, height: 44, borderRadius: 12, border: "2px solid", fontSize: 22, cursor: "pointer",
-                borderColor: icon === e ? "#4F7FFA" : colors.inputBorder,
-                background: icon === e ? "#4F7FFA11" : colors.input }}>
-              {e}
-            </button>
-          ))}
+          <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Icono</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+            {EMOJI_OPTIONS.map(e => (
+              <button type="button" key={e} onClick={() => setIcon(e)}
+                style={{ width: 44, height: 44, borderRadius: 12, border: "2px solid", fontSize: 22, cursor: "pointer",
+                  borderColor: icon === e ? "#4F7FFA" : colors.inputBorder,
+                  background: icon === e ? "#4F7FFA11" : colors.input }}>
+                {e}
+              </button>
+            ))}
+          </div>
+
+          <button type="button" onClick={handleAdd} disabled={!label.trim()}
+            style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", fontSize: 15, fontWeight: 600, fontFamily: FONT, marginBottom: 8, cursor: label.trim() ? "pointer" : "default",
+              background: label.trim() ? "linear-gradient(135deg,#4F7FFA,#3a6ae8)" : "#ccc", color: "#fff" }}>
+            Guardar
+          </button>
+          <button type="button" onClick={handleClose}
+            style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
+            Cancelar
+          </button>
         </div>
-
-        <button type="button" onClick={handleAdd} disabled={!label.trim()}
-          style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", fontSize: 15, fontWeight: 600, fontFamily: FONT, marginBottom: 8, cursor: label.trim() ? "pointer" : "default",
-            background: label.trim() ? "linear-gradient(135deg,#4F7FFA,#3a6ae8)" : "#ccc", color: "#fff" }}>
-          Guardar
-        </button>
-        <button type="button" onClick={onClose}
-          style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
-          Cancelar
-        </button>
       </div>
-    </div>
+      {showDiscard && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 400, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "28px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>¿Descartás los cambios?</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 24px", fontFamily: FONT }}>Se van a perder los datos que ingresaste.</p>
+            <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Descartar</button>
+            <button type="button" onClick={() => setShowDiscard(false)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Seguir editando</button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTheme, formatAmount } from "../theme.jsx";
+import { useSwipeSheet } from "../hooks/useSwipeSheet.js";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
 import { calcSaldos } from "../hooks/useBalances.js";
 import { getAmountPaidBy } from "../utils/expenseFilters.js";
@@ -113,6 +114,7 @@ function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, on
   const { colors } = useTheme();
   const [paidBy, setPaidBy] = useState(currentUser.uid);
   const [loading, setLoading] = useState(false);
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose });
   // allMembers ya viene normalizado desde App.jsx via buildAllMembers()
   // No es necesario re-normalizar aquí
   const members = allMembers || [];
@@ -125,7 +127,7 @@ function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, on
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+      <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
         <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 4px", fontFamily: FONT }}>¿Quién pagó?</p>
         <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>{fixedExpense.name} · {fixedExpense.amount?.toLocaleString("es-AR")}</p>

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { collection, addDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useTheme, formatAmount, CURRENCIES } from "../theme.jsx";
+import { useSwipeSheet } from "../hooks/useSwipeSheet.js";
 import { useNotif, NOTIF_TYPES } from "../notifications";
 import { calcSaldos } from "../hooks/useBalances.js";
 import { getAmountPaidBy } from "../utils/expenseFilters.js";
@@ -30,6 +31,7 @@ function SettleModal({ debtor, debts, members, fmt, currencySymbol, colors, onFu
   const [date, setDate]     = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
   const submitting = useRef(false); // previene doble tap en móvil
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose });
 
   // Cuando un acreedor es saldado, debts prop se actualiza (sin ese acreedor).
   // selectedDebt es estado local y no se sincroniza solo: avanzar al siguiente.
@@ -72,7 +74,7 @@ function SettleModal({ debtor, debts, members, fmt, currencySymbol, colors, onFu
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+      <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
 
         <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>
@@ -162,10 +164,11 @@ function PassDebtModal({ debts, members, nextMonth, fmt, colors, onConfirm, onCl
   const [loading, setLoading] = useState(false);
   const monthName = new Date(nextMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
   const currentMonthName = new Date(new Date().toISOString().slice(0, 7) + "-02").toLocaleString("es-AR", { month: "long" });
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose });
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+      <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
         <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 4px", fontFamily: FONT }}>Pasar saldo al mes siguiente</p>
         <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>Se generarán gastos en {monthName} imputados al deudor</p>

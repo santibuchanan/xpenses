@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme, CURRENCIES as CURRENCIES_MAP } from "./theme.jsx";
+import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
 import DateInput from "./DateInput";
 import InviteScreen from "./InviteScreen.jsx";
 
@@ -33,11 +34,12 @@ function SettingRow({ icon, label, value, onPress, danger, colors }) {
 function ShareAppModal({ onClose, colors }) {
   const appUrl = "https://xpenses.vercel.app";
   const [copied, setCopied] = useState(false);
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose });
   const handleCopy = () => { navigator.clipboard.writeText(appUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   const handleShare = () => { if (navigator.share) { navigator.share({ title: "X-penses", text: "Usá X-penses para llevar tus gastos compartidos", url: appUrl }); } else { handleCopy(); } };
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT }}>
+      <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
         <p style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: "0 0 6px", fontFamily: FONT }}>Compartir X-penses</p>
         <p style={{ color: colors.textMuted, fontSize: 14, margin: "0 0 24px", fontFamily: FONT }}>Invitá a otros a usar la app</p>
@@ -58,25 +60,43 @@ function ShareAppModal({ onClose, colors }) {
 function EditCategoryModal({ category, onSave, onClose, onDelete, isDefault, colors }) {
   const [label, setLabel] = useState(category.label);
   const [icon, setIcon]   = useState(category.icon);
+  const [showDiscard, setShowDiscard] = useState(false);
+
+  const isDirty = label !== category.label || icon !== category.icon;
+  const handleClose = () => { if (isDirty) { setShowDiscard(true); return; } onClose(); };
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose: handleClose });
+
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 16, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
-        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-        <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>Editar categoría</p>
-        <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
-        <input value={label} onChange={e => setLabel(e.target.value)} style={inputStyle} />
-        <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Icono</p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-          {EMOJI_OPTIONS.map(e => (
-            <button key={e} onClick={() => setIcon(e)} style={{ width: 44, height: 44, borderRadius: 12, border: "2px solid", fontSize: 22, cursor: "pointer", borderColor: icon === e ? "#4F7FFA" : colors.inputBorder, background: icon === e ? "#4F7FFA11" : colors.input }}>{e}</button>
-          ))}
+    <>
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
+        <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto", transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
+          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+          <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>Editar categoría</p>
+          <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
+          <input value={label} onChange={e => setLabel(e.target.value)} style={inputStyle} />
+          <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Icono</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+            {EMOJI_OPTIONS.map(e => (
+              <button key={e} onClick={() => setIcon(e)} style={{ width: 44, height: 44, borderRadius: 12, border: "2px solid", fontSize: 22, cursor: "pointer", borderColor: icon === e ? "#4F7FFA" : colors.inputBorder, background: icon === e ? "#4F7FFA11" : colors.input }}>{e}</button>
+            ))}
+          </div>
+          <button onClick={() => onSave({ ...category, label, icon })} style={{ width: "100%", padding: 14, borderRadius: 14, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Guardar</button>
+          {!isDefault && <button onClick={() => onDelete(category.id)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.dangerBg, color: colors.danger, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Eliminar</button>}
+          <button onClick={handleClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
         </div>
-        <button onClick={() => onSave({ ...category, label, icon })} style={{ width: "100%", padding: 14, borderRadius: 14, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Guardar</button>
-        {!isDefault && <button onClick={() => onDelete(category.id)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.dangerBg, color: colors.danger, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Eliminar</button>}
-        <button onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
       </div>
-    </div>
+      {showDiscard && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 400, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "28px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>¿Descartás los cambios?</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 24px", fontFamily: FONT }}>Se van a perder los datos que ingresaste.</p>
+            <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Descartar</button>
+            <button type="button" onClick={() => setShowDiscard(false)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Seguir editando</button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -85,6 +105,13 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
     expense || { name: "", amount: "", dueDay: "", shared: true, startDate: new Date().toISOString().slice(0, 10) }
   );
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const [showDiscard, setShowDiscard] = useState(false);
+
+  const initialName = expense?.name || "";
+  const initialAmount = String(expense?.amount || "");
+  const isDirty = form.name !== initialName || String(form.amount) !== initialAmount;
+  const handleClose = () => { if (isDirty) { setShowDiscard(true); return; } onClose(); };
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose: handleClose });
 
   const inputStyle = {
     width: "100%", padding: "13px 14px", borderRadius: 14,
@@ -98,92 +125,122 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, maxHeight: "90vh", overflowY: "auto" }}>
-        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-        <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>
-          {expense?.id ? "Editar gasto fijo" : "Nuevo gasto fijo"}
-        </p>
+    <>
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
+        <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, maxHeight: "90vh", overflowY: "auto", transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
+          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+          <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>
+            {expense?.id ? "Editar gasto fijo" : "Nuevo gasto fijo"}
+          </p>
 
-        <p style={labelStyle}>Nombre</p>
-        <input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Ej: Expensas, Netflix, Gym..." style={inputStyle} />
+          <p style={labelStyle}>Nombre</p>
+          <input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Ej: Expensas, Netflix, Gym..." style={inputStyle} />
 
-        <p style={labelStyle}>Monto</p>
-        <input type="number" inputMode="decimal" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0" style={inputStyle} />
+          <p style={labelStyle}>Monto</p>
+          <input type="number" inputMode="decimal" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0" style={inputStyle} />
 
-        {!isPersonalAccount && (
-          <>
-            <p style={labelStyle}>Tipo</p>
-            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-              {[[true, "🏠 Hogar"], [false, "👤 Personal"]].map(([val, lbl]) => (
-                <button key={String(val)} onClick={() => set("shared", val)}
-                  style={{ flex: 1, padding: 12, borderRadius: 12, border: "2px solid", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                    borderColor: form.shared === val ? "#4F7FFA" : colors.inputBorder,
-                    background: form.shared === val ? "#4F7FFA11" : colors.input,
-                    color: form.shared === val ? "#4F7FFA" : colors.textMuted }}>
-                  {lbl}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+          {!isPersonalAccount && (
+            <>
+              <p style={labelStyle}>Tipo</p>
+              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                {[[true, "🏠 Hogar"], [false, "👤 Personal"]].map(([val, lbl]) => (
+                  <button key={String(val)} onClick={() => set("shared", val)}
+                    style={{ flex: 1, padding: 12, borderRadius: 12, border: "2px solid", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                      borderColor: form.shared === val ? "#4F7FFA" : colors.inputBorder,
+                      background: form.shared === val ? "#4F7FFA11" : colors.input,
+                      color: form.shared === val ? "#4F7FFA" : colors.textMuted }}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
-        <p style={labelStyle}>Fecha de inicio</p>
-        <DateInput value={form.startDate || new Date().toISOString().slice(0, 10)} onChange={v => set("startDate", v)} />
+          <p style={labelStyle}>Fecha de inicio</p>
+          <DateInput value={form.startDate || new Date().toISOString().slice(0, 10)} onChange={v => set("startDate", v)} />
 
-        <p style={labelStyle}>Día de vencimiento (opcional)</p>
-        <input
-          type="number" inputMode="numeric"
-          value={form.dueDay}
-          onChange={e => set("dueDay", e.target.value)}
-          placeholder="Ej: 10  (día del mes)"
-          min="1" max="31"
-          style={inputStyle}
-        />
-        {form.dueDay
-          ? <p style={{ fontSize: 12, color: colors.textMuted, margin: "-10px 0 14px", fontFamily: FONT }}>Vence el día {form.dueDay} de cada mes</p>
-          : null}
+          <p style={labelStyle}>Día de vencimiento (opcional)</p>
+          <input
+            type="number" inputMode="numeric"
+            value={form.dueDay}
+            onChange={e => set("dueDay", e.target.value)}
+            placeholder="Ej: 10  (día del mes)"
+            min="1" max="31"
+            style={inputStyle}
+          />
+          {form.dueDay
+            ? <p style={{ fontSize: 12, color: colors.textMuted, margin: "-10px 0 14px", fontFamily: FONT }}>Vence el día {form.dueDay} de cada mes</p>
+            : null}
 
-        <button
-          onClick={() => onSave({ ...form, amount: parseFloat(form.amount) || 0, dueDay: parseInt(form.dueDay) || null })}
-          style={{ width: "100%", padding: 14, borderRadius: 14, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
-          Guardar
-        </button>
-        <button onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+          <button
+            onClick={() => onSave({ ...form, amount: parseFloat(form.amount) || 0, dueDay: parseInt(form.dueDay) || null })}
+            style={{ width: "100%", padding: 14, borderRadius: 14, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+            Guardar
+          </button>
+          <button onClick={handleClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+        </div>
       </div>
-    </div>
+      {showDiscard && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 400, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "28px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>¿Descartás los cambios?</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 24px", fontFamily: FONT }}>Se van a perder los datos que ingresaste.</p>
+            <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Descartar</button>
+            <button type="button" onClick={() => setShowDiscard(false)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Seguir editando</button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
 function EditMemberModal({ member, onSave, onClose, onDelete, colors }) {
   const [name, setName]   = useState(member.name || "");
   const [color, setColor] = useState(member.color || MEMBER_COLORS[0]);
+  const [showDiscard, setShowDiscard] = useState(false);
+
+  const isDirty = name !== (member.name || "") || color !== (member.color || MEMBER_COLORS[0]);
+  const handleClose = () => { if (isDirty) { setShowDiscard(true); return; } onClose(); };
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose: handleClose });
+
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT }}>
-        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-        <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>{member.id ? "Editar miembro" : "Nuevo miembro"}</p>
-        <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del integrante" style={inputStyle} />
-        <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Color</p>
-        <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-          {MEMBER_COLORS.map(c => (
-            <button key={c} onClick={() => setColor(c)} style={{ width: 36, height: 36, borderRadius: 18, background: c, border: color === c ? "3px solid #fff" : "3px solid transparent", cursor: "pointer", boxShadow: color === c ? `0 0 0 2px ${c}` : "none" }} />
-          ))}
-        </div>
-        <button onClick={() => onSave({ ...member, name: name.trim(), color })} disabled={!name.trim()}
-          style={{ width: "100%", padding: 14, borderRadius: 14, background: !name.trim() ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: !name.trim() ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
-          Guardar
-        </button>
-        {member.id && !member.linkedUid && (
-          <button onClick={() => onDelete(member.id)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.dangerBg, color: colors.danger, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
-            Eliminar miembro
+    <>
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
+        <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
+          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+          <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>{member.id ? "Editar miembro" : "Nuevo miembro"}</p>
+          <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del integrante" style={inputStyle} />
+          <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Color</p>
+          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            {MEMBER_COLORS.map(c => (
+              <button key={c} onClick={() => setColor(c)} style={{ width: 36, height: 36, borderRadius: 18, background: c, border: color === c ? "3px solid #fff" : "3px solid transparent", cursor: "pointer", boxShadow: color === c ? `0 0 0 2px ${c}` : "none" }} />
+            ))}
+          </div>
+          <button onClick={() => onSave({ ...member, name: name.trim(), color })} disabled={!name.trim()}
+            style={{ width: "100%", padding: 14, borderRadius: 14, background: !name.trim() ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: !name.trim() ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
+            Guardar
           </button>
-        )}
-        <button onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+          {member.id && !member.linkedUid && (
+            <button onClick={() => onDelete(member.id)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.dangerBg, color: colors.danger, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+              Eliminar miembro
+            </button>
+          )}
+          <button onClick={handleClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+        </div>
       </div>
-    </div>
+      {showDiscard && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 400, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "28px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>¿Descartás los cambios?</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 24px", fontFamily: FONT }}>Se van a perder los datos que ingresaste.</p>
+            <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>Descartar</button>
+            <button type="button" onClick={() => setShowDiscard(false)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Seguir editando</button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -342,6 +399,10 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     return out;
   });
   const [savingBudget, setSavingBudget] = useState(false);
+
+  const budgetSwipe   = useSwipeSheet({ onClose: () => setShowBudgetEditor(false) });
+  const currencySwipe = useSwipeSheet({ onClose: () => setShowCurrencySheet(false) });
+  const removeSwipe   = useSwipeSheet({ onClose: () => setRemovingMember(null) });
 
   const cardStyle = { background: colors.card, borderRadius: 16, padding: "14px 16px", marginBottom: 8, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` };
   const inputStyle = { width: "100%", padding: "11px 13px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 12, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
@@ -681,7 +742,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       {/* MODAL PRESUPUESTO */}
       {showBudgetEditor && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
+          <div {...budgetSwipe.handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto", transform: `translateY(${budgetSwipe.dragY}px)`, transition: budgetSwipe.isDragging ? "none" : "transform 0.3s ease" }}>
             <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
             <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 4px", fontFamily: FONT }}>Presupuesto mensual</p>
             <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>Configurá cuánto querés gastar por mes. Recibirás alertas al llegar al 80% de la categoría.</p>
@@ -738,7 +799,8 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           onTouchMove={e => e.preventDefault()}
         >
           <div
-            style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "70vh", overflowY: "auto" }}
+            {...currencySwipe.handlers}
+            style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "70vh", overflowY: "auto", transform: `translateY(${currencySwipe.dragY}px)`, transition: currencySwipe.isDragging ? "none" : "transform 0.3s ease" }}
             onClick={e => e.stopPropagation()}
             onTouchMove={e => e.stopPropagation()}
           >
@@ -766,7 +828,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       {/* MODAL CONFIRMAR ELIMINAR MIEMBRO */}
       {removingMember && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
-          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
+          <div {...removeSwipe.handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${removeSwipe.dragY}px)`, transition: removeSwipe.isDragging ? "none" : "transform 0.3s ease" }}>
             <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
             <p style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: "0 0 8px", fontFamily: FONT }}>¿Eliminar integrante?</p>
             <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 24px", fontFamily: FONT }}>
