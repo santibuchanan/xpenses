@@ -22,7 +22,7 @@ export default defineConfig({
         ]
       },
       workbox: {
-        navigateFallbackDenylist: [/^\/__\/auth\//],
+        navigateFallbackDenylist: [/^\/__\/auth\//, /^\/privacy\.html$/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.googleapis\.com\/.*/i,
