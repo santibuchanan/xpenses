@@ -270,7 +270,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
 
       <div style={{ padding: "0 20px" }}>
         {showHomeTooltip && (
-          <div style={{ background: "#4F7FFA18", border: "1px solid #4F7FFA44", borderRadius: 16, padding: "12px 14px", margin: "12px 0 4px", display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <div style={{ background: "#4F7FFA18", border: "1px solid #4F7FFA44", borderRadius: 16, padding: "12px 14px", margin: "12px 0 4px", display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>
             <p style={{ flex: 1, margin: 0, fontSize: 13, color: colors.text, fontFamily: FONT, lineHeight: 1.5 }}>
               Acá ves todos los gastos del mes y tu balance personal. Tocá + para agregar tu primer gasto.

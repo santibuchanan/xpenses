@@ -410,7 +410,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       <SectionTitle>{isPozo ? "Resumen del Pozo" : "Saldos del mes"}</SectionTitle>
 
       {showSaldosTooltip && (
-        <div style={{ background: "#4F7FFA18", border: "1px solid #4F7FFA44", borderRadius: 16, padding: "12px 14px", marginBottom: 12, display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ background: "#4F7FFA18", border: "1px solid #4F7FFA44", borderRadius: 16, padding: "12px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>
           <p style={{ flex: 1, margin: 0, fontSize: 13, color: colors.text, fontFamily: FONT, lineHeight: 1.5 }}>
             Acá ves quién le debe a quién. Cuando alguien paga, tocá Saldar para registrarlo.
