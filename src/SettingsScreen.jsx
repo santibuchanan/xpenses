@@ -324,6 +324,15 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const [editingMember,     setEditingMember]     = useState(null);
   const [removingMember,    setRemovingMember]    = useState(null);
   const [removeLoading,     setRemoveLoading]     = useState(false);
+  const [showBudgetEditor,  setShowBudgetEditor]  = useState(false);
+  const [budgetTotal,       setBudgetTotal]       = useState((account?.categoryBudgets?._total || "").toString());
+  const [budgetByCategory,  setBudgetByCategory]  = useState(() => {
+    const b = account?.categoryBudgets || {};
+    const out = {};
+    DEFAULT_CATEGORIES.forEach(c => { out[c.id] = (b[c.id] || "").toString(); });
+    return out;
+  });
+  const [savingBudget, setSavingBudget] = useState(false);
 
   const cardStyle = { background: colors.card, borderRadius: 16, padding: "14px 16px", marginBottom: 8, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` };
   const inputStyle = { width: "100%", padding: "11px 13px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 12, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
@@ -347,6 +356,18 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const saveCurrency = async (cur) => {
     setSelectedCurrency(cur);
     if (account?.id) await updateDoc(doc(db, "accounts", account.id), { currency: cur });
+  };
+
+  const saveBudgets = async () => {
+    setSavingBudget(true);
+    const budgets = { _total: parseFloat(budgetTotal) || 0 };
+    Object.entries(budgetByCategory).forEach(([id, val]) => {
+      const n = parseFloat(val) || 0;
+      if (n > 0) budgets[id] = n;
+    });
+    await updateDoc(doc(db, "accounts", account.id), { categoryBudgets: budgets });
+    setSavingBudget(false);
+    setShowBudgetEditor(false);
   };
 
   const handleSaveCategory = async (updated) => {
@@ -608,7 +629,67 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         </div>
       </div>
 
+      {account?.type === "pozo" && (
+        <>
+          <SectionHeader title="Presupuesto" colors={colors} />
+          <div style={cardStyle}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: colors.text, fontFamily: FONT }}>Presupuesto mensual</p>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
+                  {account?.categoryBudgets?._total
+                    ? `Total: ${(account.categoryBudgets._total || 0).toLocaleString("es-AR")}`
+                    : "Sin presupuesto configurado"}
+                </p>
+              </div>
+              <button type="button" onClick={() => setShowBudgetEditor(true)}
+                style={{ background: "#4F7FFA11", border: "none", borderRadius: 10, padding: "6px 12px", fontSize: 12, color: "#4F7FFA", cursor: "pointer", fontFamily: FONT, fontWeight: 600 }}>
+                {account?.categoryBudgets?._total ? "Editar" : "Configurar"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       <div style={{ height: 100 }} />
+
+      {showBudgetEditor && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
+          <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
+            <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 4px", fontFamily: FONT }}>Presupuesto mensual</p>
+            <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>Configurá cuánto querés gastar por mes. Las alertas aparecen al llegar al 80%.</p>
+            <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, fontFamily: FONT }}>Presupuesto total del mes</p>
+            <input type="number" inputMode="decimal" value={budgetTotal} onChange={e => setBudgetTotal(e.target.value)}
+              placeholder="Ej: 500000"
+              style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 20, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }} />
+            <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10, fontFamily: FONT }}>Por categoría (opcional)</p>
+            {allCategories.map(c => (
+              <div key={c.id} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 16 }}>{c.icon}</span>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</p>
+                </div>
+                <input type="number" inputMode="decimal"
+                  value={budgetByCategory[c.id] || ""}
+                  onChange={e => setBudgetByCategory(prev => ({ ...prev, [c.id]: e.target.value }))}
+                  placeholder="Sin límite"
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }} />
+              </div>
+            ))}
+            <div style={{ marginTop: 12 }}>
+              <button type="button" onClick={saveBudgets} disabled={savingBudget}
+                style={{ width: "100%", padding: 14, borderRadius: 14, background: savingBudget ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: savingBudget ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
+                {savingBudget ? "Guardando..." : "Guardar presupuesto"}
+              </button>
+              <button type="button" onClick={() => setShowBudgetEditor(false)}
+                style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODALES */}
       {showShareApp && <ShareAppModal onClose={() => setShowShareApp(false)} colors={colors} />}

@@ -190,7 +190,7 @@ function PassDebtModal({ debts, members, nextMonth, fmt, colors, onConfirm, onCl
 }
 
 // ── SALDOS SCREEN ──
-export default function SaldosScreen({ expenses, visibleFixed, members, account, currentMonth, currentUser, onAddExpense, settlements, customCategories }) {
+export default function SaldosScreen({ expenses, visibleFixed, members, account, currentMonth, currentUser, onAddExpense, settlements, customCategories, categoryBudgets }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
@@ -353,6 +353,28 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
     .map(m => ({ ...m, total: monthExp.reduce((s, e) => s + getAmountPaidBy(e, m.uid), 0) }))
     .sort((a, b) => b.total - a.total);
 
+  const prevMonth = (() => {
+    const [y, m] = currentMonth.split("-").map(Number);
+    return new Date(y, m - 2, 1).toISOString().slice(0, 7);
+  })();
+  const prevMonthExp = expenses.filter(e => e.month === prevMonth && !e.deleted);
+  const catTotalsWithCompare = allCategories
+    .map(c => {
+      const total     = monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0);
+      const prevTotal = prevMonthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0);
+      const budget    = categoryBudgets?.[c.id] || 0;
+      const pct       = budget > 0 ? Math.min(100, (total / budget) * 100) : 0;
+      const delta     = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null;
+      return { ...c, total, prevTotal, budget, pct, delta };
+    })
+    .filter(c => c.total > 0)
+    .sort((a, b) => b.total - a.total);
+  const totalSpent     = monthExp.reduce((s, e) => s + e.amount, 0);
+  const prevTotalSpent = prevMonthExp.reduce((s, e) => s + e.amount, 0);
+  const totalDelta     = prevTotalSpent > 0 ? ((totalSpent - prevTotalSpent) / prevTotalSpent) * 100 : null;
+  const totalBudget    = categoryBudgets?._total || 0;
+  const totalBudgetPct = totalBudget > 0 ? Math.min(100, (totalSpent / totalBudget) * 100) : 0;
+
   // ── HISTORIAL — mes independiente de currentMonth ──
   const shiftMonth = (base, delta) => {
     const [y, m] = base.split("-").map(Number);
@@ -407,9 +429,49 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
         </div>
       )}
 
-      {/* Vista Pozo Común — ranking por integrante + categorías */}
+      {/* Vista Pozo Común — resumen total + ranking por integrante + categorías con comparación y presupuesto */}
       {isPozo && (
         <>
+          {/* Resumen total del mes con comparación */}
+          <div style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Total del mes</p>
+                <p style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 800, color: "#f39c12", fontFamily: FONT }}>{fmt(totalSpent)}</p>
+              </div>
+              {totalDelta !== null && (
+                <div style={{ background: totalDelta > 0 ? "#e74c3c18" : "#2ecc7118", borderRadius: 12, padding: "6px 12px", textAlign: "center" }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: totalDelta > 0 ? "#e74c3c" : "#2ecc71", fontFamily: FONT }}>
+                    {totalDelta > 0 ? "▲" : "▼"} {Math.abs(totalDelta).toFixed(0)}%
+                  </p>
+                  <p style={{ margin: 0, fontSize: 10, color: colors.textMuted, fontFamily: FONT }}>vs mes anterior</p>
+                </div>
+              )}
+            </div>
+            {totalBudget > 0 && (
+              <div style={{ marginTop: 12 }}>
+                {totalBudgetPct >= 80 && (
+                  <div style={{ background: totalBudgetPct >= 100 ? "#e74c3c18" : "#f39c1218", borderRadius: 8, padding: "5px 10px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 14 }}>{totalBudgetPct >= 100 ? "🚨" : "⚠️"}</span>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, fontFamily: FONT, color: totalBudgetPct >= 100 ? "#e74c3c" : "#f39c12" }}>
+                      {totalBudgetPct >= 100 ? "Superaron el presupuesto mensual" : `Usaron el ${totalBudgetPct.toFixed(0)}% del presupuesto`}
+                    </p>
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <p style={{ margin: 0, fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>Presupuesto mensual</p>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 700, fontFamily: FONT, color: totalBudgetPct >= 100 ? "#e74c3c" : colors.textMuted }}>{fmt(totalBudget)}</p>
+                </div>
+                <div style={{ background: colors.divider, borderRadius: 6, height: 6, overflow: "hidden" }}>
+                  <div style={{ height: 6, borderRadius: 6, width: `${totalBudgetPct}%`, background: totalBudgetPct >= 100 ? "#e74c3c" : "#f39c12", transition: "width 0.4s ease" }} />
+                </div>
+                <p style={{ margin: "4px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT, textAlign: "right" }}>
+                  {fmt(Math.max(0, totalBudget - totalSpent))} disponible
+                </p>
+              </div>
+            )}
+          </div>
+          {/* Ranking por integrante */}
           <div style={{ background: colors.card, borderRadius: 20, overflow: "hidden", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
             <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.divider}` }}>
               <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Gastos por integrante</p>
@@ -432,26 +494,46 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT, flex: 1 }}>
                   {m.name}{m.uid === currentUser.uid ? " (vos)" : ""}
                 </p>
+                {totalSpent > 0 && (
+                  <p style={{ margin: 0, fontSize: 11, color: colors.textMuted, fontFamily: FONT, marginRight: 6 }}>
+                    {((m.total / totalSpent) * 100).toFixed(0)}%
+                  </p>
+                )}
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: "#f39c12", fontFamily: FONT }}>{fmt(m.total)}</p>
               </div>
             ))}
           </div>
-
-          {catTotals.length > 0 && (
+          {/* Ranking por categoría con comparación vs mes anterior y presupuesto */}
+          {catTotalsWithCompare.length > 0 && (
             <div style={{ background: colors.card, borderRadius: 20, padding: 16, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
-              <p style={{ margin: "0 0 12px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Por categoría</p>
-              {catTotals.map(c => (
-                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <span style={{ fontSize: 20, width: 28, flexShrink: 0 }}>{c.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</span>
-                    </div>
-                    <div style={{ background: colors.divider, borderRadius: 4, height: 4 }}>
-                      <div style={{ background: "#f39c12", borderRadius: 4, height: 4, width: `${Math.min(100, (c.total / catTotals[0].total) * 100)}%` }} />
-                    </div>
+              <p style={{ margin: "0 0 14px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Por categoría</p>
+              {catTotalsWithCompare.map((c, idx) => (
+                <div key={c.id} style={{ marginBottom: idx < catTotalsWithCompare.length - 1 ? 14 : 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                    <span style={{ fontSize: 18, width: 26, flexShrink: 0 }}>{c.icon}</span>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, flex: 1 }}>{c.label}</p>
+                    {c.delta !== null && (
+                      <span style={{ fontSize: 11, fontWeight: 700, fontFamily: FONT,
+                        color: c.delta > 10 ? "#e74c3c" : c.delta < -10 ? "#2ecc71" : colors.textMuted }}>
+                        {c.delta > 0 ? "▲" : "▼"}{Math.abs(c.delta).toFixed(0)}%
+                      </span>
+                    )}
+                    {c.budget > 0 && c.pct >= 80 && (
+                      <span style={{ fontSize: 14 }}>{c.pct >= 100 ? "🚨" : "⚠️"}</span>
+                    )}
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</p>
                   </div>
+                  <div style={{ background: colors.divider, borderRadius: 4, height: 5, overflow: "hidden" }}>
+                    <div style={{ height: 5, borderRadius: 4,
+                      width: c.budget > 0 ? `${c.pct}%` : `${Math.min(100, (c.total / catTotalsWithCompare[0].total) * 100)}%`,
+                      background: c.budget > 0 && c.pct >= 100 ? "#e74c3c" : "#f39c12",
+                      transition: "width 0.4s ease" }} />
+                  </div>
+                  {c.budget > 0 && (
+                    <p style={{ margin: "3px 0 0", fontSize: 10, color: colors.textMuted, fontFamily: FONT, textAlign: "right" }}>
+                      {fmt(c.total)} / {fmt(c.budget)}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

@@ -16,7 +16,7 @@ function SectionTitle({ children, style = {} }) {
   return <p style={{ fontSize: 20, fontWeight: 700, margin: "22px 0 10px", color: colors.text, fontFamily: FONT, ...style }}>{children}</p>;
 }
 
-export default function GraficosScreen({ expenses, account, customCategories, fixedExpenses }) {
+export default function GraficosScreen({ expenses, account, customCategories, fixedExpenses, categoryBudgets }) {
   const { colors } = useTheme();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
@@ -158,6 +158,95 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
           ))}
         </div>
       </Card>
+      {/* ── PRESUPUESTO POR CATEGORÍA ── */}
+      {categoryBudgets && Object.keys(categoryBudgets).filter(k => k !== "_total" && categoryBudgets[k] > 0).length > 0 && (() => {
+        const budgetCats = Object.keys(categoryBudgets)
+          .filter(k => k !== "_total" && categoryBudgets[k] > 0)
+          .map(catId => {
+            const cat    = allCategories.find(c => c.id === catId);
+            const budget = categoryBudgets[catId];
+            const spent  = activeExpenses.filter(e => e.month === pieMonth && e.category === catId).reduce((s, e) => s + e.amount, 0);
+            const pct    = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
+            const over80 = pct >= 80 && pct < 100;
+            const over100 = pct >= 100;
+            return { catId, cat, budget, spent, pct, over80, over100 };
+          })
+          .filter(b => b.cat); // solo categorías que existen
+
+        const totalBudget = categoryBudgets._total || 0;
+        const totalSpent  = activeExpenses.filter(e => e.month === pieMonth).reduce((s, e) => s + e.amount, 0);
+        const totalPct    = totalBudget > 0 ? Math.min(100, (totalSpent / totalBudget) * 100) : 0;
+        const totalOver80 = totalPct >= 80 && totalPct < 100;
+        const totalOver100 = totalPct >= 100;
+
+        return (
+          <>
+            <SectionTitle>Presupuesto</SectionTitle>
+            {/* Presupuesto total */}
+            {totalBudget > 0 && (
+              <Card style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Total del mes</p>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, fontFamily: FONT,
+                    color: totalOver100 ? "#e74c3c" : totalOver80 ? "#f39c12" : colors.textMuted }}>
+                    {fmt(totalSpent)} / {fmt(totalBudget)}
+                  </p>
+                </div>
+                {(totalOver80 || totalOver100) && (
+                  <div style={{ background: totalOver100 ? "#e74c3c18" : "#f39c1218", borderRadius: 10, padding: "7px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>{totalOver100 ? "🚨" : "⚠️"}</span>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, fontFamily: FONT,
+                      color: totalOver100 ? "#e74c3c" : "#f39c12" }}>
+                      {totalOver100 ? "Superaste el presupuesto mensual" : `Usaste el ${totalPct.toFixed(0)}% del presupuesto`}
+                    </p>
+                  </div>
+                )}
+                <div style={{ background: colors.divider, borderRadius: 6, height: 8, overflow: "hidden" }}>
+                  <div style={{
+                    height: 8, borderRadius: 6,
+                    width: `${totalPct}%`,
+                    background: totalOver100 ? "#e74c3c" : totalOver80 ? "#f39c12" : "#4F7FFA",
+                    transition: "width 0.4s ease",
+                  }} />
+                </div>
+                <p style={{ margin: "6px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT, textAlign: "right" }}>
+                  {fmt(Math.max(0, totalBudget - totalSpent))} disponible
+                </p>
+              </Card>
+            )}
+
+            {/* Presupuesto por categoría */}
+            <Card>
+              {budgetCats.map((b, idx) => (
+                <div key={b.catId} style={{ marginBottom: idx < budgetCats.length - 1 ? 16 : 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 18 }}>{b.cat?.icon}</span>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{b.cat?.label}</p>
+                      {(b.over80 || b.over100) && (
+                        <span style={{ fontSize: 14 }}>{b.over100 ? "🚨" : "⚠️"}</span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 700, fontFamily: FONT,
+                      color: b.over100 ? "#e74c3c" : b.over80 ? "#f39c12" : colors.textMuted }}>
+                      {fmt(b.spent)} / {fmt(b.budget)}
+                    </p>
+                  </div>
+                  <div style={{ background: colors.divider, borderRadius: 4, height: 6, overflow: "hidden" }}>
+                    <div style={{
+                      height: 6, borderRadius: 4,
+                      width: `${b.pct}%`,
+                      background: b.over100 ? "#e74c3c" : b.over80 ? "#f39c12" : CAT_COLORS[idx % CAT_COLORS.length],
+                      transition: "width 0.4s ease",
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </Card>
+          </>
+        );
+      })()}
+
       <div style={{ height: 120 }} />
     </div>
   );
