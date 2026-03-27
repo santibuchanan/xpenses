@@ -33,3 +33,8 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+.claude/
+serviceAccount.json
+README.md.pdf
+XPENSES ANALISIS COMPLETO.pdf

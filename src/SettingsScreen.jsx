@@ -629,6 +629,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         </div>
       </div>
 
+      {/* PRESUPUESTO — solo para cuentas Pozo Común */}
       {account?.type === "pozo" && (
         <>
           <SectionHeader title="Presupuesto" colors={colors} />
@@ -653,16 +654,25 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
 
       <div style={{ height: 100 }} />
 
+      {/* MODAL PRESUPUESTO */}
       {showBudgetEditor && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
           <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
             <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
             <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 4px", fontFamily: FONT }}>Presupuesto mensual</p>
             <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>Configurá cuánto querés gastar por mes. Las alertas aparecen al llegar al 80%.</p>
+
+            {/* Total */}
             <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, fontFamily: FONT }}>Presupuesto total del mes</p>
-            <input type="number" inputMode="decimal" value={budgetTotal} onChange={e => setBudgetTotal(e.target.value)}
+            <input
+              type="number" inputMode="decimal"
+              value={budgetTotal}
+              onChange={e => setBudgetTotal(e.target.value)}
               placeholder="Ej: 500000"
-              style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 20, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }} />
+              style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 20, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+            />
+
+            {/* Por categoría */}
             <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10, fontFamily: FONT }}>Por categoría (opcional)</p>
             {allCategories.map(c => (
               <div key={c.id} style={{ marginBottom: 10 }}>
@@ -670,13 +680,16 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
                   <span style={{ fontSize: 16 }}>{c.icon}</span>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</p>
                 </div>
-                <input type="number" inputMode="decimal"
+                <input
+                  type="number" inputMode="decimal"
                   value={budgetByCategory[c.id] || ""}
                   onChange={e => setBudgetByCategory(prev => ({ ...prev, [c.id]: e.target.value }))}
                   placeholder="Sin límite"
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }} />
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+                />
               </div>
             ))}
+
             <div style={{ marginTop: 12 }}>
               <button type="button" onClick={saveBudgets} disabled={savingBudget}
                 style={{ width: "100%", padding: 14, borderRadius: 14, background: savingBudget ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: savingBudget ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>

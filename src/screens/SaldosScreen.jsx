@@ -277,7 +277,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
         title: "¡Cuentas saldadas! 🎉",
         body: `${debtor?.name} saldó ${fmt(amount)} con ${creditor?.name}`,
         fromName: debtor?.name || "Un miembro",
-        toUids: [creditorUid],
+        toUids: realMembers.filter(m => m.uid !== debtorUid).map(m => m.uid),
         accountId: account?.id, accountName: account?.name,
       });
     } finally {
@@ -285,12 +285,10 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     }
   };
 
-const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => {
+  const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => {
     if (isSubmitting.current) return;
     isSubmitting.current = true;
     try {
-      const debtor   = realMembers.find(m => m.uid === debtorUid);
-      const creditor = realMembers.find(m => m.uid === creditorUid);
       await addDoc(collection(db, "accounts", account.id, "settlements"), {
         debtorUid, creditorUid, amount, date, month: currentMonth, full: false,
         createdAt: new Date().toISOString(),
@@ -300,19 +298,10 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
         const remaining = prev.debts.filter(d => d.creditorUid !== creditorUid);
         return remaining.length === 0 ? null : { ...prev, debts: remaining };
       });
-      await sendNotification({
-        type: NOTIF_TYPES.ACCOUNT_SETTLED,
-        title: "Pago parcial registrado",
-        body: `${debtor?.name} te pagó ${fmt(amount)}`,
-        fromName: debtor?.name || "Un miembro",
-        toUids: [creditorUid],
-        accountId: account?.id, accountName: account?.name,
-      });
     } finally {
       isSubmitting.current = false;
     }
   };
-
 
   const nextMonth = (() => {
     const [y, m] = currentMonth.split("-").map(Number);
@@ -353,6 +342,7 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
     .map(m => ({ ...m, total: monthExp.reduce((s, e) => s + getAmountPaidBy(e, m.uid), 0) }))
     .sort((a, b) => b.total - a.total);
 
+  // Mes anterior — para comparación en Pozo
   const prevMonth = (() => {
     const [y, m] = currentMonth.split("-").map(Number);
     return new Date(y, m - 2, 1).toISOString().slice(0, 7);
@@ -360,19 +350,20 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
   const prevMonthExp = expenses.filter(e => e.month === prevMonth && !e.deleted);
   const catTotalsWithCompare = allCategories
     .map(c => {
-      const total     = monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0);
+      const total    = monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0);
       const prevTotal = prevMonthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0);
-      const budget    = categoryBudgets?.[c.id] || 0;
-      const pct       = budget > 0 ? Math.min(100, (total / budget) * 100) : 0;
-      const delta     = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null;
+      const budget   = categoryBudgets?.[c.id] || 0;
+      const pct      = budget > 0 ? Math.min(100, (total / budget) * 100) : 0;
+      const delta    = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null;
       return { ...c, total, prevTotal, budget, pct, delta };
     })
     .filter(c => c.total > 0)
     .sort((a, b) => b.total - a.total);
-  const totalSpent     = monthExp.reduce((s, e) => s + e.amount, 0);
+
+  const totalSpent    = monthExp.reduce((s, e) => s + e.amount, 0);
   const prevTotalSpent = prevMonthExp.reduce((s, e) => s + e.amount, 0);
-  const totalDelta     = prevTotalSpent > 0 ? ((totalSpent - prevTotalSpent) / prevTotalSpent) * 100 : null;
-  const totalBudget    = categoryBudgets?._total || 0;
+  const totalDelta    = prevTotalSpent > 0 ? ((totalSpent - prevTotalSpent) / prevTotalSpent) * 100 : null;
+  const totalBudget   = categoryBudgets?._total || 0;
   const totalBudgetPct = totalBudget > 0 ? Math.min(100, (totalSpent / totalBudget) * 100) : 0;
 
   // ── HISTORIAL — mes independiente de currentMonth ──
@@ -429,7 +420,7 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
         </div>
       )}
 
-      {/* Vista Pozo Común — resumen total + ranking por integrante + categorías con comparación y presupuesto */}
+      {/* Vista Pozo Común — ranking por integrante + categorías + presupuesto */}
       {isPozo && (
         <>
           {/* Resumen total del mes con comparación */}
@@ -448,9 +439,10 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
                 </div>
               )}
             </div>
+            {/* Barra de presupuesto total si existe */}
             {totalBudget > 0 && (
               <div style={{ marginTop: 12 }}>
-                {totalBudgetPct >= 80 && (
+                {(totalBudgetPct >= 80) && (
                   <div style={{ background: totalBudgetPct >= 100 ? "#e74c3c18" : "#f39c1218", borderRadius: 8, padding: "5px 10px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: 14 }}>{totalBudgetPct >= 100 ? "🚨" : "⚠️"}</span>
                     <p style={{ margin: 0, fontSize: 12, fontWeight: 600, fontFamily: FONT, color: totalBudgetPct >= 100 ? "#e74c3c" : "#f39c12" }}>
@@ -463,7 +455,7 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
                   <p style={{ margin: 0, fontSize: 11, fontWeight: 700, fontFamily: FONT, color: totalBudgetPct >= 100 ? "#e74c3c" : colors.textMuted }}>{fmt(totalBudget)}</p>
                 </div>
                 <div style={{ background: colors.divider, borderRadius: 6, height: 6, overflow: "hidden" }}>
-                  <div style={{ height: 6, borderRadius: 6, width: `${totalBudgetPct}%`, background: totalBudgetPct >= 100 ? "#e74c3c" : "#f39c12", transition: "width 0.4s ease" }} />
+                  <div style={{ height: 6, borderRadius: 6, width: `${totalBudgetPct}%`, background: totalBudgetPct >= 100 ? "#e74c3c" : totalBudgetPct >= 80 ? "#f39c12" : "#f39c12", transition: "width 0.4s ease" }} />
                 </div>
                 <p style={{ margin: "4px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT, textAlign: "right" }}>
                   {fmt(Math.max(0, totalBudget - totalSpent))} disponible
@@ -471,6 +463,7 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
               </div>
             )}
           </div>
+
           {/* Ranking por integrante */}
           <div style={{ background: colors.card, borderRadius: 20, overflow: "hidden", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
             <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.divider}` }}>
@@ -494,6 +487,7 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT, flex: 1 }}>
                   {m.name}{m.uid === currentUser.uid ? " (vos)" : ""}
                 </p>
+                {/* % del total */}
                 {totalSpent > 0 && (
                   <p style={{ margin: 0, fontSize: 11, color: colors.textMuted, fontFamily: FONT, marginRight: 6 }}>
                     {((m.total / totalSpent) * 100).toFixed(0)}%
@@ -503,39 +497,45 @@ const handlePartialSettle = async ({ debtorUid, creditorUid, amount, date }) => 
               </div>
             ))}
           </div>
+
           {/* Ranking por categoría con comparación vs mes anterior y presupuesto */}
           {catTotalsWithCompare.length > 0 && (
             <div style={{ background: colors.card, borderRadius: 20, padding: 16, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
               <p style={{ margin: "0 0 14px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Por categoría</p>
-              {catTotalsWithCompare.map((c, idx) => (
-                <div key={c.id} style={{ marginBottom: idx < catTotalsWithCompare.length - 1 ? 14 : 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                    <span style={{ fontSize: 18, width: 26, flexShrink: 0 }}>{c.icon}</span>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, flex: 1 }}>{c.label}</p>
-                    {c.delta !== null && (
-                      <span style={{ fontSize: 11, fontWeight: 700, fontFamily: FONT,
-                        color: c.delta > 10 ? "#e74c3c" : c.delta < -10 ? "#2ecc71" : colors.textMuted }}>
-                        {c.delta > 0 ? "▲" : "▼"}{Math.abs(c.delta).toFixed(0)}%
-                      </span>
+              {catTotalsWithCompare.map((c, idx) => {
+                const barColor = c.pct >= 100 ? "#e74c3c" : c.pct >= 80 ? "#f39c12" : "#f39c12";
+                return (
+                  <div key={c.id} style={{ marginBottom: idx < catTotalsWithCompare.length - 1 ? 14 : 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                      <span style={{ fontSize: 18, width: 26, flexShrink: 0 }}>{c.icon}</span>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, flex: 1 }}>{c.label}</p>
+                      {/* Badge comparación */}
+                      {c.delta !== null && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: c.delta > 10 ? "#e74c3c" : c.delta < -10 ? "#2ecc71" : colors.textMuted, fontFamily: FONT }}>
+                          {c.delta > 0 ? "▲" : "▼"}{Math.abs(c.delta).toFixed(0)}%
+                        </span>
+                      )}
+                      {c.budget > 0 && (c.pct >= 80) && (
+                        <span style={{ fontSize: 14 }}>{c.pct >= 100 ? "🚨" : "⚠️"}</span>
+                      )}
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</p>
+                    </div>
+                    <div style={{ background: colors.divider, borderRadius: 4, height: 5, overflow: "hidden" }}>
+                      <div style={{
+                        height: 5, borderRadius: 4,
+                        width: c.budget > 0 ? `${c.pct}%` : `${Math.min(100, (c.total / catTotalsWithCompare[0].total) * 100)}%`,
+                        background: c.budget > 0 ? barColor : "#f39c12",
+                        transition: "width 0.4s ease",
+                      }} />
+                    </div>
+                    {c.budget > 0 && (
+                      <p style={{ margin: "3px 0 0", fontSize: 10, color: colors.textMuted, fontFamily: FONT, textAlign: "right" }}>
+                        {fmt(c.total)} / {fmt(c.budget)}
+                      </p>
                     )}
-                    {c.budget > 0 && c.pct >= 80 && (
-                      <span style={{ fontSize: 14 }}>{c.pct >= 100 ? "🚨" : "⚠️"}</span>
-                    )}
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</p>
                   </div>
-                  <div style={{ background: colors.divider, borderRadius: 4, height: 5, overflow: "hidden" }}>
-                    <div style={{ height: 5, borderRadius: 4,
-                      width: c.budget > 0 ? `${c.pct}%` : `${Math.min(100, (c.total / catTotalsWithCompare[0].total) * 100)}%`,
-                      background: c.budget > 0 && c.pct >= 100 ? "#e74c3c" : "#f39c12",
-                      transition: "width 0.4s ease" }} />
-                  </div>
-                  {c.budget > 0 && (
-                    <p style={{ margin: "3px 0 0", fontSize: 10, color: colors.textMuted, fontFamily: FONT, textAlign: "right" }}>
-                      {fmt(c.total)} / {fmt(c.budget)}
-                    </p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
