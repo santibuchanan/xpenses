@@ -268,8 +268,9 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
 const SLIDES = [
   { emoji: "👋", title: "¡Bienvenido a X-penses!", text: "X-penses te ayuda a llevar los gastos compartidos sin drama. Todo en tiempo real, sin hojas de cálculo." },
   { emoji: "👤", title: "Cuenta Personal", text: "Solo para vos. Registrá tus propios gastos y gastos fijos sin compartir con nadie." },
-  { emoji: "👥", title: "Cuenta Compartida (Partes iguales)", text: "Para grupos donde todos pagan lo mismo. Ideal para convivencia, viajes, grupos de amigos. Cada gasto se divide en partes iguales automáticamente." },
-  { emoji: "📊", title: "Cuenta Compartida (Proporcional)", text: "Para parejas o grupos donde cada uno aporta según sus ingresos. Cada miembro configura su salario y los gastos se dividen en proporción. Ej: si Santi gana el doble que Jime, Santi paga el doble." },
+  { emoji: "⚖️", title: "Partes Iguales", text: "Para grupos donde todos contribuyen por igual. Los gastos se dividen en partes iguales entre los miembros, sin importar quién gana más." },
+  { emoji: "📊", title: "Proporcional", text: "Para parejas o grupos donde cada uno aporta según sus ingresos. Cada miembro configura su salario y los gastos se dividen en proporción." },
+  { emoji: "🏦", title: "Pozo Común", text: "Para familias o grupos que comparten un fondo común. Registrá los gastos del grupo sin generar deudas individuales — todos aportan al pozo, nadie le debe a nadie." },
   { emoji: "🤝", title: "Miembros", text: "Podés agregar miembros aunque no tengan cuenta. Después pueden unirse con un link de invitación y ver todo el historial desde el primer día." },
   { emoji: "📋", title: "Gastos fijos", text: "Los gastos que se repiten cada mes (alquiler, expensas, suscripciones) van en Gastos Fijos. La app los muestra todos los meses y te avisa cuáles faltan pagar." },
 ];
