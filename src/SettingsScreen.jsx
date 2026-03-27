@@ -646,7 +646,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
                 <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
                   {account?.categoryBudgets?._total
                     ? `Total: ${(account.categoryBudgets._total || 0).toLocaleString("es-AR")}`
-                    : "Sin presupuesto configurado"}
+                    : "Crea presupuestos para cada categoría."}
                 </p>
               </div>
               <button type="button" onClick={() => setShowBudgetEditor(true)}
@@ -681,17 +681,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           <div style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
             <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
             <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 4px", fontFamily: FONT }}>Presupuesto mensual</p>
-            <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>Configurá cuánto querés gastar por mes. Las alertas aparecen al llegar al 80%.</p>
-
-            {/* Total */}
-            <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6, fontFamily: FONT }}>Presupuesto total del mes</p>
-            <input
-              type="number" inputMode="decimal"
-              value={budgetTotal}
-              onChange={e => setBudgetTotal(e.target.value)}
-              placeholder="Ej: 500000"
-              style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 20, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
-            />
+            <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 20px", fontFamily: FONT }}>Configurá cuánto querés gastar por mes. Recibirás alertas al llegar al 80% de la categoría.</p>
 
             {/* Por categoría */}
             <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10, fontFamily: FONT }}>Por categoría (opcional)</p>
