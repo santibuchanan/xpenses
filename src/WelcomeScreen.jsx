@@ -252,8 +252,11 @@ export default function WelcomeScreen({ onEnter, onEmailClick }) {
           </div>
 
           <button className="btn-press" onClick={onEmailClick} disabled={loading}
-            style={{ width:"100%", padding:"15px 20px", borderRadius:18, background:"rgba(79,127,250,0.12)", border:"1.5px solid rgba(79,127,250,0.4)", cursor:loading?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:12, fontFamily:SF, fontWeight:600, fontSize:15, color:"#ffffffcc", marginBottom:12, opacity:loading?0.5:1 }}>
-            <span style={{ fontSize:20 }}>✉️</span>
+            style={{ width:"100%", padding:"16px 20px", borderRadius:18, background:"#1c1c2e", border:"1px solid #ffffff22", cursor:loading?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:12, fontFamily:SF, fontWeight:700, fontSize:16, color:"#ffffff", opacity:loading?0.5:1, marginBottom:12, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="4" width="20" height="16" rx="3" stroke="#ffffff" strokeWidth="1.8"/>
+              <path d="M2 8l10 7 10-7" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
             Continuar con email
           </button>
 
