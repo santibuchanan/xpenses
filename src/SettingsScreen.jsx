@@ -335,7 +335,10 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const [budgetByCategory,  setBudgetByCategory]  = useState(() => {
     const b = account?.categoryBudgets || {};
     const out = {};
-    DEFAULT_CATEGORIES.forEach(c => { out[c.id] = (b[c.id] || "").toString(); });
+    DEFAULT_CATEGORIES.forEach(c => {
+      const v = b[c.id];
+      out[c.id] = v ? parseInt(v, 10).toLocaleString("es-AR") : "";
+    });
     return out;
   });
   const [savingBudget, setSavingBudget] = useState(false);
@@ -368,7 +371,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     setSavingBudget(true);
     const budgets = { _total: parseFloat(budgetTotal) || 0 };
     Object.entries(budgetByCategory).forEach(([id, val]) => {
-      const n = parseFloat(val) || 0;
+      const n = parseFloat((val || "").replace(/\./g, "")) || 0;
       if (n > 0) budgets[id] = n;
     });
     await updateDoc(doc(db, "accounts", account.id), { categoryBudgets: budgets });
@@ -691,13 +694,22 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
                   <span style={{ fontSize: 16 }}>{c.icon}</span>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</p>
                 </div>
-                <input
-                  type="number" inputMode="decimal"
-                  value={budgetByCategory[c.id] || ""}
-                  onChange={e => setBudgetByCategory(prev => ({ ...prev, [c.id]: e.target.value }))}
-                  placeholder="Sin límite"
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
-                />
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 14, fontFamily: FONT }}>
+                    {CURRENCY_SYMBOLS[account?.currency || "ARS"] || "$"}
+                  </span>
+                  <input
+                    type="text" inputMode="decimal"
+                    value={budgetByCategory[c.id] || ""}
+                    onChange={e => {
+                      const digits = e.target.value.replace(/\D/g, "");
+                      const display = digits ? parseInt(digits, 10).toLocaleString("es-AR") : "";
+                      setBudgetByCategory(prev => ({ ...prev, [c.id]: display }));
+                    }}
+                    placeholder="Sin límite"
+                    style={{ width: "100%", padding: "10px 14px 10px 36px", borderRadius: 12, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+                  />
+                </div>
               </div>
             ))}
 
