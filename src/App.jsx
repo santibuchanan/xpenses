@@ -635,7 +635,7 @@ function AppInner() {
       </div>
 
       {/* Modales */}
-      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={activeCategories} isPersonal={isPersonal} isPozo={account?.type === "pozo"} accountId={account?.id} />}
+      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onSaved={() => setTab("home")} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={activeCategories} isPersonal={isPersonal} isPozo={account?.type === "pozo"} accountId={account?.id} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={activeCategories} currentUser={authUser} isPozo={account?.type === "pozo"} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}
       {showNotifs && <NotifCenter onClose={() => setShowNotifs(false)} />}
       {showMenu && <MenuPanel onClose={() => setShowMenu(false)} currentUser={authUser} userProfile={userProfile} members={members} account={account} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} onDeleteAccount={handleDeleteAccount} colors={colors} />}

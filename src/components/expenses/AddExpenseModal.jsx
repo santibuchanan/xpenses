@@ -16,7 +16,7 @@ const TYPE_DESCRIPTIONS = [
   { icon: "🙋🏼‍♂️", name: "Para mí", desc: "Un gasto tuyo que no se comparte con nadie. No afecta los saldos del grupo." },
 ];
 
-export default function AddExpenseModal({ onClose, onAdd, currentUser, allMembers, currency, customCategories, isPersonal, isPozo, accountId }) {
+export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, allMembers, currency, customCategories, isPersonal, isPozo, accountId }) {
   const { colors } = useTheme();
 
   // Scroll lock
@@ -153,6 +153,7 @@ export default function AddExpenseModal({ onClose, onAdd, currentUser, allMember
       return;
     }
     // onAdd succeeded — siempre cerrar aunque onClose() lance
+    try { onSaved?.(); } catch {}
     try { onClose(); } catch {}
   };
 
