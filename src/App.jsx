@@ -311,7 +311,7 @@ function ClaimIdentityModal({ claimData, onClaim, onSkip, colors }) {
           ))}
         </div>
         <button onClick={handleClaim} disabled={!selected || loading} style={{ width: "100%", padding: 16, borderRadius: 16, border: "none", background: !selected || loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", fontSize: 16, fontWeight: 700, cursor: !selected || loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 10 }}>
-          {loading ? "Uniéndome..." : "¡Soy yo, unirme! →"}
+          {loading ? "Uniéndome..." : "¡Soy yo, unirme!"}
         </button>
         <button onClick={onSkip} style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", background: colors.pill, color: colors.textMuted, fontSize: 14, cursor: "pointer", fontFamily: FONT }}>Mi nombre no está en la lista</button>
       </div>

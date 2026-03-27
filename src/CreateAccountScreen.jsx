@@ -623,7 +623,7 @@ export default function CreateAccountScreen({
           style={{ width: "100%", padding: 16, borderRadius: 16, border: "none", fontSize: 16, fontWeight: 600, fontFamily: "inherit", marginTop: 8,
             background: canSave ? "linear-gradient(135deg,#4F7FFA,#3a6ae8)" : "#aaa",
             color: "#fff", cursor: canSave ? "pointer" : "default" }}>
-          {saving ? (isSetup ? "Guardando..." : "Creando...") : (isSetup ? "Comenzar →" : "Crear cuenta →")}
+          {saving ? (isSetup ? "Guardando..." : "Creando...") : (isSetup ? "Comenzar" : "Crear cuenta")}
         </button>
         <div style={{ height: 40 }} />
       </div>

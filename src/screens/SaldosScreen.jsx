@@ -184,7 +184,7 @@ function PassDebtModal({ debts, members, nextMonth, fmt, colors, onConfirm, onCl
         })}
         <button onClick={async () => { setLoading(true); await onConfirm(debts); setLoading(false); }} disabled={loading}
           style={{ width: "100%", padding: 15, borderRadius: 14, background: loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 8, marginTop: 8 }}>
-          {loading ? "Generando..." : "Confirmar y generar gastos →"}
+          {loading ? "Generando..." : "Confirmar y generar gastos"}
         </button>
         <button onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
       </div>

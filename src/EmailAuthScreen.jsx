@@ -191,7 +191,7 @@ export default function EmailAuthScreen({ onBack, onEnter }) {
                   background: !email ? "#555" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)",
                   color: "#fff", border: "none", fontSize: 16, fontWeight: 700,
                   cursor: !email ? "default" : "pointer", fontFamily: SF, opacity: loading ? 0.7 : 1 }}>
-                {loading ? "Verificando..." : "Continuar →"}
+                {loading ? "Verificando..." : "Continuar"}
               </button>
             </>
           )}
@@ -219,7 +219,7 @@ export default function EmailAuthScreen({ onBack, onEnter }) {
                   background: !password ? "#555" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)",
                   color: "#fff", border: "none", fontSize: 16, fontWeight: 700,
                   cursor: !password ? "default" : "pointer", fontFamily: SF, opacity: loading ? 0.7 : 1 }}>
-                {loading ? "Iniciando sesión..." : "Iniciar sesión →"}
+                {loading ? "Iniciando sesión..." : "Iniciar sesión"}
               </button>
               {resetSent ? (
                 <p style={{ color: "#2ecc71", fontSize: 13, textAlign: "center", marginTop: 16 }}>
@@ -305,7 +305,7 @@ export default function EmailAuthScreen({ onBack, onEnter }) {
                     ) : (
                       <button onClick={handleReset} disabled={loading}
                         style={{ background: "none", border: "none", color: "#4F7FFA", fontSize: 13, cursor: "pointer", fontFamily: SF, marginBottom: 12, width: "100%", textAlign: "center" }}>
-                        Restablecer contraseña →
+                        Restablecer contraseña
                       </button>
                     )
                   )}
@@ -325,7 +325,7 @@ export default function EmailAuthScreen({ onBack, onEnter }) {
                     background: (!password || !confirm) ? "#555" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)",
                     color: "#fff", border: "none", fontSize: 16, fontWeight: 700,
                     cursor: (!password || !confirm) ? "default" : "pointer", fontFamily: SF, opacity: loading ? 0.7 : 1 }}>
-                  {loading ? "Creando cuenta..." : "Crear cuenta →"}
+                  {loading ? "Creando cuenta..." : "Crear cuenta"}
                 </button>
               )}
             </>

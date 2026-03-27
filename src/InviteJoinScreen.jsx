@@ -276,7 +276,7 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
 
         <button onClick={() => processJoin(auth.currentUser)} disabled={!selectedLabel}
           style={{ ...btnPrimary, marginTop: 8, opacity: selectedLabel ? 1 : 0.5, cursor: selectedLabel ? "pointer" : "default" }}>
-          ¡Soy yo, unirme! →
+          ¡Soy yo, unirme!
         </button>
         <button onClick={() => { setSelectedLabel(null); processJoin(auth.currentUser); }}
           style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", background: "transparent", color: "#ffffff66", fontSize: 14, cursor: "pointer", fontFamily: SF }}>
@@ -327,7 +327,7 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
               style={inputStyle} />
             {authError && <p style={{ color: "#ff6b6b", fontSize: 13, margin: "-8px 0 12px" }}>{authError}</p>}
             <button onClick={handleCheckEmail} disabled={authLoading || !email} style={{ ...btnPrimary, opacity: (!email || authLoading) ? 0.6 : 1 }}>
-              {authLoading ? "Verificando..." : "Continuar →"}
+              {authLoading ? "Verificando..." : "Continuar"}
             </button>
           </>
         )}
@@ -344,7 +344,7 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
               style={inputStyle} />
             {authError && <p style={{ color: "#ff6b6b", fontSize: 13, margin: "-8px 0 12px" }}>{authError}</p>}
             <button onClick={handleLogin} disabled={authLoading || !password} style={{ ...btnPrimary, opacity: (!password || authLoading) ? 0.6 : 1 }}>
-              {authLoading ? "Iniciando sesión..." : "Iniciar sesión →"}
+              {authLoading ? "Iniciando sesión..." : "Iniciar sesión"}
             </button>
             {resetSent
               ? <p style={{ color: "#2ecc71", fontSize: 13, textAlign: "center" }}>✓ Email de recuperación enviado</p>
@@ -374,7 +374,7 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
               style={inputStyle} />
             {authError && <p style={{ color: "#ff6b6b", fontSize: 13, margin: "-8px 0 12px" }}>{authError}</p>}
             <button onClick={handleRegister} disabled={authLoading || !password || !confirm} style={{ ...btnPrimary, opacity: (!password || !confirm || authLoading) ? 0.6 : 1 }}>
-              {authLoading ? "Creando cuenta..." : "Crear cuenta y unirme →"}
+              {authLoading ? "Creando cuenta..." : "Crear cuenta y unirme"}
             </button>
             <button onClick={() => { setStep("email"); setPassword(""); setConfirm(""); setAuthError(""); }}
               style={{ background: "none", border: "none", color: "#ffffff44", fontSize: 13, cursor: "pointer", fontFamily: SF, width: "100%", textAlign: "center", padding: "4px 0" }}>

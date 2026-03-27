@@ -20,7 +20,7 @@ const SLIDES = [
     title: "Todo listo para empezar",
     desc:  "Creá tu primera cuenta en menos de 2 minutos. ¡Empecemos!",
     color: "#2ecc71",
-    cta:   "Crear mi cuenta →",
+    cta:   "Crear mi cuenta",
   },
 ];
 
@@ -106,7 +106,7 @@ export default function OnboardingScreen({ user, onDone }) {
             boxShadow: `0 4px 20px ${slide.color}44`,
             transition: "background 0.4s, box-shadow 0.4s",
           }}>
-          {slide.cta || "Siguiente →"}
+          {slide.cta || "Siguiente"}
         </button>
 
         {!isLast && (

@@ -315,7 +315,7 @@ function OnboardingSlides({ onDone }) {
         {isLast ? (
           <button type="button" onClick={onDone}
             style={{ width: "100%", padding: 16, borderRadius: 16, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
-            Empezar →
+            Empezar
           </button>
         ) : (
           <div style={{ display: "flex", gap: 10 }}>
@@ -327,7 +327,7 @@ function OnboardingSlides({ onDone }) {
             )}
             <button type="button" onClick={goNext}
               style={{ flex: 2, padding: 16, borderRadius: 16, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
-              Siguiente →
+              Siguiente
             </button>
           </div>
         )}
