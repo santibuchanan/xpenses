@@ -610,6 +610,9 @@ function AppInner() {
           {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} categoryBudgets={account?.categoryBudgets} />}
           {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} customCategories={customCategories} fixedExpenses={fixedExpenses} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
         </Suspense>
+        <div style={{ textAlign: "center", padding: "12px 0 4px" }}>
+          <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: colors.textSubtle, textDecoration: "none", fontFamily: FONT }}>Política de Privacidad</a>
+        </div>
       </div>
 
       {/* Bottom Nav */}

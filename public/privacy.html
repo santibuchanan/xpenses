@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidad — X-penses</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --card: #1a1a2e;
+      --border: rgba(255,255,255,0.06);
+      --text: #f0f0f0;
+      --muted: #888;
+      --subtle: #555;
+      --accent: #4F7FFA;
+      --divider: rgba(255,255,255,0.06);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f7f8fc;
+        --card: #ffffff;
+        --border: transparent;
+        --text: #1a1a2e;
+        --muted: #888;
+        --subtle: #aaa;
+        --accent: #4F7FFA;
+        --divider: #f0f0f0;
+      }
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+    }
+
+    .notice {
+      background: var(--accent)18;
+      border: 1px solid var(--accent)44;
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 36px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .notice strong {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    header {
+      margin-bottom: 36px;
+    }
+
+    header .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    header .logo img {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+    }
+
+    header .logo-text {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--subtle);
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+    }
+
+    .date {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--divider);
+      margin: 32px 0;
+    }
+
+    section {
+      margin-bottom: 36px;
+    }
+
+    h2 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    p {
+      font-size: 15px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    p:last-child {
+      margin-bottom: 0;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 12px 0 0;
+    }
+
+    ul li {
+      font-size: 15px;
+      color: var(--muted);
+      padding: 6px 0 6px 20px;
+      position: relative;
+    }
+
+    ul li::before {
+      content: '·';
+      position: absolute;
+      left: 6px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-top: 12px;
+    }
+
+    .card p {
+      margin-bottom: 8px;
+    }
+
+    .contact-box {
+      background: var(--accent)11;
+      border: 1px solid var(--accent)33;
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-top: 12px;
+    }
+
+    .contact-box p {
+      margin-bottom: 0;
+      font-size: 14px;
+    }
+
+    .contact-box a {
+      font-weight: 600;
+    }
+
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--divider);
+      text-align: center;
+      font-size: 12px;
+      color: var(--subtle);
+    }
+
+    footer a {
+      color: var(--subtle);
+    }
+
+    @media (max-width: 480px) {
+      h1 { font-size: 22px; }
+      h2 { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <div class="logo">
+        <img src="/logo.png" alt="X-penses" />
+        <span class="logo-text">X-penses</span>
+      </div>
+      <h1>Política de Privacidad</h1>
+      <p class="date">Última actualización: 27 de marzo de 2026</p>
+    </header>
+
+    <div class="notice">
+      <strong>Nota provisional:</strong> Esta política es provisional. X-penses está en proceso de registro legal. El nombre y los datos de contacto se actualizarán oportunamente una vez completado dicho proceso.
+    </div>
+
+    <section>
+      <h2>1. ¿Qué es X-penses?</h2>
+      <p>X-penses es una aplicación web para registrar y dividir gastos compartidos entre grupos de personas. Esta Política de Privacidad describe cómo recopilamos, usamos y protegemos la información de quienes usan la app.</p>
+      <p>Al usar X-penses, aceptás los términos descritos en este documento.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>2. Datos que recopilamos</h2>
+      <p>Recopilamos únicamente los datos necesarios para que la app funcione:</p>
+      <ul>
+        <li><strong>De tu cuenta de Google:</strong> nombre, dirección de email y foto de perfil, obtenidos con tu consentimiento al iniciar sesión.</li>
+        <li><strong>De tu uso de la app:</strong> gastos que cargás (concepto, monto, fecha, categoría, participantes), cuentas que creás o a las que te unís, y saldos entre participantes.</li>
+        <li><strong>Técnicos:</strong> identificador único de usuario (UID) generado por Firebase Authentication.</li>
+      </ul>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>3. Para qué usamos tus datos</h2>
+      <p>Usamos tus datos exclusivamente para:</p>
+      <ul>
+        <li>Mostrar tus gastos, saldos y estadísticas dentro de la app.</li>
+        <li>Identificarte frente a otros miembros de tus cuentas compartidas.</li>
+        <li>Enviarte notificaciones sobre gastos que te involucran.</li>
+        <li>Mantener el historial de tus cuentas compartidas.</li>
+      </ul>
+      <p><strong>No vendemos, cedemos ni compartimos tus datos con terceros</strong> con fines comerciales o publicitarios.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>4. Firebase y Google como proveedores</h2>
+      <p>X-penses usa servicios de Google para su funcionamiento:</p>
+      <div class="card">
+        <p><strong>Firebase Authentication</strong> — gestiona el inicio de sesión de forma segura.</p>
+        <p><strong>Cloud Firestore</strong> — almacena tus gastos y datos de cuenta.</p>
+        <p><strong>Firebase Cloud Messaging</strong> — permite el envío de notificaciones.</p>
+      </div>
+      <p style="margin-top: 14px;">Estos servicios cuentan con sus propias políticas de privacidad:</p>
+      <ul>
+        <li><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Política de privacidad de Firebase</a></li>
+        <li><a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Política de privacidad de Google</a></li>
+      </ul>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>5. Almacenamiento local</h2>
+      <p>X-penses guarda en tu dispositivo (vía <code>localStorage</code>) únicamente preferencias de uso personal:</p>
+      <ul>
+        <li>Tema visual (oscuro / claro / automático).</li>
+        <li>Tamaño de letra preferido.</li>
+        <li>La última cuenta seleccionada.</li>
+      </ul>
+      <p>Estos datos no se transmiten a ningún servidor y no contienen información personal. No usamos cookies de rastreo ni herramientas de analytics de terceros.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>6. Tus derechos (GDPR)</h2>
+      <p>Si sos residente del Espacio Económico Europeo o de otra jurisdicción con legislación de protección de datos equivalente, tenés derecho a:</p>
+      <ul>
+        <li><strong>Acceso:</strong> saber qué datos tenemos sobre vos.</li>
+        <li><strong>Rectificación:</strong> corregir datos inexactos o desactualizados.</li>
+        <li><strong>Portabilidad:</strong> recibir tus datos en un formato legible.</li>
+        <li><strong>Derecho al olvido:</strong> solicitar la eliminación de todos tus datos.</li>
+        <li><strong>Oposición:</strong> oponerte al procesamiento de tus datos en determinadas circunstancias.</li>
+      </ul>
+      <p>Para ejercer cualquiera de estos derechos, escribinos a <a href="mailto:buchanan.santiago@gmail.com">buchanan.santiago@gmail.com</a>.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>7. Cómo eliminar tus datos</h2>
+      <p>Podés solicitar la eliminación completa de tu cuenta y todos los datos asociados en cualquier momento.</p>
+      <div class="contact-box">
+        <p>Escribinos a <a href="mailto:buchanan.santiago@gmail.com">buchanan.santiago@gmail.com</a> con el asunto <strong>"Eliminar mi cuenta"</strong> y procesamos tu solicitud en un plazo máximo de 30 días.</p>
+      </div>
+      <p style="margin-top: 14px;">Ten en cuenta que los gastos en los que participaste dentro de cuentas compartidas pueden permanecer visibles para los demás miembros de esa cuenta, con tu nombre anonimizado.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>8. Menores de edad</h2>
+      <p>X-penses no está dirigida a menores de 13 años. No recopilamos intencionalmente información de menores. Si creés que un menor registró una cuenta, contactanos a <a href="mailto:buchanan.santiago@gmail.com">buchanan.santiago@gmail.com</a> para eliminarlo.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>9. Cambios a esta política</h2>
+      <p>Podemos actualizar esta Política de Privacidad en cualquier momento. Cuando haya cambios relevantes, lo notificaremos dentro de la app. La fecha de última actualización siempre estará visible al inicio de esta página.</p>
+      <p>El uso continuado de X-penses después de publicados los cambios implica la aceptación de la política actualizada.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>10. Contacto</h2>
+      <p>Para cualquier consulta sobre privacidad o protección de datos:</p>
+      <div class="contact-box">
+        <p>📧 <a href="mailto:buchanan.santiago@gmail.com">buchanan.santiago@gmail.com</a></p>
+      </div>
+    </section>
+
+    <footer>
+      <p><a href="/">← Volver a X-penses</a></p>
+      <p style="margin-top: 8px;">© 2026 X-penses — Todos los derechos reservados</p>
+    </footer>
+
+  </div>
+</body>
+</html>
