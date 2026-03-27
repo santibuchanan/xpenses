@@ -238,22 +238,23 @@ function SwipeableFixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
 
 function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, colors, showSalary }) {
   const [swipeX,     setSwipeX]   = useState(0);
-  const [swiped,     setSwiped]   = useState(false);
+  const [isSettling, setIsSettling] = useState(false);
   const startX                    = useRef(null);
   const isDragging                = useRef(false);
   const DELETE_THRESHOLD          = 80;
 
-  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; isDragging.current = true; };
+  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; isDragging.current = false; setIsSettling(false); };
   const onTouchMove  = (e) => {
-    if (!isDragging.current || startX.current === null) return;
+    if (startX.current === null) return;
     const diff = startX.current - e.touches[0].clientX;
+    if (Math.abs(diff) > 6) isDragging.current = true;
     if (diff > 0) setSwipeX(Math.min(diff, DELETE_THRESHOLD + 20));
-    else if (diff < -10) { setSwipeX(0); setSwiped(false); }
+    else if (diff < -10) { setSwipeX(0); }
   };
   const onTouchEnd = () => {
-    isDragging.current = false;
-    if (swipeX > DELETE_THRESHOLD / 2) { setSwipeX(DELETE_THRESHOLD); setSwiped(true); }
-    else { setSwipeX(0); setSwiped(false); }
+    setIsSettling(true);
+    if (swipeX >= DELETE_THRESHOLD) onRemoveRequest(member);
+    setSwipeX(0);
     startX.current = null;
   };
 
@@ -262,12 +263,17 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
       {!isCurrentUser && (
         <div style={{
           position: "absolute", right: 0, top: 0, bottom: 0, width: DELETE_THRESHOLD,
-          background: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center",
+          background: `rgba(229,62,62,${0.15 + Math.min(1, swipeX / DELETE_THRESHOLD) * 0.85})`, display: "flex", alignItems: "center", justifyContent: "center",
           borderRadius: "0 16px 16px 0",
         }}>
           <button onClick={(e) => { e.stopPropagation(); onRemoveRequest(member); }}
             style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 0 }}>
-            <span style={{ fontSize: 20 }}>🗑️</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14H6L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+                <path d="M9 6V4h6v2"/>
+              </svg>
             <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
           </button>
         </div>
@@ -277,10 +283,10 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
         onTouchStart={!isCurrentUser ? onTouchStart : undefined}
         onTouchMove={!isCurrentUser ? onTouchMove : undefined}
         onTouchEnd={!isCurrentUser ? onTouchEnd : undefined}
-        onClick={() => { if (swiped) { setSwipeX(0); setSwiped(false); } else if (onEdit) { onEdit(member); } }}
+        onClick={() => { if (isDragging.current) return; if (onEdit) onEdit(member); }}
         style={{
           transform: `translateX(-${swipeX}px)`,
-          transition: isDragging.current ? "none" : "transform 0.3s ease",
+          transition: isSettling ? "transform 0.3s ease" : "none",
           background: colors.card, borderRadius: 16, padding: "14px 16px",
           border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow,
           display: "flex", alignItems: "center", gap: 12,
