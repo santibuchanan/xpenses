@@ -59,6 +59,7 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
   // Claim flow
   const [claimLabels, setClaimLabels] = useState(null);
   const [selectedLabel, setSelectedLabel] = useState(null);
+  const [alreadyMember, setAlreadyMember] = useState(null);
 
   const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
@@ -98,6 +99,15 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
   const processJoin = async (user) => {
     if (!invite || !account || joining) return;
     setJoining(true);
+
+    // Guard: ya es miembro de la cuenta
+    if ((account.memberIds || []).includes(user.uid)) {
+      const linkedLabel = (account.memberLabels || []).find(l => l.linkedUid === user.uid);
+      setAlreadyMember({ name: linkedLabel?.name || null });
+      setJoining(false);
+      return;
+    }
+
     try {
       const unlinked = (account.memberLabels || []).filter(l => !l.linkedUid);
 
@@ -249,6 +259,20 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
     <div style={{ position: "fixed", inset: 0, background: "#08090d", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, padding: 24 }}>
       <p style={{ fontSize: 40 }}>⚠️</p>
       <p style={{ color: "#fff", fontFamily: SF, fontSize: 16, textAlign: "center" }}>{error}</p>
+    </div>
+  );
+
+  // Ya es miembro
+  if (alreadyMember) return (
+    <div style={{ position: "fixed", inset: 0, background: "#08090d", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, padding: 24 }}>
+      <p style={{ fontSize: 40 }}>✅</p>
+      <p style={{ color: "#fff", fontFamily: SF, fontSize: 18, fontWeight: 700, textAlign: "center" }}>
+        {alreadyMember.name ? `Ya sos ${alreadyMember.name} en esta cuenta` : "Ya sos miembro de esta cuenta"}
+      </p>
+      <button onClick={() => window.location.replace(window.location.origin)}
+        style={{ ...btnPrimary, width: "auto", padding: "14px 32px" }}>
+        Ir a la app
+      </button>
     </div>
   );
 
