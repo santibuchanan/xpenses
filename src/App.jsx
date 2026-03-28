@@ -376,6 +376,20 @@ function AppInner() {
     return id || null;
   });
 
+  // Si la PWA está en background y el usuario abre un link de invite, el hash
+  // puede llegar después del montaje inicial. Recargamos limpio para que
+  // inviteIdFromUrl se inicialice con el hash correcto.
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith("#invite=")) {
+        window.location.reload();
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
   useEffect(() => {
     if (!authUser) return;
     // Leer directamente de localStorage — más confiable que el state
