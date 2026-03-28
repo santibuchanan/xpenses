@@ -32,7 +32,9 @@ function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width 
           <span style={{ fontSize: 13, fontWeight: 600, color: intPart ? colors.inputText : colors.textMuted }}>
             {intPart || "0"}
           </span>
-          {decPart !== undefined && <span style={{ fontSize: 10, color: colors.inputText }}>,{decPart}</span>}
+          <span style={{ fontSize: 10, color: intPart ? colors.inputText : colors.textMuted }}>
+            ,{decPart !== undefined ? decPart.padEnd(2, "0") : "00"}
+          </span>
         </div>
       )}
       <input type="text" inputMode="decimal"
