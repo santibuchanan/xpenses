@@ -9,6 +9,49 @@ import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
+function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width = 120, height = 28 }) {
+  const input = useAmountInput("");
+  const isMounted = useRef(false);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!isMounted.current) { isMounted.current = true; return; }
+    onValueChange(uid, input.numericValue);
+  }, [input.numericValue]);
+  const [intPart = "", decPart] = (input.displayValue || "").split(",");
+  return (
+    <div style={{ position: "relative", width, height }}>
+      <span style={{
+        position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)",
+        fontSize: 11, color: colors.textMuted, pointerEvents: "none", zIndex: 3, fontFamily: FONT,
+      }}>{currSymbol}</span>
+      {!focused && (
+        <div style={{
+          position: "absolute", left: 20, right: 0, top: 0, bottom: 0,
+          display: "flex", alignItems: "center", pointerEvents: "none", zIndex: 2, fontFamily: FONT,
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: intPart ? colors.inputText : colors.textMuted }}>
+            {intPart || "0"}
+          </span>
+          {decPart !== undefined && <span style={{ fontSize: 10, color: colors.inputText }}>,{decPart}</span>}
+        </div>
+      )}
+      <input type="text" inputMode="decimal"
+        value={input.displayValue} onChange={input.onChange}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        placeholder={focused ? "0" : ""}
+        style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          padding: focused ? "0 8px 0 20px" : "0", borderRadius: 8,
+          border: `2px solid ${colors.inputBorder}`, fontSize: 13, fontFamily: FONT,
+          outline: "none", background: colors.input,
+          color: focused ? colors.inputText : "transparent",
+          caretColor: colors.inputText, boxSizing: "border-box",
+        }}
+      />
+    </div>
+  );
+}
+
 const TYPE_DESCRIPTIONS = [
   { icon: "🛍️", name: "Ordinario", desc: "Un gasto habitual que se divide entre todos los miembros. Por ejemplo: supermercado, servicios, limpieza." },
   { icon: "🫵🏽", name: "Para otro", desc: "Pagaste algo para uno o varios miembros específicos. Elegís para quién fue el gasto." },
@@ -103,6 +146,30 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
     }
   };
 
+  const memberList = profiles.filter(m => !!m.uid && !m._isLabel);
+
+  const togglePayerSelection = (uid) => {
+    if (!multiPayer) {
+      if (uid === form.paidBy) return;
+      setPaidAmounts({ [form.paidBy]: 0, [uid]: 0 });
+      setMultiPayer(true);
+    } else {
+      const current = Object.keys(paidAmounts);
+      if (current.includes(uid)) {
+        const remaining = current.filter(u => u !== uid);
+        if (remaining.length === 1) {
+          set("paidBy", remaining[0]);
+          setPaidAmounts({});
+          setMultiPayer(false);
+        } else {
+          setPaidAmounts(prev => { const u = { ...prev }; delete u[uid]; return u; });
+        }
+      } else {
+        setPaidAmounts(prev => ({ ...prev, [uid]: 0 }));
+      }
+    }
+  };
+
   const toggleForWhom = (uid) => {
     setForm(f => {
       const cur = Array.isArray(f.forWhom) ? f.forWhom : [];
@@ -133,7 +200,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
     const paidByValue = multiPayer
       ? Object.entries(paidAmounts)
           .filter(([, v]) => (parseFloat(v) || 0) > 0)
-          .map(([uid, v]) => ({ uid, amount: parseFloat(v) }))
+          .map(([uid, v]) => ({ uid, amount: Math.round(parseFloat(v) * 100) / 100 }))
       : form.paidBy;
     const { id, ...data } = form;
     await updateDoc(doc(db, "expenses", id), {
@@ -245,77 +312,99 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
         <p style={labelStyle}>Fecha</p>
         <DateInput value={form.date} onChange={v => set("date", v)} />
 
-        {/* PAGÓ */}
-        {showPaidBy && (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <p style={{ ...labelStyle, margin: 0 }}>Pagó</p>
-              <button
-                onClick={() => setMultiPayer(mp => {
-                  if (!mp) setPaidAmounts({ [form.paidBy]: String(form.amount || "") });
-                  return !mp;
+        {/* PAGADO POR + PARA — grid 80/20 */}
+        {(showPaidBy || showForWhom) && (
+          <div style={{ display: "grid", gridTemplateColumns: "4fr 1fr", gap: 10, marginBottom: 14, alignItems: "start" }}>
+
+            {showPaidBy && (
+              <div>
+                <p style={labelStyle}>Pagado por</p>
+                {memberList.map(m => {
+                  const isPayer = multiPayer ? (m.uid in paidAmounts) : form.paidBy === m.uid;
+                  const mc = "#4F7FFA";
+                  return (
+                    <div key={m.uid} style={{
+                      display: "flex", alignItems: "center", gap: 8, marginBottom: 6,
+                      height: 42, padding: "0 10px", borderRadius: 12,
+                      border: `2px solid ${isPayer ? mc : colors.inputBorder}`,
+                      background: isPayer ? mc + "18" : colors.input,
+                    }}>
+                      <button type="button" onClick={() => togglePayerSelection(m.uid)}
+                        style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0,
+                          background: "none", border: "none", cursor: "pointer", padding: 0,
+                          fontFamily: FONT, textAlign: "left" }}>
+                        <span style={{
+                          width: 18, height: 18, borderRadius: 9, flexShrink: 0,
+                          border: `2px solid ${isPayer ? mc : colors.textMuted}`,
+                          background: isPayer ? mc : "transparent",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 10, color: "#fff", fontWeight: 700,
+                        }}>
+                          {isPayer && "✓"}
+                        </span>
+                        <span style={{
+                          fontWeight: 600, fontSize: 13, color: isPayer ? mc : colors.text,
+                          fontFamily: FONT, flex: 1, minWidth: 0,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          textAlign: "left",
+                        }}>
+                          {m.name}
+                        </span>
+                      </button>
+                      {multiPayer && isPayer && (
+                        <PayerAmountInput
+                          uid={m.uid}
+                          onValueChange={(u, amt) => setPaidAmounts(prev => ({ ...prev, [u]: amt }))}
+                          currSymbol={currSymbol}
+                          colors={colors}
+                          FONT={FONT}
+                        />
+                      )}
+                    </div>
+                  );
                 })}
-                style={{ fontSize: 11, fontWeight: 700, color: "#4F7FFA", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT, letterSpacing: 0.4 }}>
-                {multiPayer ? "Un pagador" : "Pago compartido"}
-              </button>
-            </div>
-            {!multiPayer ? (
-              <>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-                  {profiles.map(p => (
-                    <button key={p.uid} onClick={() => set("paidBy", p.uid)}
-                      style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                        borderColor: form.paidBy === p.uid ? (p.color || "#4F7FFA") : colors.inputBorder,
-                        background: form.paidBy === p.uid ? (p.color || "#4F7FFA") + "18" : colors.input,
-                        color: form.paidBy === p.uid ? (p.color || "#4F7FFA") : colors.textMuted }}>
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-                {!form.paidBy && <p style={{ fontSize: 12, color: "#e74c3c", margin: "-10px 0 12px", fontFamily: FONT }}>Seleccioná quién pagó</p>}
-              </>
-            ) : (
-              <div style={{ marginBottom: 14 }}>
-                {profiles.map(p => (
-                  <div key={p.uid} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span style={{ flex: 1, fontWeight: 600, color: colors.text, fontFamily: FONT, fontSize: 14 }}>{p.name}</span>
-                    <span style={{ color: colors.textMuted, fontFamily: FONT, fontSize: 15 }}>{currSymbol}</span>
-                    <input type="text" inputMode="decimal"
-                      value={paidAmounts[p.uid] ?? ""}
-                      onChange={e => setPaidAmt(p.uid, e.target.value)}
-                      placeholder="0"
-                      style={{ width: 90, padding: "8px 10px", borderRadius: 10, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", background: colors.input, color: colors.inputText, boxSizing: "border-box" }} />
-                  </div>
-                ))}
-                <p style={{ fontSize: 12, textAlign: "right", fontFamily: FONT, fontWeight: 600, margin: "2px 0 0",
-                  color: Math.abs(multiPayerTotal - parseFloat(form.amount || 0)) < 0.01 ? "#27ae60" : "#e74c3c" }}>
-                  Total: {currSymbol}{multiPayerTotal.toLocaleString("es-AR")} / {currSymbol}{parseFloat(form.amount || 0).toLocaleString("es-AR")}
-                </p>
+                {multiPayer && (
+                  <p style={{
+                    fontSize: 11, textAlign: "right", fontFamily: FONT, fontWeight: 600, margin: "2px 0 0",
+                    color: Math.abs(multiPayerTotal - parseFloat(form.amount || 0)) < 0.01 ? "#27ae60" : "#e74c3c",
+                  }}>
+                    {currSymbol}{multiPayerTotal.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {currSymbol}{parseFloat(form.amount || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                )}
               </div>
             )}
-          </>
-        )}
 
-        {/* PARA QUIÉN (type=personal) */}
-        {showForWhom && (
-          <>
-            <p style={labelStyle}>Para quién/es</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {profiles.map(p => {
-                const sel = forWhomArr.includes(p.uid);
-                return (
-                  <button key={p.uid} onClick={() => toggleForWhom(p.uid)}
-                    style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                      borderColor: sel ? (p.color || "#4F7FFA") : colors.inputBorder,
-                      background: sel ? (p.color || "#4F7FFA") + "18" : colors.input,
-                      color: sel ? (p.color || "#4F7FFA") : colors.textMuted }}>
-                    {p.name}
-                  </button>
-                );
-              })}
-            </div>
-            {forWhomArr.length === 0 && <p style={{ fontSize: 12, color: "#e74c3c", margin: "-10px 0 12px", fontFamily: FONT }}>Seleccioná al menos un destinatario</p>}
-          </>
+            {showForWhom && (
+              <div>
+                <p style={{ ...labelStyle, textAlign: "center" }}>Para</p>
+                {memberList.map(m => {
+                  const sel = forWhomArr.includes(m.uid);
+                  const mc = "#4F7FFA";
+                  return (
+                    <button key={m.uid} type="button" onClick={() => toggleForWhom(m.uid)}
+                      style={{
+                        width: "100%", height: 42, marginBottom: 6,
+                        borderRadius: 12, border: `2px solid ${sel ? mc : colors.inputBorder}`,
+                        background: sel ? mc + "18" : colors.input,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer", padding: 0,
+                      }}>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: 9,
+                        border: `2px solid ${sel ? mc : colors.textMuted}`,
+                        background: sel ? mc : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 10, color: "#fff", fontWeight: 700,
+                      }}>
+                        {sel && "✓"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+          </div>
         )}
 
         <button onClick={handleSave} disabled={!isSaveable}

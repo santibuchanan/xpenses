@@ -30,12 +30,18 @@ function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width 
 
   return (
     <div style={{ position: "relative", width, height }}>
+      {/* $ siempre visible, separado del overlay del número */}
+      <span style={{
+        position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)",
+        fontSize: 11, color: colors.textMuted, pointerEvents: "none", zIndex: 3, fontFamily: FONT,
+      }}>{currSymbol}</span>
+      {/* Número formateado — solo cuando no está enfocado */}
       {!focused && (
         <div style={{
-          position: "absolute", inset: 0, display: "flex", alignItems: "center",
-          padding: "0 8px", pointerEvents: "none", zIndex: 2, fontFamily: FONT,
+          position: "absolute", left: 20, right: 0, top: 0, bottom: 0,
+          display: "flex", alignItems: "center",
+          pointerEvents: "none", zIndex: 2, fontFamily: FONT,
         }}>
-          <span style={{ fontSize: 11, color: colors.textMuted, marginRight: 1 }}>{currSymbol}</span>
           <span style={{ fontSize: 13, fontWeight: 600, color: intPart ? colors.inputText : colors.textMuted }}>
             {intPart || "0"}
           </span>
@@ -53,7 +59,7 @@ function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width 
         placeholder={focused ? "0" : ""}
         style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
-          padding: focused ? "0 8px 0 24px" : "0",
+          padding: focused ? "0 8px 0 20px" : "0",
           borderRadius: 8,
           border: `2px solid ${colors.inputBorder}`,
           fontSize: 13, fontFamily: FONT, outline: "none",
@@ -370,7 +376,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
                     fontSize: 11, textAlign: "right", fontFamily: FONT, fontWeight: 600, margin: "2px 0 0",
                     color: Math.abs(multiPayerTotal - (amountInput.numericValue || 0)) < 0.01 ? "#27ae60" : "#e74c3c",
                   }}>
-                    {currSymbol}{multiPayerTotal.toLocaleString("es-AR")} / {currSymbol}{(amountInput.numericValue || 0).toLocaleString("es-AR")}
+                    {currSymbol}{multiPayerTotal.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {currSymbol}{(amountInput.numericValue || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 )}
               </div>
