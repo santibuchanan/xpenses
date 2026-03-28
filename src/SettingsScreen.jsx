@@ -400,7 +400,7 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
     }
     try {
       await deleteUserData(currentUser.uid);
-      console.log("Firestore cleanup OK");
+      await currentUser.delete();
     } catch {
       setAuthError("Hubo un error al eliminar tu cuenta. Intentá de nuevo.");
     } finally {
