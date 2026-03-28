@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth, GoogleAuthProvider, EmailAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, EmailAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -19,3 +19,14 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const emailProvider = new EmailAuthProvider();
 export const storage = getStorage(app);
+
+export async function reauthenticateUser(user, password) {
+  const providerId = user.providerData[0]?.providerId;
+  if (providerId === "google.com") {
+    const provider = new GoogleAuthProvider();
+    await reauthenticateWithPopup(user, provider);
+  } else {
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+  }
+}

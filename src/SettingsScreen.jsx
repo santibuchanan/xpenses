@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, reauthenticateUser } from "./firebase";
 import { useTheme, CURRENCIES as CURRENCIES_MAP } from "./theme.jsx";
 import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
 import DateInput from "./DateInput";
@@ -376,6 +376,106 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
   );
 }
 
+function DeleteAccountModal({ onClose, colors, currentUser }) {
+  const [step, setStep] = useState(1);
+  const [confirmText, setConfirmText] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const { dragY, isDragging, handlers } = useSwipeSheet({ onClose });
+
+  const canDelete = confirmText === "ELIMINAR";
+  const providerId = currentUser?.providerData[0]?.providerId;
+  const isGoogle = providerId === "google.com";
+
+  const handleVerify = async () => {
+    setAuthError("");
+    setVerifying(true);
+    try {
+      await reauthenticateUser(currentUser, password);
+      console.log("reauthenticated OK");
+    } catch {
+      setAuthError(isGoogle ? "No se pudo verificar con Google" : "Contraseña incorrecta");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
+      <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(44px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
+        <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+
+        {step === 1 && (
+          <>
+            <p style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: "0 0 12px", fontFamily: FONT }}>Eliminar tu cuenta</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 28px", lineHeight: 1.55, fontFamily: FONT }}>
+              Esta acción es irreversible. Se eliminarán todos tus datos: perfil, notificaciones y acceso a tus cuentas compartidas. Los gastos cargados por vos van a quedar registrados.
+            </p>
+            <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>Cancelar</button>
+            <button type="button" onClick={() => setStep(2)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.danger, color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>Continuar</button>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <p style={{ fontSize: 20, fontWeight: 700, color: colors.danger, margin: "0 0 12px", fontFamily: FONT }}>Confirmar eliminación</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 20px", lineHeight: 1.55, fontFamily: FONT }}>
+              Escribí <strong style={{ color: colors.text }}>ELIMINAR</strong> para confirmar.
+            </p>
+            <input
+              value={confirmText}
+              onChange={e => setConfirmText(e.target.value)}
+              placeholder="ELIMINAR"
+              autoCapitalize="characters"
+              style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${canDelete ? colors.danger : colors.inputBorder}`, fontSize: 15, marginBottom: 20, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+            />
+            <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>Cancelar</button>
+            <button
+              type="button"
+              onClick={() => setStep(3)}
+              disabled={!canDelete}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: canDelete ? colors.danger : colors.textMuted, color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: canDelete ? "pointer" : "default", fontFamily: FONT, opacity: canDelete ? 1 : 0.5 }}
+            >
+              Eliminar definitivamente
+            </button>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <p style={{ fontSize: 20, fontWeight: 700, color: colors.danger, margin: "0 0 12px", fontFamily: FONT }}>Verificar identidad</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 20px", lineHeight: 1.55, fontFamily: FONT }}>
+              Por seguridad, necesitamos confirmar que sos vos.
+            </p>
+            {!isGoogle && (
+              <input
+                type="password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setAuthError(""); }}
+                placeholder="Tu contraseña"
+                style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${authError ? colors.danger : colors.inputBorder}`, fontSize: 15, marginBottom: 8, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+              />
+            )}
+            {authError && (
+              <p style={{ fontSize: 13, color: colors.danger, margin: "0 0 12px", fontFamily: FONT }}>{authError}</p>
+            )}
+            <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>Cancelar</button>
+            <button
+              type="button"
+              onClick={handleVerify}
+              disabled={verifying || (!isGoogle && !password)}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.danger, color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, opacity: (verifying || (!isGoogle && !password)) ? 0.6 : 1 }}
+            >
+              {verifying ? "Verificando..." : isGoogle ? "Verificar con Google" : "Verificar"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsScreen({ currentUser, userProfile, account, members, allMembers, customCategories, fixedExpenses, onSignOut, onSwitchAccount }) {
   const { colors } = useTheme();
   const isPersonal = account?.type === "personal";
@@ -393,6 +493,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const [showInvite,        setShowInvite]        = useState(false);
   const [editingMember,     setEditingMember]     = useState(null);
   const [removingMember,    setRemovingMember]    = useState(null);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [removeLoading,     setRemoveLoading]     = useState(false);
   const [showBudgetEditor,  setShowBudgetEditor]  = useState(false);
   const [budgetTotal,       setBudgetTotal]       = useState((account?.categoryBudgets?._total || "").toString());
@@ -750,6 +851,17 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         ))}
       </div>
 
+      {/* ELIMINAR CUENTA */}
+      <SectionHeader title="Zona de peligro" colors={colors} />
+      <SettingRow
+        colors={colors}
+        icon="🗑️"
+        label="Eliminar mi cuenta"
+        value="Eliminá tu perfil y acceso a la app"
+        danger
+        onPress={() => setShowDeleteAccount(true)}
+      />
+
       <div style={{ height: 100 }} />
 
       {/* MODAL PRESUPUESTO */}
@@ -889,6 +1001,14 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           onDelete={handleDeleteMember}
           onClose={() => setEditingMember(null)}
           allMembers={allMembers}
+        />
+      )}
+
+      {showDeleteAccount && (
+        <DeleteAccountModal
+          colors={colors}
+          onClose={() => setShowDeleteAccount(false)}
+          currentUser={currentUser}
         />
       )}
     </div>
