@@ -91,7 +91,15 @@ export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, col
   };
 
   const cat = allCategories.find(c => c.id === e.category);
-  const payer = allMembers?.find(m => m.uid === e.paidBy);
+  const payer = (() => {
+    if (Array.isArray(e.paidBy)) {
+      const names = e.paidBy
+        .map(({ uid }) => allMembers?.find(m => m.uid === uid)?.name)
+        .filter(Boolean);
+      return names.length > 0 ? { name: names.join(" y ") } : null;
+    }
+    return allMembers?.find(m => m.uid === e.paidBy) || null;
+  })();
   const forWhomUids = Array.isArray(e.forWhom) ? e.forWhom : (e.forWhom ? [e.forWhom] : []);
   const PEEK = 80;
 

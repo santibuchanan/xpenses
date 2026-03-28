@@ -202,7 +202,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
     const paidByValue = multiPayer
       ? Object.entries(paidAmounts)
           .filter(([, v]) => (parseFloat(v) || 0) > 0)
-          .map(([uid, v]) => ({ uid, amount: parseFloat(v) }))
+          .map(([uid, v]) => ({ uid, amount: Math.round(parseFloat(v) * 100) / 100 }))
       : form.paidBy;
     try {
       await onAdd({ ...form, paidBy: paidByValue, amount, month: form.date.slice(0, 7) });

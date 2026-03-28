@@ -68,8 +68,18 @@ export async function removeMember({ accountId, memberUid, ownerUid, currentMont
       const updates = {};
       let hasChanges = false;
 
-      // paidBy → reasignar al owner de la cuenta
-      if (e.paidBy === memberUid) {
+      // paidBy → reasignar al owner de la cuenta (compatible con string y array)
+      if (Array.isArray(e.paidBy)) {
+        if (e.paidBy.some(p => p.uid === memberUid)) {
+          const remaining = e.paidBy.filter(p => p.uid !== memberUid);
+          updates.paidBy = remaining.length === 1 ? remaining[0].uid
+                         : remaining.length === 0 ? ownerUid
+                         : remaining;
+          updates.reassignedFrom = memberUid;
+          updates.reassignedAt = new Date().toISOString();
+          hasChanges = true;
+        }
+      } else if (e.paidBy === memberUid) {
         updates.paidBy = ownerUid;
         updates.reassignedFrom = memberUid;
         updates.reassignedAt = new Date().toISOString();
@@ -85,7 +95,10 @@ export async function removeMember({ accountId, memberUid, ownerUid, currentMont
 
       // type="mio" con owner = memberUid → reasignar
       if (e.type === "mio" && e.owner === memberUid) {
-        updates.owner = (e.paidBy && e.paidBy !== memberUid) ? e.paidBy : ownerUid;
+        const fallbackPayer = Array.isArray(e.paidBy)
+          ? (e.paidBy.find(p => p.uid !== memberUid)?.uid || ownerUid)
+          : (e.paidBy && e.paidBy !== memberUid ? e.paidBy : ownerUid);
+        updates.owner = fallbackPayer;
         hasChanges = true;
       }
 
