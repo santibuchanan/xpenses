@@ -16,6 +16,57 @@ const TYPE_DESCRIPTIONS = [
   { icon: "🙋🏼‍♂️", name: "Para mí", desc: "Un gasto tuyo que no se comparte con nadie. No afecta los saldos del grupo." },
 ];
 
+function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT }) {
+  const input = useAmountInput("");
+  const isMounted = useRef(false);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isMounted.current) { isMounted.current = true; return; }
+    onValueChange(uid, input.numericValue);
+  }, [input.numericValue]);
+
+  const [intPart = "", decPart] = (input.displayValue || "").split(",");
+
+  return (
+    <div style={{ position: "relative", width: 110, height: 38 }}>
+      {!focused && (
+        <div style={{
+          position: "absolute", inset: 0, display: "flex", alignItems: "center",
+          padding: "0 10px", pointerEvents: "none", zIndex: 2, fontFamily: FONT,
+        }}>
+          <span style={{ fontSize: 12, color: colors.textMuted, marginRight: 2 }}>{currSymbol}</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: intPart ? colors.inputText : colors.textMuted }}>
+            {intPart || "0"}
+          </span>
+          {decPart !== undefined && (
+            <span style={{ fontSize: 11, color: colors.inputText }}>,{decPart}</span>
+          )}
+        </div>
+      )}
+      <input
+        type="text" inputMode="decimal"
+        value={input.displayValue}
+        onChange={input.onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder={focused ? "0" : ""}
+        style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          padding: focused ? "0 10px 0 28px" : "0",
+          borderRadius: 10,
+          border: `2px solid ${colors.inputBorder}`,
+          fontSize: 16, fontFamily: FONT, outline: "none",
+          background: colors.input,
+          color: focused ? colors.inputText : "transparent",
+          caretColor: colors.inputText,
+          boxSizing: "border-box",
+        }}
+      />
+    </div>
+  );
+}
+
 export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, allMembers, currency, customCategories, isPersonal, isPozo, accountId }) {
   const { colors } = useTheme();
 
@@ -113,21 +164,29 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
   // Multi-payer state
   const [multiPayer, setMultiPayer] = useState(false);
   const [paidAmounts, setPaidAmounts] = useState({});
-  const [primaryPayer, setPrimaryPayer] = useState(currentUser.uid);
 
   const r2 = (n) => Math.round(n * 100) / 100;
 
-  const setPaidAmt = (uid, val) => {
-    setPaidAmounts(prev => {
-      const updated = { ...prev, [uid]: val };
-      // Autoajustar al pagador principal: total - suma del resto
-      const total = amountInput.numericValue || 0;
-      const othersTotal = Object.entries(updated)
-        .filter(([u]) => u !== primaryPayer)
-        .reduce((s, [, v]) => s + (parseFloat(v) || 0), 0);
-      updated[primaryPayer] = String(r2(Math.max(0, total - othersTotal)));
-      return updated;
-    });
+  const togglePayerSelection = (uid) => {
+    if (!multiPayer) {
+      if (uid === form.paidBy) return;
+      setPaidAmounts({ [form.paidBy]: 0, [uid]: 0 });
+      setMultiPayer(true);
+    } else {
+      const current = Object.keys(paidAmounts);
+      if (current.includes(uid)) {
+        const remaining = current.filter(u => u !== uid);
+        if (remaining.length === 1) {
+          set("paidBy", remaining[0]);
+          setPaidAmounts({});
+          setMultiPayer(false);
+        } else {
+          setPaidAmounts(prev => { const u = { ...prev }; delete u[uid]; return u; });
+        }
+      } else {
+        setPaidAmounts(prev => ({ ...prev, [uid]: 0 }));
+      }
+    }
   };
 
   const multiPayerTotal = Math.round(
@@ -259,64 +318,60 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
 
         {showPaidBy && (
           <>
-            <p style={labelStyle}>Pagó</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-              <button type="button"
-                onClick={() => {
-                  if (multiPayer) setMultiPayer(false);
-                }}
-                style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                  borderColor: !multiPayer ? "#4F7FFA" : colors.inputBorder,
-                  background: !multiPayer ? "#4F7FFA11" : colors.input,
-                  color: !multiPayer ? "#4F7FFA" : colors.textMuted }}>
-                👤 Un pagador
-              </button>
-              <button type="button"
-                onClick={() => {
-                  if (!multiPayer) {
-                    setPrimaryPayer(form.paidBy);
-                    setPaidAmounts({ [form.paidBy]: String(amountInput.numericValue || "") });
-                    setMultiPayer(true);
-                  }
-                }}
-                style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                  borderColor: multiPayer ? "#4F7FFA" : colors.inputBorder,
-                  background: multiPayer ? "#4F7FFA11" : colors.input,
-                  color: multiPayer ? "#4F7FFA" : colors.textMuted }}>
-                👥 Entre varios
-              </button>
-            </div>
-            {!multiPayer ? (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-                {memberList.map(m => (
-                  <button key={m.uid} onClick={() => set("paidBy", m.uid)}
-                    style={{ flex: 1, minWidth: 80, padding: 12, borderRadius: 14, border: "2px solid", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                      borderColor: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.inputBorder,
-                      background: form.paidBy === m.uid ? (m.color || "#4F7FFA") + "18" : colors.input,
-                      color: form.paidBy === m.uid ? (m.color || "#4F7FFA") : colors.textMuted }}>
-                    {m.name}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div style={{ marginBottom: 14 }}>
-                {memberList.map(m => (
-                  <div key={m.uid} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span style={{ flex: 1, fontWeight: 600, color: colors.text, fontFamily: FONT, fontSize: 14 }}>{m.name}</span>
-                    <span style={{ color: colors.textMuted, fontFamily: FONT, fontSize: 15 }}>{currSymbol}</span>
-                    <input type="text" inputMode="decimal"
-                      value={paidAmounts[m.uid] ?? ""}
-                      onChange={e => setPaidAmt(m.uid, e.target.value)}
-                      placeholder="0"
-                      style={{ width: 90, padding: "8px 10px", borderRadius: 10, border: `2px solid ${colors.inputBorder}`, fontSize: 14, fontFamily: FONT, outline: "none", background: colors.input, color: colors.inputText, boxSizing: "border-box" }} />
+            <p style={labelStyle}>Pagó (podés seleccionar varios)</p>
+            <div style={{ marginBottom: 14 }}>
+              {memberList.map(m => {
+                const isSelected = multiPayer ? (m.uid in paidAmounts) : form.paidBy === m.uid;
+                const mc = m.color || "#4F7FFA";
+                return (
+                  <div key={m.uid} style={{
+                    display: "flex", alignItems: "center", gap: 10, marginBottom: 8,
+                    padding: "10px 12px", borderRadius: 12,
+                    border: `2px solid ${isSelected ? mc : colors.inputBorder}`,
+                    background: isSelected ? mc + "18" : colors.input,
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => togglePayerSelection(m.uid)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10, flex: 1,
+                        background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT,
+                      }}
+                    >
+                      <span style={{
+                        width: 20, height: 20, borderRadius: 10, flexShrink: 0,
+                        border: `2px solid ${isSelected ? mc : colors.textMuted}`,
+                        background: isSelected ? mc : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 11, color: "#fff", fontWeight: 700,
+                      }}>
+                        {isSelected && "✓"}
+                      </span>
+                      <span style={{ fontWeight: 600, fontSize: 14, color: isSelected ? mc : colors.text, fontFamily: FONT }}>
+                        {m.name}
+                      </span>
+                    </button>
+                    {multiPayer && isSelected && (
+                      <PayerAmountInput
+                        uid={m.uid}
+                        onValueChange={(u, amt) => setPaidAmounts(prev => ({ ...prev, [u]: amt }))}
+                        currSymbol={currSymbol}
+                        colors={colors}
+                        FONT={FONT}
+                      />
+                    )}
                   </div>
-                ))}
-                <p style={{ fontSize: 12, textAlign: "right", fontFamily: FONT, fontWeight: 600, margin: "2px 0 0",
-                  color: Math.abs(multiPayerTotal - (amountInput.numericValue || 0)) < 0.01 ? "#27ae60" : "#e74c3c" }}>
+                );
+              })}
+              {multiPayer && (
+                <p style={{
+                  fontSize: 12, textAlign: "right", fontFamily: FONT, fontWeight: 600, margin: "4px 0 0",
+                  color: Math.abs(multiPayerTotal - (amountInput.numericValue || 0)) < 0.01 ? "#27ae60" : "#e74c3c",
+                }}>
                   Total: {currSymbol}{multiPayerTotal.toLocaleString("es-AR")} / {currSymbol}{(amountInput.numericValue || 0).toLocaleString("es-AR")}
                 </p>
-              </div>
-            )}
+              )}
+            </div>
           </>
         )}
 
