@@ -414,7 +414,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
             background: isSaveable ? "linear-gradient(135deg,#4F7FFA,#3a6ae8)" : "#aaa",
             color: "#fff", border: "none", fontSize: 16, fontWeight: 700,
             cursor: isSaveable ? "pointer" : "default", fontFamily: FONT }}>
-          {saving ? "Guardando..." : "Guardar cambios ✓"}
+          {saving ? "Guardando..." : "Guardar cambios"}
         </button>
       </div>
 

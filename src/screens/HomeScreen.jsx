@@ -99,7 +99,7 @@ function FixedExpenseHomeRow({ f, fmt, fs, currentMonth, allMembers, onMarkPaid 
               background: "linear-gradient(135deg,#2ecc71,#27ae60)", border: "none", borderRadius: 10,
               padding: "5px 10px", fontSize: 11, color: "#fff", cursor: "pointer", fontFamily: FONT, fontWeight: 700, whiteSpace: "nowrap",
             }}>
-              Pagar ✓
+              Pagar
             </button>
           )}
         </div>
@@ -154,7 +154,7 @@ function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, on
 
         <button onClick={handleConfirm} disabled={loading}
           style={{ width: "100%", padding: 15, borderRadius: 14, background: loading ? "#aaa" : "linear-gradient(135deg,#2ecc71,#27ae60)", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
-          {loading ? "Guardando..." : "Confirmar pago ✓"}
+          {loading ? "Guardando..." : "Confirmar pago"}
         </button>
         <button onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
       </div>
