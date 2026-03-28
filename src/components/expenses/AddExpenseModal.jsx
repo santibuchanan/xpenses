@@ -320,7 +320,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14, alignItems: "start" }}>
             {showPaidBy && (
               <div>
-                <p style={labelStyle}>Pagó (varios)</p>
+                <p style={labelStyle}>Pagado por</p>
                 <div>
                   {memberList.map(m => {
                     const isSelected = multiPayer ? (m.uid in paidAmounts) : form.paidBy === m.uid;
