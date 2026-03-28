@@ -855,7 +855,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       <button
         type="button"
         onClick={onSignOut}
-        style={{ width: "100%", padding: 16, borderRadius: 16, background: colors.card, border: "none", fontSize: 16, fontWeight: 500, color: colors.danger, cursor: "pointer", fontFamily: FONT, boxShadow: colors.shadow, marginBottom: 16 }}
+        style={{ width: "100%", padding: 16, borderRadius: 16, background: colors.card, border: "none", fontSize: 16, fontWeight: 500, color: colors.danger, cursor: "pointer", fontFamily: FONT, boxShadow: colors.shadow, marginBottom: 16, marginTop: 24 }}
       >
         Cerrar sesión
       </button>
