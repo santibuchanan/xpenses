@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc } from "firebase/firestore";
-import { db, reauthenticateUser } from "./firebase";
+import { db, reauthenticateUser, deleteUserData } from "./firebase";
 import { useTheme, CURRENCIES as CURRENCIES_MAP } from "./theme.jsx";
 import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
 import DateInput from "./DateInput";
@@ -393,9 +393,16 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
     setVerifying(true);
     try {
       await reauthenticateUser(currentUser, password);
-      console.log("reauthenticated OK");
     } catch {
       setAuthError(isGoogle ? "No se pudo verificar con Google" : "Contraseña incorrecta");
+      setVerifying(false);
+      return;
+    }
+    try {
+      await deleteUserData(currentUser.uid);
+      console.log("Firestore cleanup OK");
+    } catch {
+      setAuthError("Hubo un error al eliminar tu cuenta. Intentá de nuevo.");
     } finally {
       setVerifying(false);
     }
