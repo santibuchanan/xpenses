@@ -851,16 +851,22 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         ))}
       </div>
 
-      {/* ELIMINAR CUENTA */}
-      <SectionHeader title="Zona de peligro" colors={colors} />
-      <SettingRow
-        colors={colors}
-        icon="🗑️"
-        label="Eliminar mi cuenta"
-        value="Eliminá tu perfil y acceso a la app"
-        danger
-        onPress={() => setShowDeleteAccount(true)}
-      />
+      {/* CERRAR SESIÓN / ELIMINAR CUENTA */}
+      <button
+        type="button"
+        onClick={onSignOut}
+        style={{ width: "100%", padding: 16, borderRadius: 16, background: colors.card, border: "none", fontSize: 16, fontWeight: 500, color: colors.danger, cursor: "pointer", fontFamily: FONT, boxShadow: colors.shadow, marginBottom: 16 }}
+      >
+        Cerrar sesión
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setShowDeleteAccount(true)}
+        style={{ width: "100%", padding: 8, background: "none", border: "none", fontSize: 13, color: colors.textMuted, cursor: "pointer", fontFamily: FONT }}
+      >
+        Eliminar mi cuenta
+      </button>
 
       <div style={{ height: 100 }} />
 
