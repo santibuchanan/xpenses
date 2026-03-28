@@ -114,8 +114,9 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
         const accountRef = doc(db, "accounts", account.id);
         const userRef    = doc(db, "users", user.uid);
 
-        const [inviteSnap, userSnap] = await Promise.all([
+        const [inviteSnap, accountSnap, userSnap] = await Promise.all([
           tx.get(inviteRef),
+          tx.get(accountRef),
           tx.get(userRef),
         ]);
 
@@ -123,23 +124,23 @@ export default function InviteJoinScreen({ inviteId, onJoined, onError }) {
 
         const existingIds = userSnap.exists() ? (userSnap.data().accountIds || []) : [];
 
-        // Link reutilizable — nunca se marca como usado (Opción A)
-        tx.update(accountRef, { memberIds: arrayUnion(user.uid) });
-
         const userUpdate = {
           accountIds: existingIds.includes(account.id) ? existingIds : [...existingIds, account.id],
           setupDone: true,
         };
 
+        const accountUpdate = { memberIds: arrayUnion(user.uid) };
+
         if (selectedLabel) {
           const label = account.memberLabels?.find(l => l.id === selectedLabel);
           if (label?.name) userUpdate.name = label.name;
-          const updatedLabels = (account.memberLabels || []).map(l =>
+          const freshLabels = accountSnap.data()?.memberLabels || [];
+          accountUpdate.memberLabels = freshLabels.map(l =>
             l.id === selectedLabel ? { ...l, linkedUid: user.uid } : l
           );
-          tx.update(accountRef, { memberLabels: updatedLabels });
         }
 
+        tx.update(accountRef, accountUpdate);
         tx.set(userRef, userUpdate, { merge: true });
       });
 
