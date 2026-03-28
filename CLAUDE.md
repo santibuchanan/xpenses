@@ -50,6 +50,9 @@
   paidBy, forWhom[], owner, deleted, createdBy, createdAt }
 // Soft delete SIEMPRE: deleted: true — nunca borrado físico
 // Montos con precisión r2: Math.round(n * 100) / 100
+// paidBy: string (uid, pagador único) | Array<{uid, amount}> (multi-pagador)
+//   → NUNCA asumir que es string — usar getPaidEntries() de useBalances.js
+//   → calcSaldos(), getAmountPaidBy(), applyPaidBy() ya son retrocompatibles
 ```
 
 ### Account
@@ -134,6 +137,8 @@ style={{ touchAction: 'pan-y' }}
 - [ ] Soft delete (`deleted: true`), nunca borrado físico
 - [ ] Montos con precisión r2
 - [ ] `formatAmount()` de theme.jsx para mostrar montos
+- [ ] `paidBy` puede ser string o Array — nunca asumir tipo, usar `getPaidEntries()`
+- [ ] Multi-pagador: suma de amounts debe igualar `expense.amount`
 
 ### Notificaciones
 - [ ] Reglas de destinatarios correctas por tipo de gasto
@@ -164,3 +169,4 @@ style={{ touchAction: 'pan-y' }}
 - HomeScreen skeleton loading no funciona correctamente
 - Listeners duplicados en SettingsScreen (T1)
 - Íconos PWA no se muestran
+- `removeMember.js`: maneja array paidBy pero no redistribuye el monto del miembro eliminado entre los restantes (deuda técnica menor)

@@ -420,7 +420,7 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | Listeners en `AppInner` | `App.jsx` | Sin cleanup correcto → memory leaks o datos duplicados |
 | `account.disabledCategories` | `App.jsx`, `SettingsScreen`, `ConfigScreen` | Lógica diferente en create vs edit |
 | `isPozo` derivado de `account.type` | `App.jsx`, `HomeScreen`, `SaldosScreen`, modales | Cualquier cambio en el contrato de `type` rompe estas 4 capas |
-| `paidBy` dual-format | `useBalances.js`, `expenseFilters.js`, modales | String (viejo) vs Array<{uid,amount}> (nuevo) — usar siempre `getPaidEntries()` / `getAmountPaidBy()` |
+| `paidBy` dual-format | `useBalances.js`, `expenseFilters.js`, modales | String (viejo) vs Array<{uid,amount}> (nuevo) — usar siempre `getPaidEntries()` / `getAmountPaidBy()`. `calcSaldos()`, `applyPaidBy()`, `getAmountPaidBy()` ya son retrocompatibles ✅ |
 
 ### 🟡 Media prioridad
 
@@ -495,15 +495,21 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 - Se cierra correctamente después de guardar: `onClose()` fuera del try/catch de `onAdd()` (fix Mar 17)
 - Tipos en cuentas shared: Ordinario / Para otro / Extraordinario / Para mí
 - Tipos en cuentas pozo (`isPozo`): solo Ordinario y Extraordinario
-- Toggle "Pago compartido" → modo multi-pagador: inputs por miembro, indicador total rojo/verde
+- Sección PAGADO POR: grid 80/20 con PARA — lista de miembros con círculo toggle azul (#4F7FFA)
+- Multi-pagador: tap en segundo miembro activa modo multi-payer sin botón toggle; inputs de monto por pagador (120px, 28px alto, siempre muestra $, 2 decimales)
 - Validación: bloquea submit si total multi-payer ≠ monto del gasto (diff ≥ 0.01)
+- Sección PARA: círculos azules sin nombres, todos seleccionados por default, deseleccionables
+- `PayerAmountInput`: componente local con `useAmountInput`; acepta `initialValue`; $ siempre visible separado del overlay del número; overlay muestra 2 decimales fijos con `padEnd(2,"0")`
 
 ### EditExpenseModal ✅
 - Mismos tipos con misma lógica `isPozo` que AddExpenseModal
 - Sin botón X — swipe o confirmar descarte
 - Campo monto con símbolo de moneda
-- Toggle "Pago compartido" → modo multi-pagador; inicializa desde `expense.paidBy` si ya es array
+- Sección PAGADO POR + PARA: mismo diseño 80/20 que AddExpenseModal (Mar 28)
+- Multi-pagador: inicializa desde `expense.paidBy` si ya es array; `PayerAmountInput` recibe `initialValue` desde `paidAmounts[m.uid]`
+- `memberList` usa `profiles.filter(m => !!m.uid)` SIN filtrar `_isLabel` — labels vinculados deben aparecer en el edit
 - `isDirty` y `canSave()` consideran tanto modo single como multi-payer
+- `r2()` aplicado a amounts al guardar
 
 ### AccountSelectorScreen ✅
 - Skeleton loading mientras `accountsLoading`
@@ -546,11 +552,23 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | `visibleFixed` duplicado en HomeScreen/SaldosScreen | Baja | Deuda técnica |
 | Scroll lock de sheets no centralizado | Baja | Deuda técnica |
 | MenuPanel: label "Cuenta personal" no contempla pozo | Baja | Cosmético pendiente |
-| `SwipeableExpenseRow`: `allMembers.find(m => m.uid === e.paidBy)` rompe con multi-payer (muestra vacío) | Media | Deuda técnica Mar 17 |
+| `SwipeableExpenseRow`: maneja `paidBy` string o array — muestra nombre único o "Nombre1 y Nombre2" | ✅ Resuelto Mar 28 |
 | Notificaciones con destinatarios incorrectos — `getNotificationRecipients(expense)` reemplaza `otherMembers()` genérico; switch por tipo (hogar/personal/mio/extraordinary/settlement) | Mar 26 |
 | `handleFullSettle` notificaba a todos los miembros en lugar de solo al acreedor | Mar 26 |
 | `handlePartialSettle` no enviaba notificación — ahora notifica solo al acreedor | Mar 26 |
-| `removeMember.js`: `e.paidBy === memberUid` no maneja array → no detecta pagador en multi-payer | Baja | Deuda técnica Mar 17 |
+| `removeMember.js`: detecta y reasigna miembro en `paidBy` array; si queda 1 pagador convierte a string | ✅ Resuelto Mar 28 |
+
+### ✅ Resueltos Mar 28, 2026
+
+| Item | Sesión |
+|------|--------|
+| UI multi-pagador en AddExpenseModal: grid 80/20, PAGADO POR con círculos toggle, PARA con círculos azules sin nombres | Mar 28 |
+| UI multi-pagador portada a EditExpenseModal: mismo diseño, `initialValue` en PayerAmountInput | Mar 28 |
+| `paidBy` persistido como `Array<{uid,amount}>` en Firestore vía `addExpense` y `updateDoc` | Mar 28 |
+| `SwipeableExpenseRow`: payer display retrocompat string/array | Mar 28 |
+| `removeMember.js`: reasignación de paidBy array al eliminar miembro | Mar 28 |
+| `PayerAmountInput`: $ siempre visible al enfocar; 2 decimales fijos; `initialValue` prop | Mar 28 |
+| Checkmarks ✓ removidos de botones de acción (Guardar cambios, Pagar, Confirmar pago) | Mar 28 |
 
 ### ✅ Resueltos en sesiones anteriores
 
