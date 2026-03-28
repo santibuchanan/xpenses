@@ -16,7 +16,7 @@ const TYPE_DESCRIPTIONS = [
   { icon: "🙋🏼‍♂️", name: "Para mí", desc: "Un gasto tuyo que no se comparte con nadie. No afecta los saldos del grupo." },
 ];
 
-function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT }) {
+function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width = 80, height = 28 }) {
   const input = useAmountInput("");
   const isMounted = useRef(false);
   const [focused, setFocused] = useState(false);
@@ -29,18 +29,18 @@ function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT }) {
   const [intPart = "", decPart] = (input.displayValue || "").split(",");
 
   return (
-    <div style={{ position: "relative", width: 110, height: 38 }}>
+    <div style={{ position: "relative", width, height }}>
       {!focused && (
         <div style={{
           position: "absolute", inset: 0, display: "flex", alignItems: "center",
-          padding: "0 10px", pointerEvents: "none", zIndex: 2, fontFamily: FONT,
+          padding: "0 8px", pointerEvents: "none", zIndex: 2, fontFamily: FONT,
         }}>
-          <span style={{ fontSize: 12, color: colors.textMuted, marginRight: 2 }}>{currSymbol}</span>
-          <span style={{ fontSize: 16, fontWeight: 600, color: intPart ? colors.inputText : colors.textMuted }}>
+          <span style={{ fontSize: 11, color: colors.textMuted, marginRight: 1 }}>{currSymbol}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: intPart ? colors.inputText : colors.textMuted }}>
             {intPart || "0"}
           </span>
           {decPart !== undefined && (
-            <span style={{ fontSize: 11, color: colors.inputText }}>,{decPart}</span>
+            <span style={{ fontSize: 10, color: colors.inputText }}>,{decPart}</span>
           )}
         </div>
       )}
@@ -53,10 +53,10 @@ function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT }) {
         placeholder={focused ? "0" : ""}
         style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
-          padding: focused ? "0 10px 0 28px" : "0",
-          borderRadius: 10,
+          padding: focused ? "0 8px 0 24px" : "0",
+          borderRadius: 8,
           border: `2px solid ${colors.inputBorder}`,
-          fontSize: 16, fontFamily: FONT, outline: "none",
+          fontSize: 13, fontFamily: FONT, outline: "none",
           background: colors.input,
           color: focused ? colors.inputText : "transparent",
           caretColor: colors.inputText,
@@ -329,7 +329,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
                   return (
                     <div key={m.uid} style={{
                       display: "flex", alignItems: "center", gap: 8, marginBottom: 6,
-                      padding: "8px 10px", borderRadius: 12,
+                      height: 42, padding: "0 10px", borderRadius: 12,
                       border: `2px solid ${isPayer ? mc : colors.inputBorder}`,
                       background: isPayer ? mc + "18" : colors.input,
                     }}>
@@ -360,7 +360,6 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
                           currSymbol={currSymbol}
                           colors={colors}
                           FONT={FONT}
-                          width={80}
                         />
                       )}
                     </div>
@@ -377,28 +376,34 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
               </div>
             )}
 
-            {/* ── Para (20%) — círculos sin nombres ── */}
+            {/* ── Para (20%) — cajas alineadas con Pagado por ── */}
             {showForWhom && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <p style={{ ...labelStyle, marginBottom: 6, textAlign: "center", width: "100%" }}>Para</p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
-                  {memberList.map(m => {
-                    const sel = form.forWhom?.includes(m.uid);
-                    const mc = m.color || "#4F7FFA";
-                    return (
-                      <button key={m.uid} type="button" onClick={() => toggleForWhom(m.uid)}
-                        style={{
-                          width: 36, height: 36, borderRadius: 18, flexShrink: 0,
-                          border: `2px solid ${sel ? mc : colors.inputBorder}`,
-                          background: sel ? mc : colors.input,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          cursor: "pointer", padding: 0,
-                        }}>
-                        {sel && <span style={{ fontSize: 14, color: "#fff", fontWeight: 700 }}>✓</span>}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div>
+                <p style={{ ...labelStyle, textAlign: "center" }}>Para</p>
+                {memberList.map(m => {
+                  const sel = form.forWhom?.includes(m.uid);
+                  const mc = m.color || "#4F7FFA";
+                  return (
+                    <button key={m.uid} type="button" onClick={() => toggleForWhom(m.uid)}
+                      style={{
+                        width: "100%", height: 42, marginBottom: 6,
+                        borderRadius: 12, border: `2px solid ${sel ? mc : colors.inputBorder}`,
+                        background: sel ? mc + "18" : colors.input,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer", padding: 0,
+                      }}>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: 9,
+                        border: `2px solid ${sel ? mc : colors.textMuted}`,
+                        background: sel ? mc : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 10, color: "#fff", fontWeight: 700,
+                      }}>
+                        {sel && "✓"}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
 
