@@ -16,7 +16,7 @@ const TYPE_DESCRIPTIONS = [
   { icon: "🙋🏼‍♂️", name: "Para mí", desc: "Un gasto tuyo que no se comparte con nadie. No afecta los saldos del grupo." },
 ];
 
-function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width = 100, height = 28 }) {
+function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width = 120, height = 28 }) {
   const input = useAmountInput("");
   const isMounted = useRef(false);
   const [focused, setFocused] = useState(false);
