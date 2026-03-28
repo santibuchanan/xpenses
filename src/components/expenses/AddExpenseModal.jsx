@@ -16,7 +16,7 @@ const TYPE_DESCRIPTIONS = [
   { icon: "🙋🏼‍♂️", name: "Para mí", desc: "Un gasto tuyo que no se comparte con nadie. No afecta los saldos del grupo." },
 ];
 
-function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width = 80, height = 28 }) {
+function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width = 100, height = 28 }) {
   const input = useAmountInput("");
   const isMounted = useRef(false);
   const [focused, setFocused] = useState(false);
@@ -325,7 +325,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
                 <p style={labelStyle}>Pagado por</p>
                 {memberList.map(m => {
                   const isPayer = multiPayer ? (m.uid in paidAmounts) : form.paidBy === m.uid;
-                  const mc = m.color || "#4F7FFA";
+                  const mc = "#4F7FFA";
                   return (
                     <div key={m.uid} style={{
                       display: "flex", alignItems: "center", gap: 8, marginBottom: 6,
@@ -382,7 +382,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
                 <p style={{ ...labelStyle, textAlign: "center" }}>Para</p>
                 {memberList.map(m => {
                   const sel = form.forWhom?.includes(m.uid);
-                  const mc = m.color || "#4F7FFA";
+                  const mc = "#4F7FFA";
                   return (
                     <button key={m.uid} type="button" onClick={() => toggleForWhom(m.uid)}
                       style={{
