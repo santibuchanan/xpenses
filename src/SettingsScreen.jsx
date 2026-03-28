@@ -596,17 +596,23 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       {/* MIEMBROS */}
       <SectionHeader title="Miembros" colors={colors} />
       <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 10px", fontFamily: FONT }}>Deslizá a la izquierda para eliminar</p>
-      {members?.map(m => (
-        <SwipeableMemberRow
-          key={m.uid}
-          member={m}
-          isCurrentUser={m.uid === currentUser.uid}
-          onEdit={setEditingMember}
-          onRemoveRequest={setRemovingMember}
-          colors={colors}
-          showSalary={account?.type === 'shared' && account?.divisionSystem === 'proportional'}
-        />
-      ))}
+      {members?.map(m => {
+        const linkedLabel = memberLabels.find(l => l.linkedUid === m.uid);
+        const displayMember = linkedLabel
+          ? { ...m, name: linkedLabel.name, color: linkedLabel.color || m.color }
+          : m;
+        return (
+          <SwipeableMemberRow
+            key={m.uid}
+            member={displayMember}
+            isCurrentUser={m.uid === currentUser.uid}
+            onEdit={setEditingMember}
+            onRemoveRequest={setRemovingMember}
+            colors={colors}
+            showSalary={account?.type === 'shared' && account?.divisionSystem === 'proportional'}
+          />
+        );
+      })}
       {!isPersonal && unlinkedLabels.map(l => (
         <SwipeableMemberRow
           key={l.id}
