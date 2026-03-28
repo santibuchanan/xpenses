@@ -9,8 +9,8 @@ import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
-function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width = 120, height = 28 }) {
-  const input = useAmountInput("");
+function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width = 120, height = 28, initialValue = "" }) {
+  const input = useAmountInput(initialValue);
   const isMounted = useRef(false);
   const [focused, setFocused] = useState(false);
   useEffect(() => {
@@ -359,6 +359,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
                           currSymbol={currSymbol}
                           colors={colors}
                           FONT={FONT}
+                          initialValue={parseFloat(paidAmounts[m.uid]) || ""}
                         />
                       )}
                     </div>
