@@ -146,7 +146,8 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
     }
   };
 
-  const memberList = profiles.filter(m => !!m.uid && !m._isLabel);
+  // Edit muestra todos los perfiles (incluyendo labels vinculados) — no filtrar _isLabel
+  const memberList = profiles.filter(m => !!m.uid);
 
   const togglePayerSelection = (uid) => {
     if (!multiPayer) {
