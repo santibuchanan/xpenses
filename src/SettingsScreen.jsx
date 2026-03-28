@@ -194,11 +194,15 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
   );
 }
 
-function EditMemberModal({ member, onSave, onClose, onDelete, colors }) {
+function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers = [] }) {
   const [name, setName]   = useState(member.name || "");
   const [color, setColor] = useState(member.color || MEMBER_COLORS[0]);
   const [showDiscard, setShowDiscard] = useState(false);
 
+  const trimmed = name.trim();
+  const isDuplicate = trimmed.length > 0 && allMembers.some(
+    m => m.name.toLowerCase() === trimmed.toLowerCase() && m.uid !== member.uid
+  );
   const isDirty = name !== (member.name || "") || color !== (member.color || MEMBER_COLORS[0]);
   const handleClose = () => { if (isDirty) { setShowDiscard(true); return; } onClose(); };
   const { dragY, isDragging, handlers } = useSwipeSheet({ onClose: handleClose });
@@ -212,14 +216,17 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors }) {
           <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>{member.id ? "Editar miembro" : "Nuevo miembro"}</p>
           <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del integrante" style={inputStyle} />
+          {isDuplicate && (
+            <p style={{ color: "#ff6b6b", fontSize: 13, margin: "-10px 0 12px", fontFamily: FONT }}>Ya existe un miembro con ese nombre en la cuenta</p>
+          )}
           <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 10, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Color</p>
           <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
             {MEMBER_COLORS.map(c => (
               <button key={c} onClick={() => setColor(c)} style={{ width: 36, height: 36, borderRadius: 18, background: c, border: color === c ? "3px solid #fff" : "3px solid transparent", cursor: "pointer", boxShadow: color === c ? `0 0 0 2px ${c}` : "none" }} />
             ))}
           </div>
-          <button onClick={() => onSave({ ...member, name: name.trim(), color })} disabled={!name.trim()}
-            style={{ width: "100%", padding: 14, borderRadius: 14, background: !name.trim() ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: !name.trim() ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
+          <button onClick={() => onSave({ ...member, name: trimmed, color })} disabled={!trimmed || isDuplicate}
+            style={{ width: "100%", padding: 14, borderRadius: 14, background: (!trimmed || isDuplicate) ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: (!trimmed || isDuplicate) ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
             Guardar
           </button>
           {member.id && !member.linkedUid && (
@@ -881,6 +888,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           onSave={handleSaveMember}
           onDelete={handleDeleteMember}
           onClose={() => setEditingMember(null)}
+          allMembers={allMembers}
         />
       )}
     </div>
