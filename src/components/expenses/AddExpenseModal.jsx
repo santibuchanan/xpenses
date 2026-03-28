@@ -16,7 +16,7 @@ const TYPE_DESCRIPTIONS = [
   { icon: "🙋🏼‍♂️", name: "Para mí", desc: "Un gasto tuyo que no se comparte con nadie. No afecta los saldos del grupo." },
 ];
 
-function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width = 110 }) {
+function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT }) {
   const input = useAmountInput("");
   const isMounted = useRef(false);
   const [focused, setFocused] = useState(false);
@@ -29,7 +29,7 @@ function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width 
   const [intPart = "", decPart] = (input.displayValue || "").split(",");
 
   return (
-    <div style={{ position: "relative", width, height: 38 }}>
+    <div style={{ position: "relative", width: 110, height: 38 }}>
       {!focused && (
         <div style={{
           position: "absolute", inset: 0, display: "flex", alignItems: "center",
@@ -335,7 +335,8 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
                     }}>
                       <button type="button" onClick={() => togglePayerSelection(m.uid)}
                         style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0,
-                          background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT }}>
+                          background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT,
+                          textAlign: "left" }}>
                         <span style={{
                           width: 18, height: 18, borderRadius: 9, flexShrink: 0,
                           border: `2px solid ${isPayer ? mc : colors.textMuted}`,
@@ -347,7 +348,8 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
                         </span>
                         <span style={{ fontWeight: 600, fontSize: 13, color: isPayer ? mc : colors.text,
                           fontFamily: FONT, flex: 1, minWidth: 0,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          textAlign: "left" }}>
                           {m.name}
                         </span>
                       </button>
@@ -377,8 +379,8 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
 
             {/* ── Para (20%) — círculos sin nombres ── */}
             {showForWhom && (
-              <div>
-                <p style={labelStyle}>Para</p>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <p style={{ ...labelStyle, marginBottom: 6, textAlign: "center", width: "100%" }}>Para</p>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
                   {memberList.map(m => {
                     const sel = form.forWhom?.includes(m.uid);
