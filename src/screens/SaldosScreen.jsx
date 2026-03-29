@@ -498,7 +498,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Total del mes</p>
-                <p style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 800, color: "#f39c12", fontFamily: FONT }}>{fmt(totalSpent)}</p>
+                <p style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 800, color: "#4F7FFA", fontFamily: FONT }}>{fmt(totalSpent)}</p>
               </div>
               {totalDelta !== null && (
                 <div style={{ background: totalDelta > 0 ? "#e74c3c18" : "#2ecc7118", borderRadius: 12, padding: "6px 12px", textAlign: "center" }}>
@@ -525,7 +525,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
                   <p style={{ margin: 0, fontSize: 11, fontWeight: 700, fontFamily: FONT, color: totalBudgetPct >= 100 ? "#e74c3c" : colors.textMuted }}>{fmt(totalBudget)}</p>
                 </div>
                 <div style={{ background: colors.divider, borderRadius: 6, height: 6, overflow: "hidden" }}>
-                  <div style={{ height: 6, borderRadius: 6, width: `${totalBudgetPct}%`, background: totalBudgetPct >= 100 ? "#e74c3c" : totalBudgetPct >= 80 ? "#f39c12" : "#f39c12", transition: "width 0.4s ease" }} />
+                  <div style={{ height: 6, borderRadius: 6, width: `${totalBudgetPct}%`, background: totalBudgetPct >= 100 ? "#e74c3c" : totalBudgetPct >= 80 ? "#f39c12" : "#4F7FFA", transition: "width 0.4s ease" }} />
                 </div>
                 <p style={{ margin: "4px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT, textAlign: "right" }}>
                   {fmt(Math.max(0, totalBudget - totalSpent))} disponible
@@ -551,7 +551,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
               }}>
                 {m.photo
                   ? <img src={m.photo} style={{ width: 38, height: 38, borderRadius: 19, flexShrink: 0 }} alt="" />
-                  : <div style={{ width: 38, height: 38, borderRadius: 19, background: (m.color || "#f39c12") + "22", border: `2px solid ${(m.color || "#f39c12") + "44"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: m.color || "#f39c12", flexShrink: 0, fontFamily: FONT }}>
+                  : <div style={{ width: 38, height: 38, borderRadius: 19, background: (m.color || "#4F7FFA") + "22", border: `2px solid ${(m.color || "#4F7FFA") + "44"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: m.color || "#4F7FFA", flexShrink: 0, fontFamily: FONT }}>
                       {m.name?.[0]?.toUpperCase() || "?"}
                     </div>}
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: colors.text, fontFamily: FONT, flex: 1 }}>
@@ -563,7 +563,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
                     {((m.total / totalSpent) * 100).toFixed(0)}%
                   </p>
                 )}
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: "#f39c12", fontFamily: FONT }}>{fmt(m.total)}</p>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: "#4F7FFA", fontFamily: FONT }}>{fmt(m.total)}</p>
               </div>
             ))}
           </div>
@@ -573,7 +573,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
             <div style={{ background: colors.card, borderRadius: 20, padding: 16, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
               <p style={{ margin: "0 0 14px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Por categoría</p>
               {catTotalsWithCompare.map((c, idx) => {
-                const barColor = c.pct >= 100 ? "#e74c3c" : c.pct >= 80 ? "#f39c12" : "#f39c12";
+                const barColor = c.pct >= 100 ? "#e74c3c" : c.pct >= 80 ? "#f39c12" : "#4F7FFA";
                 return (
                   <div key={c.id} style={{ marginBottom: idx < catTotalsWithCompare.length - 1 ? 14 : 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
@@ -594,7 +594,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
                       <div style={{
                         height: 5, borderRadius: 4,
                         width: c.budget > 0 ? `${c.pct}%` : `${Math.min(100, (c.total / catTotalsWithCompare[0].total) * 100)}%`,
-                        background: c.budget > 0 ? barColor : "#f39c12",
+                        background: c.budget > 0 ? barColor : "#4F7FFA",
                         transition: "width 0.4s ease",
                       }} />
                     </div>

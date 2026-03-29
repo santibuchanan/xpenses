@@ -289,7 +289,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
             <>
               {(allMembers || []).filter(m => !!m.uid).map(m => {
                 const mTotal = monthExp.reduce((s, e) => s + getAmountPaidBy(e, m.uid), 0);
-                return <StatPill key={m.uid} label={m.name} value={fmt(mTotal)} color={m.color || "#f39c12"} />;
+                return <StatPill key={m.uid} label={m.name} value={fmt(mTotal)} color={m.color || "#4F7FFA"} />;
               })}
             </>
           ) : (
