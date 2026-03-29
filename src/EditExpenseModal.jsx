@@ -72,7 +72,7 @@ function getPerspectiveType(expense, currentUserUid) {
   return iAmDest ? "mio" : "personal";
 }
 
-export default function EditExpenseModal({ expense, members, allMembers, customCategories, currentUser, isPozo, onClose, onSave }) {
+export default function EditExpenseModal({ expense, members, allMembers, customCategories, currentUser, isPozo, isPersonal, onClose, onSave }) {
   const { colors } = useTheme();
   const profiles = (allMembers || members || []);
   const currSymbol = CURRENCIES["ARS"]?.symbol || "$";
@@ -259,23 +259,27 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
           <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Editar Gasto</span>
         </div>
 
-        {/* TIPO — muestra perspectiva del usuario */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-          <p style={{ ...labelStyle, marginBottom: 0 }}>Tipo</p>
-          <button type="button" onClick={() => setShowTypeHelp(true)}
-            style={{ width: 18, height: 18, borderRadius: 9, background: colors.pill, border: `1px solid ${colors.inputBorder}`, cursor: "pointer", fontSize: 10, fontWeight: 700, color: colors.textMuted, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontFamily: FONT }}>?</button>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-          {visibleTypes.map(([val, lbl]) => (
-            <button key={val} onClick={() => setTypeFromPerspective(val)}
-              style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                borderColor: displayType === val ? "#4F7FFA" : colors.inputBorder,
-                background: displayType === val ? "#4F7FFA11" : colors.input,
-                color: displayType === val ? "#4F7FFA" : colors.textMuted }}>
-              {lbl}
-            </button>
-          ))}
-        </div>
+        {!isPersonal && (
+          <>
+            {/* TIPO — muestra perspectiva del usuario */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <p style={{ ...labelStyle, margin: 0 }}>Tipo</p>
+              <button type="button" onClick={() => setShowTypeHelp(true)}
+                style={{ width: 18, height: 18, borderRadius: 9, background: colors.pill, border: `1px solid ${colors.inputBorder}`, cursor: "pointer", fontSize: 10, fontWeight: 700, color: colors.textMuted, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontFamily: FONT }}>?</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+              {visibleTypes.map(([val, lbl]) => (
+                <button key={val} onClick={() => setTypeFromPerspective(val)}
+                  style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                    borderColor: displayType === val ? "#4F7FFA" : colors.inputBorder,
+                    background: displayType === val ? "#4F7FFA11" : colors.input,
+                    color: displayType === val ? "#4F7FFA" : colors.textMuted }}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* CONCEPTO */}
         <p style={labelStyle}>Concepto</p>
