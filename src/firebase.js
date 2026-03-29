@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, writeBatch, collection, query, where, getDocs, doc, arrayRemove } from "firebase/firestore";
-import { getAuth, GoogleAuthProvider, EmailAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, EmailAuthProvider } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -66,15 +66,4 @@ export async function deleteUserData(uid) {
 
   // 5. Commit
   await batch.commit();
-}
-
-export async function reauthenticateUser(user, password) {
-  const providerId = user.providerData[0]?.providerId;
-  if (providerId === "google.com") {
-    const provider = new GoogleAuthProvider();
-    await reauthenticateWithPopup(user, provider);
-  } else {
-    const credential = EmailAuthProvider.credential(user.email, password);
-    await reauthenticateWithCredential(user, credential);
-  }
 }
