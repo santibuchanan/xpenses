@@ -28,7 +28,7 @@ const EMOJI_OPTIONS = [
 
 const DIVISION_SYSTEMS = [
   { id: "proportional", label: "Proporcional al ingreso", icon: "📊", desc: "Ideal para parejas que conviven. Cada uno aporta según su sueldo." },
-  { id: "50_50",        label: "Partes iguales",          icon: "⚖️", desc: "Cada uno paga exactamente la mitad." },
+  { id: "50_50",        label: "Partes iguales",          icon: "⚖️", desc: "Para grupos donde todos contribuyen por igual. Si gastaron $100 entre 4 personas, cada uno debe $25 sin importar quién pagó." },
   { id: "pozo",         label: "Pozo Común",              icon: "🪣", desc: "Registrá gastos de un fondo común. Sin saldos entre miembros." },
 ];
 
