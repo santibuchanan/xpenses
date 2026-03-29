@@ -386,9 +386,16 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
   const isGoogle = currentUser?.providerData[0]?.providerId === "google.com";
 
   const doDelete = async () => {
+    console.log("1. Iniciando doDelete para uid:", currentUser.uid);
+    console.log("2. Provider:", currentUser.providerData[0]?.providerId);
+    console.log("3. Llamando deleteUserData...");
     await deleteUserData(currentUser.uid);
+    console.log("4. deleteUserData completado");
+    console.log("5. Llamando user.delete()...");
     await currentUser.delete();
+    console.log("6. user.delete() completado");
     localStorage.removeItem("pendingInviteId");
+    console.log("7. Redirigiendo...");
     window.location.replace(window.location.origin);
   };
 
@@ -398,11 +405,11 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
     try {
       await doDelete();
     } catch (e) {
+      console.error("handleDelete catch:", e.code, e.message, e);
       if (e.code === "auth/requires-recent-login") {
         setStep(2);
         setLoading(false);
       } else {
-        console.error("Error eliminando cuenta:", e);
         setError("No se pudo eliminar la cuenta. Intentá de nuevo.");
         setLoading(false);
       }
@@ -414,7 +421,8 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
     setLoading(true);
     try {
       await reauthenticateUser(currentUser, password);
-    } catch {
+    } catch (e) {
+      console.error("handleReauth catch (reauth):", e.code, e.message, e);
       setError(isGoogle ? "No se pudo verificar con Google. Intentá de nuevo." : "Contraseña incorrecta.");
       setLoading(false);
       return;
@@ -422,7 +430,7 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
     try {
       await doDelete();
     } catch (e) {
-      console.error("Error eliminando cuenta:", e);
+      console.error("handleReauth catch (doDelete):", e.code, e.message, e);
       setError("No se pudo eliminar la cuenta. Intentá de nuevo.");
       setLoading(false);
     }
