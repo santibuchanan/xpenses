@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc } from "firebase/firestore";
-import { db, deleteUserData } from "./firebase";
+import { db, deleteUserData, reauthenticateUser } from "./firebase";
 import { useTheme, CURRENCIES as CURRENCIES_MAP } from "./theme.jsx";
 import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
 import DateInput from "./DateInput";
@@ -377,12 +377,24 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
 }
 
 function DeleteAccountModal({ onClose, colors, currentUser }) {
-  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(1);
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const { dragY, isDragging, handlers } = useSwipeSheet({ onClose });
 
-  const handleDelete = async () => {
+  const isGoogle = currentUser?.providerData[0]?.providerId === "google.com";
+
+  const handleConfirm = async () => {
+    setError("");
     setLoading(true);
+    try {
+      await reauthenticateUser(currentUser, password);
+    } catch {
+      setError(isGoogle ? "No se pudo verificar con Google. Intentá de nuevo." : "Contraseña incorrecta.");
+      setLoading(false);
+      return;
+    }
     try {
       await deleteUserData(currentUser.uid);
       await currentUser.delete();
@@ -399,22 +411,47 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 300, display: "flex", alignItems: "flex-end" }}>
       <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px calc(44px + env(safe-area-inset-bottom))", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
         <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
-        <p style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: "0 0 12px", fontFamily: FONT }}>Eliminar tu cuenta</p>
-        <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 28px", lineHeight: 1.55, fontFamily: FONT }}>
-          Esta acción es irreversible. Se eliminarán todos tus datos: perfil, notificaciones y acceso a tus cuentas compartidas. Los gastos cargados por vos van a quedar registrados.
-        </p>
-        {error && (
-          <p style={{ fontSize: 13, color: colors.danger, margin: "0 0 12px", fontFamily: FONT }}>{error}</p>
+
+        {step === 1 && (
+          <>
+            <p style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: "0 0 12px", fontFamily: FONT }}>Eliminar tu cuenta</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 28px", lineHeight: 1.55, fontFamily: FONT }}>
+              Esta acción es irreversible. Se eliminarán todos tus datos: perfil, notificaciones y acceso a tus cuentas compartidas. Los gastos cargados por vos van a quedar registrados.
+            </p>
+            <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>Cancelar</button>
+            <button type="button" onClick={() => setStep(2)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.danger, color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>Sí, eliminar</button>
+          </>
         )}
-        <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>Cancelar</button>
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={loading}
-          style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.danger, color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, opacity: loading ? 0.6 : 1 }}
-        >
-          {loading ? "Eliminando..." : "Sí, eliminar"}
-        </button>
+
+        {step === 2 && (
+          <>
+            <p style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: "0 0 12px", fontFamily: FONT }}>Confirmá tu identidad</p>
+            <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 20px", lineHeight: 1.55, fontFamily: FONT }}>
+              Por seguridad, necesitamos verificar que sos vos antes de eliminar la cuenta.
+            </p>
+            {!isGoogle && (
+              <input
+                type="password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setError(""); }}
+                placeholder="Tu contraseña"
+                style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${error ? colors.danger : colors.inputBorder}`, fontSize: 15, marginBottom: 8, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
+              />
+            )}
+            {error && (
+              <p style={{ fontSize: 13, color: colors.danger, margin: "0 0 12px", fontFamily: FONT }}>{error}</p>
+            )}
+            <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>Cancelar</button>
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={loading || (!isGoogle && !password)}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.danger, color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, opacity: (loading || (!isGoogle && !password)) ? 0.6 : 1 }}
+            >
+              {loading ? "Eliminando..." : isGoogle ? "Verificar con Google y eliminar" : "Confirmar y eliminar"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
