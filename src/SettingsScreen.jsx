@@ -401,8 +401,9 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
     try {
       await deleteUserData(currentUser.uid);
       await currentUser.delete();
+      window.location.replace(window.location.origin);
     } catch {
-      setAuthError("Hubo un error al eliminar tu cuenta. Intentá de nuevo.");
+      setAuthError("No se pudo eliminar la cuenta. Intentá de nuevo.");
     } finally {
       setVerifying(false);
     }
