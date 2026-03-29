@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, writeBatch, collection, query, where, getDocs, doc, arrayRemove } from "firebase/firestore";
+import { getFirestore, writeBatch, collection, query, where, getDocs, getDoc, doc, arrayRemove } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider, EmailAuthProvider } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
@@ -61,8 +61,11 @@ export async function deleteUserData(uid) {
     });
   }
 
-  // 4. Eliminar documento del usuario
-  batch.delete(doc(db, "users", uid));
+  // 4. Eliminar documento del usuario (solo si existe)
+  const userSnap = await getDoc(doc(db, "users", uid));
+  if (userSnap.exists()) {
+    batch.delete(doc(db, "users", uid));
+  }
 
   // 5. Commit
   await batch.commit();

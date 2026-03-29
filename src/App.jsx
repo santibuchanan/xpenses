@@ -571,17 +571,6 @@ function AppInner() {
   if (showWelcome && showEmailAuth) return <EmailAuthScreen onBack={() => setShowEmailAuth(false)} onEnter={() => { setShowEmailAuth(false); setShowWelcome(false); }} />;
   if (showWelcome) return <WelcomeScreen onEnter={() => setShowWelcome(false)} onEmailClick={() => setShowEmailAuth(true)} />;
   if (!authUser) return <AuthScreen />;
-  // Si hay un invite pendiente, no mostrar ConfigScreen — el usuario llegó por invitación
-  // y va a ser agregado a una cuenta existente, no necesita crear una nueva.
-  if (!userProfile?.setupDone && !pendingInviteId && !claimData && !inviteIdFromUrl) {
-    if (!onboardingDone) return (
-      <OnboardingScreen
-        user={authUser}
-        onDone={() => { localStorage.setItem("xpenses-onboarding-done", "1"); setOnboardingDone(true); }}
-      />
-    );
-    return <ConfigScreen user={authUser} onDone={() => {}} />;
-  }
   if (!selectedAccountId && accountsLoading) return <Spinner text="Cargando cuentas..." />;
   if (!selectedAccountId) return (
     <AccountSelectorScreen
