@@ -402,7 +402,8 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     account.memberIds.every(uid => realMembers.some(m => m.uid === uid));
   const totalSalary  = (realMembers || []).reduce((acc, mb) => acc + (mb.salary || 0), 0);
 
-  const isPozo = account?.type === "pozo";
+  const isPozo     = account?.type === "pozo";
+  const isPersonal = account?.type === "personal";
   const allCategories = customCategories || [];
   const catTotals = allCategories
     .map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) }))
@@ -448,6 +449,21 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   })();
 
+  // Vista personal — datos del mes navegable (historyMonth)
+  const personalMonthExp    = isPersonal ? expenses.filter(e => e.month === historyMonth && !e.deleted) : [];
+  const personalTotalSpent  = personalMonthExp.reduce((s, e) => s + e.amount, 0);
+  const personalCatData     = isPersonal
+    ? (customCategories || [])
+        .map(c => {
+          const total  = personalMonthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0);
+          const budget = categoryBudgets?.[c.id] || 0;
+          const pct    = budget > 0 ? Math.min(100, (total / budget) * 100) : 0;
+          return { ...c, total, budget, pct };
+        })
+        .filter(c => c.total > 0)
+        .sort((a, b) => b.total - a.total)
+    : [];
+
   const historyItems = (settlements || [])
     .filter(s => s.month === historyMonth && !s.isCorrection && s.amount > 0)
     .sort((a, b) => {
@@ -477,9 +493,62 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
-      <SectionTitle>{isPozo ? "Resumen del Pozo" : "Saldos del mes"}</SectionTitle>
+      <SectionTitle>{isPersonal ? "Gastos del mes" : isPozo ? "Resumen del Pozo" : "Saldos del mes"}</SectionTitle>
 
-      {showSaldosTooltip && (
+      {/* Vista personal — reemplaza todo el contenido de saldos compartidos */}
+      {isPersonal && (
+        <>
+          {/* Navegador de mes */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, background: colors.card, borderRadius: 16, padding: "10px 16px", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` }}>
+            <button type="button" onClick={() => setHistoryMonth(shiftMonth(historyMonth, -1))}
+              style={{ background: colors.pill, border: "none", borderRadius: 10, padding: "6px 14px", fontSize: 16, cursor: "pointer", color: colors.text, lineHeight: 1 }}>←</button>
+            <span style={{ fontSize: 14, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{historyMonthLabel}</span>
+            <button type="button" onClick={() => canGoNext && setHistoryMonth(shiftMonth(historyMonth, 1))} disabled={!canGoNext}
+              style={{ background: canGoNext ? colors.pill : "transparent", border: "none", borderRadius: 10, padding: "6px 14px", fontSize: 16, cursor: canGoNext ? "pointer" : "default", color: canGoNext ? colors.text : colors.textMuted, lineHeight: 1, opacity: canGoNext ? 1 : 0.3 }}>→</button>
+          </div>
+
+          {/* Total del mes */}
+          <div style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Total del mes</p>
+            <p style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 800, color: "#4F7FFA", fontFamily: FONT }}>{fmt(personalTotalSpent)}</p>
+          </div>
+
+          {/* Gastos por categoría */}
+          {personalCatData.length > 0 ? (
+            <div style={{ background: colors.card, borderRadius: 20, padding: 16, boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
+              <p style={{ margin: "0 0 14px", fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, fontFamily: FONT }}>Por categoría</p>
+              {personalCatData.map((c, idx) => {
+                const barColor = c.budget > 0 ? (c.pct >= 100 ? "#e74c3c" : c.pct >= 80 ? "#f39c12" : "#4F7FFA") : "#4F7FFA";
+                const barWidth = c.budget > 0 ? `${c.pct}%` : `${Math.min(100, (c.total / (personalCatData[0]?.total || 1)) * 100)}%`;
+                return (
+                  <div key={c.id} style={{ marginBottom: idx < personalCatData.length - 1 ? 14 : 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                      <span style={{ fontSize: 18, width: 26, flexShrink: 0 }}>{c.icon}</span>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, flex: 1 }}>{c.label}</p>
+                      {c.budget > 0 && c.pct >= 80 && <span style={{ fontSize: 14 }}>{c.pct >= 100 ? "🚨" : "⚠️"}</span>}
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</p>
+                    </div>
+                    <div style={{ background: colors.divider, borderRadius: 4, height: 5, overflow: "hidden" }}>
+                      <div style={{ height: 5, borderRadius: 4, width: barWidth, background: barColor, transition: "width 0.4s ease" }} />
+                    </div>
+                    {c.budget > 0 && (
+                      <p style={{ margin: "3px 0 0", fontSize: 10, color: colors.textMuted, fontFamily: FONT, textAlign: "right" }}>
+                        {fmt(c.total)} / {fmt(c.budget)}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", padding: "40px 0" }}>
+              <p style={{ margin: 0, fontSize: 14, color: colors.textMuted, fontFamily: FONT }}>Sin gastos este mes</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {!isPersonal && showSaldosTooltip && (
         <div style={{ background: "#4F7FFA18", border: "1px solid #4F7FFA44", borderRadius: 16, padding: "12px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>
           <p style={{ flex: 1, margin: 0, fontSize: 13, color: colors.text, fontFamily: FONT, lineHeight: 1.5 }}>
@@ -491,7 +560,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       )}
 
       {/* Vista Pozo Común — ranking por integrante + categorías + presupuesto */}
-      {isPozo && (
+      {!isPersonal && isPozo && (
         <>
           {/* Resumen total del mes con comparación */}
           <div style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
@@ -612,7 +681,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       )}
 
       {/* Lista compacta estilo Tricount */}
-      {!isPozo && <div style={{ background: colors.card, borderRadius: 20, overflow: "hidden", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
+      {!isPersonal && !isPozo && <div style={{ background: colors.card, borderRadius: 20, overflow: "hidden", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
         {realMembers?.map((m, idx) => {
           const s = saldos[m.uid] || { paid: 0, owes: 0, balance: 0 };
           const isMe = m.uid === currentUser.uid;
@@ -663,7 +732,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       </div>}
 
       {/* Resumen de quién le debe a quién */}
-      {!isPozo && debtPairs.length > 0 && (
+      {!isPersonal && !isPozo && debtPairs.length > 0 && (
         <div style={{ background: colors.card, borderRadius: 20, padding: "14px 16px", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, margin: "0 0 10px", fontFamily: FONT }}>Quién le debe a quién</p>
           {debtPairs.filter(pair => pair.amount > 0).map(pair => {
@@ -692,7 +761,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
       )}
 
       {/* Historial colapsable con navegación por mes */}
-      {!isPozo && hasAnySettlements && (
+      {!isPersonal && !isPozo && hasAnySettlements && (
         <div style={{ background: colors.card, borderRadius: 20, overflow: "hidden", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}`, marginBottom: 16 }}>
 
           {/* Header toggle */}

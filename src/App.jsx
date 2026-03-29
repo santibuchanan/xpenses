@@ -520,10 +520,6 @@ function AppInner() {
     window.location.replace(window.location.origin);
   };
 
-  useEffect(() => {
-    if (account?.type === "personal" && tab === "saldos") setTab("home");
-  }, [account?.type, tab]);
-
   // Si hay invite en URL, mostrar InviteJoinScreen que maneja todo el flujo
   if (inviteIdFromUrl) return (
     <InviteJoinScreen
@@ -560,12 +556,8 @@ function AppInner() {
   const accountExpenses = expenses;
   const isPersonal = account?.type === "personal";
 
-  const NAV_LEFT = isPersonal
-    ? [{ id: "home", label: "Inicio" }, { id: "graficos", label: "Gráficos" }]
-    : [{ id: "home", label: "Inicio" }, { id: "saldos", label: "Saldos" }];
-  const NAV_RIGHT = isPersonal
-    ? [{ id: "ajustes", label: "Ajustes" }]
-    : [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }];
+  const NAV_LEFT  = [{ id: "home", label: "Inicio" }, { id: "saldos", label: "Saldos" }];
+  const NAV_RIGHT = [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }];
 
   return (
     <div style={{ width: "100%", maxWidth: 500, margin: "0 auto", background: colors.bg, minHeight: "100dvh", position: "relative", fontFamily: FONT, paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", boxSizing: "border-box", overflowX: "hidden" }}>
