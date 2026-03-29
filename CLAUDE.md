@@ -28,7 +28,7 @@
 |---------|------|--------|
 | `utils/normalizeMembers.js` | `buildAllMembers()` | Rompe AddExpenseModal, SaldosScreen, HomeScreen |
 | `hooks/useBalances.js` | `calcSaldos()` | Afecta saldos en HomeScreen y SaldosScreen |
-| `App.jsx` | `inviteIdFromUrl`, listeners | Lee hash al montar — no re-ejecuta |
+| `App.jsx` | `inviteIdFromUrl`, listeners, hashchange | Lee hash al montar + escucha `hashchange` para PWA abierta — no re-ejecuta el parse inicial |
 | `constants/categories.js` | `DEFAULT_CATEGORIES` | Cambiar afecta toda la app |
 | `vite.config.js` | workbox config | Puede romper Firebase Auth con PWA |
 
@@ -170,3 +170,17 @@ style={{ touchAction: 'pan-y' }}
 - Listeners duplicados en SettingsScreen (T1)
 - Íconos PWA no se muestran
 - `removeMember.js`: maneja array paidBy pero no redistribuye el monto del miembro eliminado entre los restantes (deuda técnica menor)
+
+## Patrones de eliminación de cuenta (firebase.js)
+
+```js
+// deleteUserData(uid) — limpia Firestore con writeBatch:
+// memberIds[], memberLabels[], notificaciones, users/{uid}
+// ⚠️ Siempre getDoc() antes de batch.delete() para evitar error si el doc no existe
+
+// reauthenticateUser(user, providerId, email?, password?) — re-auth antes de user.delete()
+// DeleteAccountModal en SettingsScreen: flujo 2 pasos
+//   paso 1 → intenta user.delete() directo
+//   paso 2 → solo si Firebase retorna auth/requires-recent-login
+//   Después del delete: limpia localStorage (pendingInviteId, etc.) y recarga
+```

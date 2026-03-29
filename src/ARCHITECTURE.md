@@ -2,7 +2,7 @@
 
 > **Propósito:** Referencia de arquitectura que debe consultarse antes de cada sprint. Evita regresiones en zonas frágiles.
 
-**Última actualización:** Sesión Mar 26, 2026
+**Última actualización:** Sesión Mar 28, 2026
 **Deploy:** https://xpenses-seven.vercel.app
 **Firebase project:** xpenses-305ee
 
@@ -287,15 +287,19 @@ Usuario abre: xpenses-seven.vercel.app/#invite=XXX
     │
     ▼
 App.jsx lee hash → inviteIdFromUrl !== null
+(Si PWA ya estaba abierta: hashchange listener detecta #invite=,
+ setea localStorage.pendingInviteId y recarga)
     │
     ▼
 Renderiza InviteJoinScreen (completamente autónomo)
     │
     ├── Carga invite y account desde Firestore
     ├── Muestra: "Te invitaron a {cuenta}"
+    ├── Guard: si uid ya está en memberIds → "ya sos miembro" (sin join)
     ├── Usuario se autentica (Google o email) — onAuthStateChanged interno
     ├── Si hay labels sin vincular → selector "¿Cuál sos vos?"
     └── runTransaction: agrega a memberIds, vincula label, setupDone: true
+        (Permitido por isSelfJoin() en firestore.rules)
     │
     ▼
 window.location.replace(origin) → recarga app con usuario autenticado
@@ -314,6 +318,11 @@ Orquestador principal. Contiene:
 - **`ClaimIdentityModal`** — modal para elegir identidad al unirse via invite (legacy, usado cuando no hay InviteJoinScreen)
 
 > ⚠️ Riesgo: Modificar cualquier sección puede afectar las otras. `inviteIdFromUrl` se lee del hash al montar — no re-ejecuta.
+
+**Comportamiento de routing al arrancar:**
+- Usuario sin cuentas → muestra `AccountSelectorScreen` vacío (sin auto-redirect a `ConfigScreen`)
+- `ConfigScreen` solo se muestra cuando el usuario lo inicia manualmente desde `AccountSelectorScreen`
+- Listener `hashchange` detecta `#invite=` si la PWA ya estaba abierta — setea `pendingInviteId` en `localStorage` y recarga para que el flujo de invite arranque limpio
 
 ### `hooks/useAccountData.js`
 
@@ -388,6 +397,7 @@ Props:
 Componente completamente autónomo — maneja todo el flujo de invite sin depender de App.jsx.
 - Carga datos del invite y la cuenta
 - Autentica al usuario inline (Google o email)
+- **Guard:** si el usuario ya está en `memberIds` → muestra "ya sos miembro" sin ejecutar join (evita escrituras innecesarias)
 - Si hay labels sin vincular → selector de identidad
 - `runTransaction` para join atómico
 - Al terminar: `window.location.replace(origin)`
@@ -395,6 +405,19 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 ### `SettingsScreen.jsx`
 
 > ⚠️ Tiene sus propios listeners de Firestore para categorías y gastos fijos — duplican los de `useFirestoreData`. Pendiente de limpiar (T1).
+
+**DeleteAccountModal** — flujo 2 pasos (simplificado):
+1. Paso 1: intenta `user.delete()` directo
+2. Paso 2: solo si Firebase retorna `auth/requires-recent-login` → muestra formulario de re-auth (email/contraseña o Google vía `reauthenticateUser()` en `firebase.js`) y reintenta
+- Después del delete: llama a `deleteUserData(uid)` para limpiar Firestore, limpia `localStorage` (incluyendo `pendingInviteId`) y recarga la app
+
+### `firebase.js`
+
+Config Firebase (db, auth) + funciones de operaciones de cuenta:
+- `deleteUserData(uid)` — limpia con `writeBatch`: remueve `uid` de `memberIds[]` y `memberLabels[linkedUid]` en todas las cuentas donde aparece, borra notificaciones del usuario, y borra `users/{uid}` (con `getDoc` previo para evitar error si el doc no existe)
+- `reauthenticateUser(user, providerId, email?, password?)` — re-autentica con email/contraseña o Google según `providerId`; usado por `DeleteAccountModal` cuando Firebase lanza `auth/requires-recent-login`
+
+> ⚠️ Regla de Firestore: `isSelfJoin()` en `firestore.rules` permite que un usuario se una via invite sin ser miembro previo (necesario para el flujo de `InviteJoinScreen`)
 
 ### `theme.jsx`
 
@@ -548,7 +571,7 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 |------|-----------|--------|
 | Listeners duplicados SettingsScreen (T1) | Media | Pendiente |
 | Push notifications (FCM) | Alta | Pendiente |
-| Eliminación de cuenta usuario | Media | En debugging Mar 17 — reglas Firestore corregidas, logs agregados |
+| Eliminación de cuenta usuario | ✅ Resuelto Mar 28 | DeleteAccountModal 2 pasos + deleteUserData() + reauthenticateUser() |
 | `visibleFixed` duplicado en HomeScreen/SaldosScreen | Baja | Deuda técnica |
 | Scroll lock de sheets no centralizado | Baja | Deuda técnica |
 | MenuPanel: label "Cuenta personal" no contempla pozo | Baja | Cosmético pendiente |
@@ -569,6 +592,14 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 | `removeMember.js`: reasignación de paidBy array al eliminar miembro | Mar 28 |
 | `PayerAmountInput`: $ siempre visible al enfocar; 2 decimales fijos; `initialValue` prop | Mar 28 |
 | Checkmarks ✓ removidos de botones de acción (Guardar cambios, Pagar, Confirmar pago) | Mar 28 |
+| DeleteAccountModal simplificado a 2 pasos — re-auth solo si `auth/requires-recent-login` | Mar 28 |
+| `deleteUserData()` con `writeBatch` — getDoc previo evita error si `users/{uid}` no existe | Mar 28 |
+| `reauthenticateUser()` en `firebase.js` — soporta email y Google | Mar 28 |
+| App.jsx: eliminado auto-redirect a ConfigScreen — usuario sin cuentas ve AccountSelectorScreen vacío | Mar 28 |
+| `InviteJoinScreen`: guard "ya sos miembro" — evita join si uid ya está en memberIds | Mar 28 |
+| App.jsx: listener `hashchange` para detectar `#invite=` con PWA ya abierta | Mar 28 |
+| `firestore.rules`: función `isSelfJoin()` permite unirse via invite sin ser miembro previo | Mar 28 |
+| localStorage `pendingInviteId` limpiado al eliminar cuenta | Mar 28 |
 
 ### ✅ Resueltos en sesiones anteriores
 
