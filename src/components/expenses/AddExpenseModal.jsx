@@ -12,7 +12,7 @@ const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sa
 const TYPE_DESCRIPTIONS = [
   { icon: "🛍️", name: "Ordinario", desc: "Un gasto habitual del grupo. Por default incluye a todos los miembros, pero podés modificar quiénes participan. En cuentas proporcionales, el monto se divide según el salario de cada uno; en cuentas de partes iguales, se divide en partes iguales." },
   { icon: "🫵🏽", name: "Para otro", desc: "Pagaste algo para uno o varios miembros específicos. Elegís para quién fue el gasto." },
-  { icon: "🏝️", name: "Extraordinario", desc: "Un gasto especial que no se repite. Podés dividir el pago entre varios y asignar cuánto puso cada uno." },
+  { icon: "🏝️", name: "Extraordinario", desc: "Un gasto donde cada miembro paga una parte específica. Siempre se divide en partes iguales entre los involucrados, independientemente del tipo de cuenta." },
   { icon: "🙋🏼‍♂️", name: "Para mí", desc: "Un gasto tuyo que no se comparte con nadie. No afecta los saldos del grupo." },
 ];
 
