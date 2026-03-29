@@ -814,8 +814,8 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         </div>
       </div>
 
-      {/* PRESUPUESTO — solo para cuentas Pozo Común */}
-      {account?.type === "pozo" && (
+      {/* PRESUPUESTO — Pozo Común, Proporcional y Partes iguales */}
+      {(account?.type === "pozo" || account?.divisionSystem === "proportional" || account?.divisionSystem === "50_50") && (
         <>
           <SectionHeader title="Presupuesto" colors={colors} />
           <div style={cardStyle}>
