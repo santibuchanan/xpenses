@@ -385,7 +385,31 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
 
   const isGoogle = currentUser?.providerData[0]?.providerId === "google.com";
 
-  const handleConfirm = async () => {
+  const doDelete = async () => {
+    await deleteUserData(currentUser.uid);
+    await currentUser.delete();
+    localStorage.removeItem("pendingInviteId");
+    window.location.replace(window.location.origin);
+  };
+
+  const handleDelete = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await doDelete();
+    } catch (e) {
+      if (e.code === "auth/requires-recent-login") {
+        setStep(2);
+        setLoading(false);
+      } else {
+        console.error("Error eliminando cuenta:", e);
+        setError("No se pudo eliminar la cuenta. Intentá de nuevo.");
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleReauth = async () => {
     setError("");
     setLoading(true);
     try {
@@ -396,10 +420,7 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
       return;
     }
     try {
-      await deleteUserData(currentUser.uid);
-      await currentUser.delete();
-      localStorage.removeItem("pendingInviteId");
-      window.location.replace(window.location.origin);
+      await doDelete();
     } catch (e) {
       console.error("Error eliminando cuenta:", e);
       setError("No se pudo eliminar la cuenta. Intentá de nuevo.");
@@ -418,8 +439,11 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
             <p style={{ fontSize: 14, color: colors.textMuted, margin: "0 0 28px", lineHeight: 1.55, fontFamily: FONT }}>
               Esta acción es irreversible. Se eliminarán todos tus datos: perfil, notificaciones y acceso a tus cuentas compartidas. Los gastos cargados por vos van a quedar registrados.
             </p>
+            {error && <p style={{ fontSize: 13, color: colors.danger, margin: "0 0 12px", fontFamily: FONT }}>{error}</p>}
             <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>Cancelar</button>
-            <button type="button" onClick={() => setStep(2)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.danger, color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>Sí, eliminar</button>
+            <button type="button" onClick={handleDelete} disabled={loading} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.danger, color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, opacity: loading ? 0.6 : 1 }}>
+              {loading ? "Eliminando..." : "Sí, eliminar"}
+            </button>
           </>
         )}
 
@@ -438,17 +462,15 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
                 style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${error ? colors.danger : colors.inputBorder}`, fontSize: 15, marginBottom: 8, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input }}
               />
             )}
-            {error && (
-              <p style={{ fontSize: 13, color: colors.danger, margin: "0 0 12px", fontFamily: FONT }}>{error}</p>
-            )}
+            {error && <p style={{ fontSize: 13, color: colors.danger, margin: "0 0 12px", fontFamily: FONT }}>{error}</p>}
             <button type="button" onClick={onClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>Cancelar</button>
             <button
               type="button"
-              onClick={handleConfirm}
+              onClick={handleReauth}
               disabled={loading || (!isGoogle && !password)}
               style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.danger, color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, opacity: (loading || (!isGoogle && !password)) ? 0.6 : 1 }}
             >
-              {loading ? "Eliminando..." : isGoogle ? "Verificar con Google y eliminar" : "Confirmar y eliminar"}
+              {loading ? "Verificando..." : isGoogle ? "Verificar con Google" : "Verificar"}
             </button>
           </>
         )}
