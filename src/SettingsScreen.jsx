@@ -401,6 +401,7 @@ function DeleteAccountModal({ onClose, colors, currentUser }) {
     try {
       await deleteUserData(currentUser.uid);
       await currentUser.delete();
+      localStorage.removeItem("pendingInviteId");
       window.location.replace(window.location.origin);
     } catch {
       setAuthError("No se pudo eliminar la cuenta. Intentá de nuevo.");
