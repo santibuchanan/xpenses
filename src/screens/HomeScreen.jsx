@@ -312,20 +312,29 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
 
             {catSectionExpanded && (
               <div>
-                {(catExpanded ? catTotals : catTotals.slice(0, 4)).map(c => (
-                  <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                    <span style={{ fontSize: 22, width: 30 }}>{c.icon}</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontSize: fs.base, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</span>
-                        <span style={{ fontSize: fs.base, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{fmt(c.total)}</span>
-                      </div>
-                      <div style={{ background: colors.divider, borderRadius: 4, height: 5 }}>
-                        <div style={{ background: "#4F7FFA", borderRadius: 4, height: 5, width: `${Math.min(100, (c.total / catTotals[0].total) * 100)}%` }} />
+                {(catExpanded ? catTotals : catTotals.slice(0, 4)).map(c => {
+                  const budget = account?.categoryBudgets?.[c.id];
+                  const pct = budget ? Math.min(100, (c.total / budget) * 100) : Math.min(100, (c.total / catTotals[0].total) * 100);
+                  const barColor = budget
+                    ? (pct >= 100 ? "#e74c3c" : pct >= 80 ? "#f39c12" : "#4F7FFA")
+                    : "#4F7FFA";
+                  return (
+                    <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                      <span style={{ fontSize: 22, width: 30 }}>{c.icon}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                          <span style={{ fontSize: fs.base, fontWeight: 600, color: colors.text, fontFamily: FONT }}>{c.label}</span>
+                          <span style={{ fontSize: fs.base, fontWeight: 700, color: budget ? barColor : colors.text, fontFamily: FONT }}>
+                            {fmt(c.total)}{budget ? ` / ${fmt(budget)}` : ""}
+                          </span>
+                        </div>
+                        <div style={{ background: colors.divider, borderRadius: 4, height: 5 }}>
+                          <div style={{ background: barColor, borderRadius: 4, height: 5, width: `${pct}%` }} />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {catTotals.length > 4 && (
                   <button onClick={() => setCatExpanded(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#4F7FFA", fontWeight: 600, fontFamily: FONT, padding: "4px 0" }}>
                     {catExpanded ? "Ver menos ▲" : `Ver todas (${catTotals.length}) ▼`}
