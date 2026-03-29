@@ -98,6 +98,7 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
   const [saving,            setSaving]            = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting,          setDeleting]          = useState(false);
+  const [deleteError,       setDeleteError]       = useState("");
 
   const currentTheme = localStorage.getItem("xpenses-theme") || "auto";
   const currentLang  = localStorage.getItem("xpenses-lang")  || "es";
@@ -174,7 +175,24 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
             <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 24px", textAlign: "center", lineHeight: 1.5, fontFamily: FONT }}>
               Se eliminará tu perfil. En cuentas compartidas, tu usuario quedará desvinculado pero el integrante seguirá en la cuenta. Esta acción no se puede deshacer.
             </p>
-            <button onClick={async () => { setDeleting(true); await onDeleteAccount(); setDeleting(false); }}
+            {deleteError && (
+              <p style={{ fontSize: 13, color: "#e74c3c", margin: "0 0 12px", textAlign: "center", fontFamily: FONT }}>{deleteError}</p>
+            )}
+            <button onClick={async () => {
+                setDeleteError("");
+                setDeleting(true);
+                try {
+                  await onDeleteAccount();
+                } catch (e) {
+                  console.error("[deleteAccount] ERROR:", e.code, e.message, e);
+                  if (e.code === "auth/requires-recent-login") {
+                    setDeleteError("Tu sesión expiró. Cerrá sesión, volvé a ingresar e intentá de nuevo.");
+                  } else {
+                    setDeleteError("No se pudo eliminar la cuenta. Intentá de nuevo.");
+                  }
+                  setDeleting(false);
+                }
+              }}
               disabled={deleting}
               style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: deleting ? "default" : "pointer", fontFamily: FONT, marginBottom: 8, opacity: deleting ? 0.7 : 1 }}>
               {deleting ? "Eliminando..." : "Sí, eliminar"}

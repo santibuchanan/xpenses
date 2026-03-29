@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
 import { doc, getDoc, updateDoc, setDoc, arrayUnion, onSnapshot, deleteDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { db, auth } from "./firebase";
+import { db, auth, deleteUserData } from "./firebase";
 import AuthScreen from "./AuthScreen";
 import ConfigScreen from "./ConfigScreen";
 import OnboardingScreen from "./OnboardingScreen";
@@ -514,36 +514,10 @@ function AppInner() {
 
   const handleDeleteAccount = async () => {
     if (!authUser) return;
-    const uid = authUser.uid;
-    try {
-      for (const acc of userAccounts) {
-        const isOwner  = acc.ownerId === uid;
-        const isMember = (acc.memberIds || []).includes(uid);
-
-        if (isOwner) {
-          await deleteDoc(doc(db, "accounts", acc.id));
-        } else if (isMember) {
-          // Solo intentar updateDoc si realmente somos miembro — evita permission-denied
-          // en cuentas huérfanas que quedaron en accountIds sin relación real
-          const updatedMemberIds = acc.memberIds.filter(id => id !== uid);
-          const updatedLabels = (acc.memberLabels || []).map(l =>
-            l.linkedUid === uid ? { ...l, linkedUid: null } : l
-          );
-          await updateDoc(doc(db, "accounts", acc.id), {
-            memberIds: updatedMemberIds,
-            memberLabels: updatedLabels,
-          });
-        }
-        // Si no somos ni owner ni member: cuenta huérfana, se saltea silenciosamente
-      }
-      await deleteDoc(doc(db, "users", uid));
-      await signOut(auth);
-      setUserProfile(null);
-      setSelectedAccountId(null);
-      setShowWelcome(true);
-    } catch (e) {
-      console.error("[deleteAccount] ERROR:", e.code, e.message, e);
-    }
+    await deleteUserData(authUser.uid);
+    await authUser.delete();
+    localStorage.removeItem("pendingInviteId");
+    window.location.replace(window.location.origin);
   };
 
   useEffect(() => {
