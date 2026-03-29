@@ -238,6 +238,9 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
     ["mio",           "🙋🏼‍♂️ Para mí"],
   ];
   const visibleTypes = isPozo ? types.filter(([val]) => val === "hogar" || val === "extraordinary") : types;
+  const helpTypes = isPozo
+    ? TYPE_DESCRIPTIONS.filter(t => t.name === "Ordinario" || t.name === "Extraordinario")
+    : TYPE_DESCRIPTIONS;
 
   const showPaidBy  = form.type !== "mio";
   const showForWhom = (form.type === "personal" || form.type === "hogar" || form.type === "extraordinary");
@@ -450,7 +453,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
           <div onClick={e => e.stopPropagation()} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "20px 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT }}>
             <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
             <p style={{ fontSize: 17, fontWeight: 700, color: colors.text, margin: "0 0 16px", fontFamily: FONT }}>Tipos de gasto</p>
-            {TYPE_DESCRIPTIONS.map(t => (
+            {helpTypes.map(t => (
               <div key={t.name} style={{ display: "flex", gap: 12, marginBottom: 16 }}>
                 <span style={{ fontSize: 22, flexShrink: 0 }}>{t.icon}</span>
                 <div>
