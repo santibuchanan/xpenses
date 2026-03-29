@@ -828,7 +828,16 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
                     : "Crea presupuestos para cada categoría."}
                 </p>
               </div>
-              <button type="button" onClick={() => setShowBudgetEditor(true)}
+              <button type="button" onClick={() => {
+                const b = account?.categoryBudgets || {};
+                const out = {};
+                allCategories.forEach(c => {
+                  const v = b[c.id];
+                  out[c.id] = v ? parseInt(v, 10).toLocaleString("es-AR") : "";
+                });
+                setBudgetByCategory(out);
+                setShowBudgetEditor(true);
+              }}
                 style={{ background: "#4F7FFA11", border: "none", borderRadius: 10, padding: "6px 12px", fontSize: 12, color: "#4F7FFA", cursor: "pointer", fontFamily: FONT, fontWeight: 600 }}>
                 {account?.categoryBudgets?._total ? "Editar" : "Configurar"}
               </button>
