@@ -29,6 +29,7 @@
 | `utils/normalizeMembers.js` | `buildAllMembers()` | Rompe AddExpenseModal, SaldosScreen, HomeScreen |
 | `hooks/useBalances.js` | `calcSaldos()` | Afecta saldos en HomeScreen y SaldosScreen |
 | `App.jsx` | `inviteIdFromUrl`, listeners, hashchange | Lee hash al montar + escucha `hashchange` para PWA abierta — no re-ejecuta el parse inicial |
+| `App.jsx` | `selectedMonth` state | Estado global de mes — se resetea al cambiar de cuenta; pasado como prop a las 3 pantallas |
 | `constants/categories.js` | `DEFAULT_CATEGORIES` | Cambiar afecta toda la app |
 | `vite.config.js` | workbox config | Puede romper Firebase Auth con PWA |
 
@@ -58,7 +59,9 @@
 ### Account
 ```js
 { id, name, emoji, type, divisionSystem, ownerId, memberIds[],
-  memberLabels[], currency, disabledCategories[], createdAt }
+  memberLabels[], currency, disabledCategories[],
+  categoryBudgets: { _total?: number, [catId: string]: number },  // disponible en todos los tipos
+  createdAt }
 ```
 
 ---
@@ -164,12 +167,22 @@ style={{ touchAction: 'pan-y' }}
 
 ---
 
+## Navegación por mes (Mar 30, 2026)
+
+- `selectedMonth` vive en `App.jsx` (AppInner) — estado global `"YYYY-MM"`, se resetea al cambiar de cuenta
+- Pasado como prop `selectedMonth` + `setSelectedMonth` a `HomeScreen`, `SaldosScreen`, `GraficosScreen`
+- `MonthNavBar` (`src/components/MonthNavBar.jsx`) — label capitalizado + dots deslizantes (máx. 7), tap navega
+- Swipe horizontal (delta > 50px) en las 3 pantallas para cambiar de mes
+- `historyMonth` (SaldosScreen) y `pieMonthIdx`/`barMonthIdx` (GraficosScreen) eliminados
+- SaldosScreen: botón Saldar oculto en meses históricos; badge "Saldado en {mes}" en deudas pasadas
+
 ## Pendientes técnicos activos
 
 - HomeScreen skeleton loading no funciona correctamente
 - Listeners duplicados en SettingsScreen (T1)
 - Íconos PWA no se muestran
 - `removeMember.js`: maneja array paidBy pero no redistribuye el monto del miembro eliminado entre los restantes (deuda técnica menor)
+- `calcSaldos()` puede mostrar $0 en mes histórico si los settlements fueron registrados en otro mes
 
 ## Patrones de eliminación de cuenta (firebase.js)
 
