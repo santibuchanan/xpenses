@@ -5,7 +5,7 @@ import { db } from "../firebase";
 import { useTheme, formatAmount, CURRENCIES } from "../theme.jsx";
 import { useSwipeSheet, useSwipeRow } from "../hooks/useSwipeSheet.js";
 import { useNotif, NOTIF_TYPES } from "../notifications";
-import { calcSaldos } from "../hooks/useBalances.js";
+import { calcSaldosAcumulados } from "../hooks/useBalances.js";
 import { getAmountPaidBy } from "../utils/expenseFilters.js";
 import DateInput from "../DateInput.jsx";
 import { FONT } from "../constants/ui.js";
@@ -284,7 +284,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   );
 
   const saldos = useMemo(
-    () => calcSaldos(monthExp, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, monthSettlements),
+    () => calcSaldosAcumulados(monthExp, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, monthSettlements),
     [monthExp, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, monthSettlements]
   );
 
