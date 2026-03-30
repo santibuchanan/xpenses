@@ -285,7 +285,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
   const saldos = useMemo(
     () => calcSaldosAcumulados(expenses.filter(e => !e.deleted), visibleFixed, realMembers, account?.divisionSystem, selectedMonth, settlements),
-    [monthExp, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, monthSettlements]
+    [expenses, settlements, visibleFixed, realMembers, account?.divisionSystem, selectedMonth]
   );
 
   const balances = realMembers.map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
