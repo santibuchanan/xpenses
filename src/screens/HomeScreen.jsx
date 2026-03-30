@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useTheme, formatAmount } from "../theme.jsx";
 import { useSwipeSheet } from "../hooks/useSwipeSheet.js";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
@@ -163,7 +163,7 @@ function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, on
 }
 
 // ── HOME SCREEN ──
-export default function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, customCategories, visibleFixed, onEdit, onDelete, onMarkFixedPaid, settlements, isLoading }) {
+export default function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, selectedMonth, setSelectedMonth, customCategories, visibleFixed, onEdit, onDelete, onMarkFixedPaid, settlements, isLoading }) {
   const { colors } = useTheme();
   const fs = useExpenseFontSize();
   const isPersonal = account?.type === "personal";
@@ -178,8 +178,37 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
     ...(customCategories || []),
   ];
 
-  const monthExp    = expenses.filter(e => e.month === currentMonth && !e.deleted);
-  const monthExpAll = expenses.filter(e => e.month === currentMonth);
+  // ── Navegación de meses ──
+  const touchStartX = useRef(null);
+  const now = new Date();
+  const actualMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const shiftMonth = (delta) => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    let nm = m + delta, ny = y;
+    if (nm > 12) { nm = 1; ny++; }
+    if (nm < 1)  { nm = 12; ny--; }
+    return `${ny}-${String(nm).padStart(2, '0')}`;
+  };
+  const minMonth = expenses.length > 0
+    ? expenses.reduce((min, e) => (e.month && e.month < min ? e.month : min), expenses[0]?.month || actualMonth)
+    : actualMonth;
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) < 50) return;
+    if (delta < 0) {
+      const next = shiftMonth(1);
+      if (next <= actualMonth) setSelectedMonth(next);
+    } else {
+      const prev = shiftMonth(-1);
+      if (prev >= minMonth) setSelectedMonth(prev);
+    }
+  };
+
+  const monthExp    = expenses.filter(e => e.month === selectedMonth && !e.deleted);
+  const monthExpAll = expenses.filter(e => e.month === selectedMonth);
   const sharedExp   = monthExp.filter(e => e.type !== "mio");
 
   // visibleFixed ya viene filtrado desde App.jsx (FIX #9 — no se recalcula aquí)
@@ -189,10 +218,10 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
 
   // Saldos — incluir labels porque tienen uid estable y participan en gastos
   const realMembers = allMembers?.filter(m => !!m.uid) || [];
-  const allMonthSettlements = (settlements || []).filter(s => s.month === currentMonth);
+  const allMonthSettlements = (settlements || []).filter(s => s.month === selectedMonth);
   const saldos = useMemo(
-    () => calcSaldos(sharedExp, isPersonal ? [] : visibleFixed, realMembers, account?.divisionSystem, currentMonth, allMonthSettlements),
-    [sharedExp, visibleFixed, realMembers, account?.divisionSystem, currentMonth, allMonthSettlements]
+    () => calcSaldos(sharedExp, isPersonal ? [] : visibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements),
+    [sharedExp, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements]
   );
   const myBalance = saldos[currentUser.uid]?.balance || 0;
 
@@ -207,11 +236,11 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
 
   const [catSectionExpanded, setCatSectionExpanded] = useState(false);
   const [catExpanded, setCatExpanded] = useState(false);
-  const monthLabel = new Date(currentMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
+  const monthLabel = new Date(selectedMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
 
   const [filterType, setFilterType] = useState("todos");
   const filtered = filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.category === filterType);
-  const monthSettlements = (settlements || []).filter(s => s.month === currentMonth && !s.isCorrection && s.amount > 0);
+  const monthSettlements = (settlements || []).filter(s => s.month === selectedMonth && !s.isCorrection && s.amount > 0);
 
   // Ordenar por createdAt desc (cuándo se creó el registro).
   // Fallback a date+id para gastos viejos sin createdAt.
@@ -227,7 +256,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const [showHomeTooltip, setShowHomeTooltip] = useState(() => !localStorage.getItem('onboarding_seen_home'));
 
   return (
-    <div style={{ fontFamily: FONT }}>
+    <div style={{ fontFamily: FONT }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Hero */}
       <div style={{ background: colors.headerBg, borderRadius: "0 0 32px 32px", padding: "calc(env(safe-area-inset-top) + 76px) 20px 28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
@@ -368,7 +397,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
                       </div>
                     </button>
                     {fixedSharedExpanded && sharedFixed.map(f => (
-                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
+                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
                     ))}
                   </>
                 )}
@@ -383,13 +412,13 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
                       </div>
                     </button>
                     {fixedPersonalExpanded && personalFixed.map(f => (
-                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
+                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
                     ))}
                   </>
                 )}
 
                 {isPersonal && visibleFixed.map(f => (
-                  <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={currentMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
+                  <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
                 ))}
               </div>
             )}
@@ -430,9 +459,9 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
           fixedExpense={payingFixed}
           allMembers={allMembers}
           currentUser={currentUser}
-          currentMonth={currentMonth}
+          currentMonth={selectedMonth}
           onConfirm={async (fixedId, paidByUid) => {
-            await onMarkFixedPaid(fixedId, paidByUid, currentMonth);
+            await onMarkFixedPaid(fixedId, paidByUid, selectedMonth);
             setPayingFixed(null);
           }}
           onClose={() => setPayingFixed(null)}
