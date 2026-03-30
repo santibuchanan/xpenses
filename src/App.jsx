@@ -340,6 +340,15 @@ function AppInner() {
   // Onboarding: se muestra una vez por dispositivo a usuarios nuevos (antes de ConfigScreen)
   const [onboardingDone, setOnboardingDone] = useState(() => !!localStorage.getItem("xpenses-onboarding-done"));
   const currentMonth = getCurrentMonth();
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  useEffect(() => {
+    const now = new Date();
+    setSelectedMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  }, [selectedAccountId]);
 
   // ── Hooks de datos — reemplazan todos los useEffects inline de App.jsx ──
   // useAccountData: maneja userAccounts, account activa y members[].
@@ -573,10 +582,10 @@ function AppInner() {
       <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
-        {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} customCategories={customCategories} visibleFixed={visibleFixed} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} isLoading={expensesLoading} />}
+        {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} customCategories={customCategories} visibleFixed={visibleFixed} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} isLoading={expensesLoading} />}
         <Suspense fallback={<Spinner text="Cargando..." />}>
-          {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} visibleFixed={visibleFixed} members={allMembers} account={account} currentMonth={currentMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} customCategories={activeCategories} categoryBudgets={account?.categoryBudgets} />}
-          {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} categoryBudgets={account?.categoryBudgets} />}
+          {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} visibleFixed={visibleFixed} members={allMembers} account={account} currentMonth={currentMonth} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} customCategories={activeCategories} categoryBudgets={account?.categoryBudgets} />}
+          {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} categoryBudgets={account?.categoryBudgets} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />}
           {tab === "ajustes"  && <SettingsScreen currentUser={authUser} userProfile={userProfile} account={account} members={members} allMembers={allMembers} customCategories={customCategories} fixedExpenses={fixedExpenses} onSignOut={handleSignOut} onSwitchAccount={() => setSelectedAccountId(null)} />}
         </Suspense>
       </div>
