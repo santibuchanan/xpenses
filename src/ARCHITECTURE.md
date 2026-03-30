@@ -2,7 +2,7 @@
 
 > **Propósito:** Referencia de arquitectura que debe consultarse antes de cada sprint. Evita regresiones en zonas frágiles.
 
-**Última actualización:** Sesión Mar 28, 2026
+**Última actualización:** Sesión Mar 30, 2026
 **Deploy:** https://xpenses-seven.vercel.app
 **Firebase project:** xpenses-305ee
 
@@ -58,6 +58,7 @@ src/
     ├── SaldosScreen.jsx             ← Saldos, settlements, historial
     └── GraficosScreen.jsx           ← Gráficos por categoría y mes
 └── components/
+    ├── MonthNavBar.jsx              ← Navegación global de meses (label + dots paginación)
     └── expenses/
         ├── AddExpenseModal.jsx      ← Modal agregar gasto
         └── SwipeableExpenseRow.jsx  ← Fila de gasto con swipe
@@ -147,7 +148,7 @@ Origen: colección `accounts/{id}`
   memberLabels:        MemberLabel[],
   currency:            string,      // Código ISO, ej: "ARS"
   disabledCategories:  string[],    // IDs de DEFAULT_CATEGORIES desactivadas
-  categoryBudgets:     { _total?: number, [catId: string]: number },  // Fase 2 — solo en cuentas pozo
+  categoryBudgets:     { _total?: number, [catId: string]: number },  // presupuesto por categoría — disponible en todos los tipos de cuenta
   createdAt:           string,      // ISO date string
 }
 ```
@@ -274,9 +275,11 @@ App.jsx (AppInner)
     │
     ├── buildAllMembers(members, account.memberLabels) → allMembers[]
     │
-    ├── HomeScreen(expenses, allMembers, fixedExpenses, settlements, isLoading, ...)
-    ├── SaldosScreen(expenses, allMembers, fixedExpenses, settlements, ...)
-    ├── GraficosScreen(expenses, fixedExpenses, ...)
+    ├── selectedMonth state — "YYYY-MM", inicializado al mes actual, se resetea al cambiar de cuenta
+    │
+    ├── HomeScreen(expenses, allMembers, fixedExpenses, settlements, isLoading, selectedMonth, setSelectedMonth, ...)
+    ├── SaldosScreen(expenses, allMembers, fixedExpenses, settlements, selectedMonth, setSelectedMonth, ...)
+    ├── GraficosScreen(expenses, fixedExpenses, selectedMonth, setSelectedMonth, ...)
     └── SettingsScreen(account, members, allMembers, ...)
 ```
 
@@ -425,6 +428,19 @@ Config Firebase (db, auth) + funciones de operaciones de cuenta:
 - `CURRENCIES` — fuente única de divisas
 - `formatAmount(n, currency)` — muestra decimales solo si el monto tiene centavos
 
+### `components/MonthNavBar.jsx`
+
+Barra de navegación de meses compartida por `HomeScreen`, `SaldosScreen` y `GraficosScreen`.
+
+Props: `{ selectedMonth, setSelectedMonth, minMonth, todayMonth }`
+
+- Muestra el mes activo como label capitalizado en `es-AR`
+- Dots de paginación (máx. 7): ventana deslizante centrada en el mes activo; tap navega al mes
+- Si solo hay 1 mes disponible, muestra solo el label (sin dots)
+- Exporta también `monthsBetween(min, max)` — genera array de `"YYYY-MM"` entre dos fechas inclusive
+
+También exporta `monthsBetween(min, max)` como named export, usada internamente y por las pantallas para calcular `minMonth`.
+
 ### `constants/categories.js`
 
 > ⚠️ Cambiar aquí afecta: HomeScreen, AddExpenseModal, SettingsScreen, GraficosScreen, ConfigScreen.
@@ -453,7 +469,6 @@ Config Firebase (db, auth) + funciones de operaciones de cuenta:
 | `visibleFixed` | `HomeScreen` y `SaldosScreen` | Lógica duplicada — cambiar en uno no cambia el otro |
 | Listeners duplicados | `SettingsScreen.jsx` | Lecturas innecesarias de Firestore |
 | `forWhom` inicial | `AddExpenseModal.jsx` | Si allMembers llega tarde, forWhom queda vacío |
-| `historyMonth` vs `currentMonth` | `SaldosScreen.jsx` | Son estados independientes; `useEffect` sincroniza al cambiar mes |
 
 ### 🟢 Baja prioridad
 
@@ -489,24 +504,30 @@ Config Firebase (db, auth) + funciones de operaciones de cuenta:
 - Para Pozo Común (`isPozo`): muestra línea con gastos de cada integrante en el hero; stat pills con gasto por integrante en color del miembro
 - Pills de filtro muestran emoji de categoría
 - Gastos fijos con subsecciones Hogar/Personal
+- `MonthNavBar` debajo del hero — dots de paginación + label del mes activo
+- Swipe horizontal (delta > 50px) navega entre meses; respeta límites `minMonth` / `actualMonth`
+- Todo el contenido (gastos, gastos fijos, saldos, settlements) se filtra por `selectedMonth`
 
 ### SaldosScreen ✅
-- **Cuentas shared:** balance neto por miembro, algoritmo greedy, botón Saldar, pasar mes siguiente
+- `MonthNavBar` al tope — dots de paginación + label del mes activo (navegación global con `selectedMonth`)
+- Swipe horizontal navega entre meses; botón "Saldar" oculto en meses históricos (`selectedMonth !== todayMonth`)
+- **Cuentas shared:** balance neto por miembro, algoritmo greedy, botón Saldar
   - Botón Saldar con guard `useRef` anti-doble-tap; al saldar total usa `debtPairs` frescos (no estado del modal)
   - Settle modal avanza al siguiente acreedor automáticamente o se cierra si no quedan deudas
-  - Historial colapsable con navegación por mes independiente de `currentMonth`
-  - Historial agrupado por fecha, distinción visual para filas del usuario actual, eliminación con confirmación
+  - Sección "Quién le debe a quién": badge "Saldado en {mes}" cuando la deuda histórica fue saldada en un mes posterior
+  - Historial colapsable, agrupado por fecha, distinción visual para filas del usuario actual, eliminación con confirmación
 - **Cuentas pozo:** muestra "Resumen del Pozo":
   - Card de total del mes con delta % vs mes anterior
   - Alerta de presupuesto (⚠️ ≥80%, 🚨 ≥100%) si `categoryBudgets._total` configurado
   - Ranking por integrante con % del total
   - Ranking por categoría con delta vs mes anterior, alerta de presupuesto por categoría, barra de progreso
   - Acepta prop `categoryBudgets` desde `account.categoryBudgets`
-- No disponible en cuentas personales
+- **Cuentas personales:** muestra lista de gastos del mes (`selectedMonth`) filtrada por tipo personal/mio
 
 ### GraficosScreen ✅
-- Toggle "Por mes" / "Por tipo"
-- Torta por categoría con selector de mes
+- `MonthNavBar` antes de sección "Comparación" — navegación global con `selectedMonth`
+- Swipe horizontal navega entre meses
+- Toggle "Por mes" / "Por tipo" — torta y barras usan `selectedMonth` (eliminados `pieMonthIdx` / `barMonthIdx`)
 - Excluye gastos `deleted: true`
 - Sección "Presupuesto" (solo si `categoryBudgets` con categorías configuradas): card total del mes con barra de progreso + alertas, cards por categoría con barra de progreso individual
 - Acepta prop `categoryBudgets` desde `account.categoryBudgets`
@@ -571,6 +592,7 @@ Config Firebase (db, auth) + funciones de operaciones de cuenta:
 |------|-----------|--------|
 | Listeners duplicados SettingsScreen (T1) | Media | Pendiente |
 | Push notifications (FCM) | Alta | Pendiente |
+| `calcSaldos()` en mes histórico sin settlements puede mostrar $0 — si los settlements del mes fueron registrados en otro mes, el balance aparece como saldado aunque no lo estaba | Media | Pendiente |
 | Eliminación de cuenta usuario | ✅ Resuelto Mar 28 | DeleteAccountModal 2 pasos + deleteUserData() + reauthenticateUser() |
 | `visibleFixed` duplicado en HomeScreen/SaldosScreen | Baja | Deuda técnica |
 | Scroll lock de sheets no centralizado | Baja | Deuda técnica |
@@ -580,6 +602,17 @@ Config Firebase (db, auth) + funciones de operaciones de cuenta:
 | `handleFullSettle` notificaba a todos los miembros en lugar de solo al acreedor | Mar 26 |
 | `handlePartialSettle` no enviaba notificación — ahora notifica solo al acreedor | Mar 26 |
 | `removeMember.js`: detecta y reasigna miembro en `paidBy` array; si queda 1 pagador convierte a string | ✅ Resuelto Mar 28 |
+
+### ✅ Resueltos Mar 30, 2026
+
+| Item | Sesión |
+|------|--------|
+| `selectedMonth` global en App.jsx — estado único de mes compartido por HomeScreen, SaldosScreen y GraficosScreen; se resetea al cambiar de cuenta | Mar 30 |
+| `MonthNavBar` — barra de navegación con label y dots, ventana deslizante de 7, swipe horizontal en las 3 pantallas | Mar 30 |
+| `historyMonth` (SaldosScreen) y `pieMonthIdx`/`barMonthIdx` (GraficosScreen) eliminados — reemplazados por `selectedMonth` prop | Mar 30 |
+| SaldosScreen: botón "Saldar" oculto en meses históricos | Mar 30 |
+| SaldosScreen: badge "Saldado en {mes}" para deudas históricas saldadas en mes posterior | Mar 30 |
+| `categoryBudgets` habilitado para todos los tipos de cuenta (no solo pozo) | Mar 30 |
 
 ### ✅ Resueltos Mar 28, 2026
 
