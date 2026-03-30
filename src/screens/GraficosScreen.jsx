@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useTheme, formatAmount } from "../theme.jsx";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
@@ -16,7 +16,7 @@ function SectionTitle({ children, style = {} }) {
   return <p style={{ fontSize: 20, fontWeight: 700, margin: "22px 0 10px", color: colors.text, fontFamily: FONT, ...style }}>{children}</p>;
 }
 
-export default function GraficosScreen({ expenses, account, customCategories, fixedExpenses, categoryBudgets }) {
+export default function GraficosScreen({ expenses, account, customCategories, fixedExpenses, categoryBudgets, selectedMonth, setSelectedMonth }) {
   const { colors } = useTheme();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
@@ -27,11 +27,34 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
   const monthLabel = (m) => new Date(m + "-02").toLocaleString("es-AR", { month: "short" });
 
   const [barView, setBarView] = useState("total");
-  const [pieMonthIdx, setPieMonthIdx] = useState(last6.length - 1);
-  const [barMonthIdx, setBarMonthIdx] = useState(last6.length - 1);
 
-  const pieMonth = last6[pieMonthIdx] || last6[last6.length - 1];
-  const barMonth = last6[barMonthIdx] || last6[last6.length - 1];
+  const todayMonth = new Date().toISOString().slice(0, 7);
+  const shiftMonth = (base, delta) => {
+    const [y, m] = base.split('-').map(Number);
+    let nm = m + delta, ny = y;
+    if (nm > 12) { nm = 1; ny++; }
+    if (nm < 1)  { nm = 12; ny--; }
+    return `${ny}-${String(nm).padStart(2, '0')}`;
+  };
+  const minMonth = activeExpenses.length > 0
+    ? activeExpenses.reduce((min, e) => (e.month && e.month < min ? e.month : min), activeExpenses[0]?.month || todayMonth)
+    : todayMonth;
+  const canGoPrev = selectedMonth > minMonth;
+  const canGoNext = selectedMonth < todayMonth;
+
+  const touchStartX = useRef(null);
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) < 50) return;
+    if (delta < 0) { if (canGoNext) setSelectedMonth(shiftMonth(selectedMonth, 1)); }
+    else           { if (canGoPrev) setSelectedMonth(shiftMonth(selectedMonth, -1)); }
+  };
+
+  const pieMonth = selectedMonth;
+  const barMonth = selectedMonth;
 
   const barDataTotal = last6.map(m => ({
     mes: monthLabel(m),
@@ -65,7 +88,7 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
   };
 
   return (
-    <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
+    <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <SectionTitle>Comparación</SectionTitle>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -82,13 +105,13 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
 
       {barView === "por_tipo" && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 8, gap: 8 }}>
-          <button onClick={() => setBarMonthIdx(i => Math.max(0, i - 1))} disabled={barMonthIdx === 0}
-            style={{ background: "none", border: "none", cursor: barMonthIdx === 0 ? "default" : "pointer", color: barMonthIdx === 0 ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>←</button>
+          <button onClick={() => canGoPrev && setSelectedMonth(shiftMonth(selectedMonth, -1))} disabled={!canGoPrev}
+            style={{ background: "none", border: "none", cursor: !canGoPrev ? "default" : "pointer", color: !canGoPrev ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>←</button>
           <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, minWidth: 70, textAlign: "center" }}>
             {barMonth ? new Date(barMonth + "-02").toLocaleString("es-AR", { month: "short", year: "2-digit" }) : "-"}
           </span>
-          <button onClick={() => setBarMonthIdx(i => Math.min(last6.length - 1, i + 1))} disabled={barMonthIdx === last6.length - 1}
-            style={{ background: "none", border: "none", cursor: barMonthIdx === last6.length - 1 ? "default" : "pointer", color: barMonthIdx === last6.length - 1 ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>→</button>
+          <button onClick={() => canGoNext && setSelectedMonth(shiftMonth(selectedMonth, 1))} disabled={!canGoNext}
+            style={{ background: "none", border: "none", cursor: !canGoNext ? "default" : "pointer", color: !canGoNext ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>→</button>
         </div>
       )}
 
@@ -127,13 +150,13 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, marginTop: 4 }}>
         <SectionTitle style={{ margin: 0 }}>Por categoría</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => setPieMonthIdx(i => Math.max(0, i - 1))} disabled={pieMonthIdx === 0}
-            style={{ background: "none", border: "none", cursor: pieMonthIdx === 0 ? "default" : "pointer", color: pieMonthIdx === 0 ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>←</button>
+          <button onClick={() => canGoPrev && setSelectedMonth(shiftMonth(selectedMonth, -1))} disabled={!canGoPrev}
+            style={{ background: "none", border: "none", cursor: !canGoPrev ? "default" : "pointer", color: !canGoPrev ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>←</button>
           <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, minWidth: 60, textAlign: "center" }}>
             {pieMonth ? new Date(pieMonth + "-02").toLocaleString("es-AR", { month: "short", year: "2-digit" }) : "-"}
           </span>
-          <button onClick={() => setPieMonthIdx(i => Math.min(last6.length - 1, i + 1))} disabled={pieMonthIdx === last6.length - 1}
-            style={{ background: "none", border: "none", cursor: pieMonthIdx === last6.length - 1 ? "default" : "pointer", color: pieMonthIdx === last6.length - 1 ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>→</button>
+          <button onClick={() => canGoNext && setSelectedMonth(shiftMonth(selectedMonth, 1))} disabled={!canGoNext}
+            style={{ background: "none", border: "none", cursor: !canGoNext ? "default" : "pointer", color: !canGoNext ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>→</button>
         </div>
       </div>
 
