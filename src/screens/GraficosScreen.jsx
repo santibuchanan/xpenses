@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import MonthNavBar from "../components/MonthNavBar.jsx";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useTheme, formatAmount } from "../theme.jsx";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
@@ -89,6 +90,7 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
 
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <MonthNavBar selectedMonth={selectedMonth} minMonth={minMonth} todayMonth={todayMonth} setSelectedMonth={setSelectedMonth} />
       <SectionTitle>Comparación</SectionTitle>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
