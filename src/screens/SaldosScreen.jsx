@@ -284,7 +284,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   );
 
   const saldos = useMemo(
-    () => calcSaldosAcumulados(expenses.filter(e => !e.deleted), visibleFixed, realMembers, account?.divisionSystem, selectedMonth, monthSettlements),
+    () => calcSaldosAcumulados(expenses.filter(e => !e.deleted), visibleFixed, realMembers, account?.divisionSystem, selectedMonth, settlements),
     [monthExp, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, monthSettlements]
   );
 
