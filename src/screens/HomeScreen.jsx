@@ -6,6 +6,7 @@ import { calcSaldos } from "../hooks/useBalances.js";
 import { getAmountPaidBy } from "../utils/expenseFilters.js";
 import { SwipeableExpenseRow } from "../components/expenses/SwipeableExpenseRow.jsx";
 import { FONT } from "../constants/ui.js";
+import MonthNavBar from "../components/MonthNavBar.jsx";
 
 const FONT_SIZE_MAP = {
   small:  { base: 12, sub: 10, title: 18 },
@@ -300,6 +301,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
       </div>
 
       <div style={{ padding: "0 20px" }}>
+        <MonthNavBar selectedMonth={selectedMonth} minMonth={minMonth} todayMonth={actualMonth} setSelectedMonth={setSelectedMonth} />
         {showHomeTooltip && (
           <div style={{ background: "#4F7FFA18", border: "1px solid #4F7FFA44", borderRadius: 16, padding: "12px 14px", margin: "12px 0 4px", display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>

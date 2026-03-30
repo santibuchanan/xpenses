@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import MonthNavBar from "../components/MonthNavBar.jsx";
 import { collection, addDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useTheme, formatAmount, CURRENCIES } from "../theme.jsx";
@@ -507,7 +508,8 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-      <SectionTitle>{isPersonal ? "Gastos del mes" : isPozo ? "Resumen del Pozo" : "Saldos del mes"}</SectionTitle>
+      <MonthNavBar selectedMonth={selectedMonth} minMonth={minMonth} todayMonth={todayMonth} setSelectedMonth={setSelectedMonth} />
+      <SectionTitle style={{ marginTop: 4 }}>{isPersonal ? "Gastos del mes" : isPozo ? "Resumen del Pozo" : `Saldos de ${selectedMonthLabel}`}</SectionTitle>
 
       {/* Vista personal — reemplaza todo el contenido de saldos compartidos */}
       {isPersonal && (
