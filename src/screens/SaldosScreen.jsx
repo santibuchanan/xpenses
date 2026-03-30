@@ -260,13 +260,14 @@ function SwipeableSettlementRow({ s, debtor, creditor, isMeDebtor, isMeCreditor,
 }
 
 // ── SALDOS SCREEN ──
-export default function SaldosScreen({ expenses, visibleFixed, members, account, currentMonth, currentUser, onAddExpense, settlements, customCategories, categoryBudgets }) {
+export default function SaldosScreen({ expenses, visibleFixed, members, account, currentMonth, selectedMonth, setSelectedMonth, currentUser, onAddExpense, settlements, customCategories, categoryBudgets }) {
   const { colors } = useTheme();
   const { sendNotification } = useNotif();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const isSubmitting = useRef(false);
+  const touchStartX  = useRef(null);
 
-  const monthExp = expenses.filter(e => e.month === currentMonth && !e.deleted);
+  const monthExp = expenses.filter(e => e.month === selectedMonth && !e.deleted);
   // Memoizado: evita que saldos useMemo recalcule en cada render por referencia nueva de array.
   const realMembers = useMemo(
     () => (members || []).filter(m => !!m.uid).sort((a, b) => {
@@ -277,13 +278,13 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     [members, currentUser.uid]
   );
   const monthSettlements = useMemo(
-    () => (settlements || []).filter(s => s.month === currentMonth),
-    [settlements, currentMonth]
+    () => (settlements || []).filter(s => s.month === selectedMonth),
+    [settlements, selectedMonth]
   );
 
   const saldos = useMemo(
-    () => calcSaldos(monthExp, visibleFixed, realMembers, account?.divisionSystem, currentMonth, monthSettlements),
-    [monthExp, visibleFixed, realMembers, account?.divisionSystem, currentMonth, monthSettlements]
+    () => calcSaldos(monthExp, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, monthSettlements),
+    [monthExp, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, monthSettlements]
   );
 
   const balances = realMembers.map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
@@ -314,11 +315,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   const [settledPairs, setSettledPairs] = useState({});
   const [historyOpen, setHistoryOpen]   = useState(false);
   const [showSaldosTooltip, setShowSaldosTooltip] = useState(() => !localStorage.getItem('onboarding_seen_saldos'));
-  const [historyMonth, setHistoryMonth] = useState(currentMonth);
   const [confirmDelete, setConfirmDelete] = useState(null); // settlement a eliminar
-
-  // Sincronizar historyMonth cuando el usuario navega de mes en la app
-  useEffect(() => { setHistoryMonth(currentMonth); }, [currentMonth]);
 
   const handleFullSettle = async (debtorUid, creditorUid, amount) => {
     if (isSubmitting.current) return;
@@ -415,7 +412,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
   // Mes anterior — para comparación en Pozo
   const prevMonth = (() => {
-    const [y, m] = currentMonth.split("-").map(Number);
+    const [y, m] = selectedMonth.split("-").map(Number);
     return new Date(y, m - 2, 1).toISOString().slice(0, 7);
   })();
   const prevMonthExp = expenses.filter(e => e.month === prevMonth && !e.deleted);
@@ -443,14 +440,31 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     return new Date(y, m - 1 + delta, 1).toISOString().slice(0, 7);
   };
   const todayMonth        = new Date().toISOString().slice(0, 7);
-  const canGoNext         = shiftMonth(historyMonth, 1) <= todayMonth;
-  const historyMonthLabel = (() => {
-    const raw = new Date(historyMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
+  const canGoNext         = shiftMonth(selectedMonth, 1) <= todayMonth;
+  const selectedMonthLabel = (() => {
+    const raw = new Date(selectedMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   })();
+  const minMonth = expenses.length > 0
+    ? expenses.reduce((min, e) => (e.month && e.month < min ? e.month : min), expenses[0]?.month || todayMonth)
+    : todayMonth;
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) < 50) return;
+    if (delta < 0) {
+      const next = shiftMonth(selectedMonth, 1);
+      if (next <= todayMonth) setSelectedMonth(next);
+    } else {
+      const prev = shiftMonth(selectedMonth, -1);
+      if (prev >= minMonth) setSelectedMonth(prev);
+    }
+  };
 
-  // Vista personal — datos del mes navegable (historyMonth)
-  const personalMonthExp    = isPersonal ? expenses.filter(e => e.month === historyMonth && !e.deleted) : [];
+  // Vista personal — datos del mes navegable (selectedMonth)
+  const personalMonthExp    = isPersonal ? expenses.filter(e => e.month === selectedMonth && !e.deleted) : [];
   const personalTotalSpent  = personalMonthExp.reduce((s, e) => s + e.amount, 0);
   const personalCatData     = isPersonal
     ? (customCategories || [])
@@ -465,7 +479,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     : [];
 
   const historyItems = (settlements || [])
-    .filter(s => s.month === historyMonth && !s.isCorrection && s.amount > 0)
+    .filter(s => s.month === selectedMonth && !s.isCorrection && s.amount > 0)
     .sort((a, b) => {
       const dc = (b.date || "").localeCompare(a.date || "");
       return dc !== 0 ? dc : (b.createdAt || "").localeCompare(a.createdAt || "");
@@ -492,7 +506,7 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
   };
 
   return (
-    <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }}>
+    <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <SectionTitle>{isPersonal ? "Gastos del mes" : isPozo ? "Resumen del Pozo" : "Saldos del mes"}</SectionTitle>
 
       {/* Vista personal — reemplaza todo el contenido de saldos compartidos */}
@@ -500,10 +514,10 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
         <>
           {/* Navegador de mes */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, background: colors.card, borderRadius: 16, padding: "10px 16px", boxShadow: colors.shadow, border: `1px solid ${colors.cardBorder}` }}>
-            <button type="button" onClick={() => setHistoryMonth(shiftMonth(historyMonth, -1))}
+            <button type="button" onClick={() => setSelectedMonth(shiftMonth(selectedMonth, -1))}
               style={{ background: colors.pill, border: "none", borderRadius: 10, padding: "6px 14px", fontSize: 16, cursor: "pointer", color: colors.text, lineHeight: 1 }}>←</button>
-            <span style={{ fontSize: 14, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{historyMonthLabel}</span>
-            <button type="button" onClick={() => canGoNext && setHistoryMonth(shiftMonth(historyMonth, 1))} disabled={!canGoNext}
+            <span style={{ fontSize: 14, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{selectedMonthLabel}</span>
+            <button type="button" onClick={() => canGoNext && setSelectedMonth(shiftMonth(selectedMonth, 1))} disabled={!canGoNext}
               style={{ background: canGoNext ? colors.pill : "transparent", border: "none", borderRadius: 10, padding: "6px 14px", fontSize: 16, cursor: canGoNext ? "pointer" : "default", color: canGoNext ? colors.text : colors.textMuted, lineHeight: 1, opacity: canGoNext ? 1 : 0.3 }}>→</button>
           </div>
 
@@ -716,8 +730,8 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
                 {s.balance > 0.005 ? "+" : ""}{fmt(Math.abs(s.balance) < 0.005 ? 0 : s.balance)}
               </p>
 
-              {/* Botón Saldar — solo si este miembro tiene deuda pendiente y todos los members cargaron */}
-              {allMembersLoaded && myDebts.length > 0 ? (
+              {/* Botón Saldar — solo para el mes actual, con todos los members cargados */}
+              {allMembersLoaded && myDebts.length > 0 && selectedMonth === todayMonth ? (
                 <button
                   onClick={() => setSettleModal({ debtorUid: m.uid, debts: myDebts })}
                   style={{ flexShrink: 0, marginLeft: 8, padding: "7px 14px", borderRadius: 20, background: "#2ecc7118", color: "#2ecc71", border: "1px solid #2ecc7144", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
@@ -739,15 +753,31 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
             const debtor   = realMembers.find(m => m.uid === pair.debtorUid);
             const creditor = realMembers.find(m => m.uid === pair.creditorUid);
             const isSettled = !!settledPairs[pair.debtorUid + "-" + pair.creditorUid];
+            const futureSett = !isSettled ? (settlements || []).find(s =>
+              !s.isCorrection && s.amount > 0 &&
+              s.month > selectedMonth &&
+              s.debtorUid === pair.debtorUid &&
+              s.creditorUid === pair.creditorUid
+            ) : null;
+            const settledInLabel = futureSett ? (() => {
+              const raw = new Date(futureSett.month + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
+              return raw.charAt(0).toUpperCase() + raw.slice(1);
+            })() : null;
             return (
-              <div key={pair.debtorUid + "-" + pair.creditorUid}
-                style={{ display: "flex", alignItems: "center", gap: 10, paddingVertical: 6, marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: isSettled ? colors.textMuted : colors.text, fontFamily: FONT, flex: 1 }}>
-                  {debtor?.name} → {creditor?.name}
-                </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: isSettled ? "#4F7FFA" : colors.danger, fontFamily: FONT, flexShrink: 0 }}>
-                  {isSettled ? fmt(0) : fmt(pair.amount)}
-                </span>
+              <div key={pair.debtorUid + "-" + pair.creditorUid} style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: isSettled ? colors.textMuted : colors.text, fontFamily: FONT, flex: 1 }}>
+                    {debtor?.name} → {creditor?.name}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: isSettled ? "#4F7FFA" : colors.danger, fontFamily: FONT, flexShrink: 0 }}>
+                    {isSettled ? fmt(0) : fmt(pair.amount)}
+                  </span>
+                </div>
+                {settledInLabel && (
+                  <p style={{ margin: "2px 0 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>
+                    Saldado en {settledInLabel}
+                  </p>
+                )}
               </div>
             );
           })}
@@ -781,13 +811,13 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
               {/* Navegación por mes */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderTop: `1px solid ${colors.divider}` }}>
                 <button
-                  onClick={() => setHistoryMonth(shiftMonth(historyMonth, -1))}
+                  onClick={() => setSelectedMonth(shiftMonth(selectedMonth, -1))}
                   style={{ background: colors.pill, border: "none", borderRadius: 10, padding: "6px 14px", fontSize: 16, cursor: "pointer", color: colors.text, lineHeight: 1 }}>
                   ←
                 </button>
-                <span style={{ fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{historyMonthLabel}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT }}>{selectedMonthLabel}</span>
                 <button
-                  onClick={() => canGoNext && setHistoryMonth(shiftMonth(historyMonth, 1))}
+                  onClick={() => canGoNext && setSelectedMonth(shiftMonth(selectedMonth, 1))}
                   disabled={!canGoNext}
                   style={{ background: canGoNext ? colors.pill : "transparent", border: "none", borderRadius: 10, padding: "6px 14px", fontSize: 16, cursor: canGoNext ? "pointer" : "default", color: canGoNext ? colors.text : colors.textMuted, lineHeight: 1, opacity: canGoNext ? 1 : 0.3 }}>
                   →
