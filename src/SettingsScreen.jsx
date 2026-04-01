@@ -379,7 +379,7 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
             {isCurrentUser && <span style={{ fontSize: 11, color: colors.textMuted }}> (vos)</span>}
           </p>
           <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
-            {(showSalary && member.salary) ? `$${(member.salary || 0).toLocaleString('es-AR')}/mes · ` : ""}
+            {showSalary ? `$${(member.salary || 0).toLocaleString('es-AR')}/mes · ` : ""}
             {member.uid ? "Vinculado ✓" : (member.linkedUid ? "Vinculado ✓" : "Sin vincular")}
           </p>
         </div>
