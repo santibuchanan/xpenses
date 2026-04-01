@@ -207,20 +207,13 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers
   const isDirty = name !== (member.name || "") || color !== (member.color || MEMBER_COLORS[0]) || (isProportional && salary !== (member.salary?.toString() || ""));
   const handleClose = () => { if (isDirty) { setShowDiscard(true); return; } onClose(); };
   const { dragY, isDragging, handlers } = useSwipeSheet({ onClose: handleClose });
-  const sheetRef = useRef(null);
-  const isDraggingFromHandle = useRef(false);
 
   const inputStyle = { width: "100%", padding: "13px 14px", borderRadius: 14, border: `2px solid ${colors.inputBorder}`, fontSize: 15, marginBottom: 14, fontFamily: FONT, outline: "none", boxSizing: "border-box", color: colors.inputText, background: colors.input };
   return (
     <>
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}>
-        <div
-          ref={sheetRef}
-          onTouchStart={(e) => { const handle = sheetRef.current?.querySelector("[data-handle]"); if (handle && handle.contains(e.target)) { isDraggingFromHandle.current = true; handlers.onTouchStart(e); } }}
-          onTouchMove={handlers.onTouchMove}
-          onTouchEnd={(e) => { if (isDraggingFromHandle.current) handlers.onTouchEnd(e); isDraggingFromHandle.current = false; }}
-          style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
-          <div data-handle style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
+        <div {...handlers} style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "24px 20px 44px", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
+          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto 20px" }} />
           <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 20px", fontFamily: FONT }}>{member.id ? "Editar miembro" : "Nuevo miembro"}</p>
           <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Nombre</p>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del integrante" style={inputStyle} />
@@ -239,16 +232,16 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers
               <input type="number" inputMode="decimal" value={salary} onChange={e => setSalary(e.target.value)} placeholder="0" style={inputStyle} />
             </>
           )}
-          <button type="button" onClick={() => onSave({ ...member, name: trimmed, color, ...(isProportional && { salary: parseFloat(salary) || 0 }) })} disabled={!trimmed || isDuplicate}
+          <button onClick={() => onSave({ ...member, name: trimmed, color, ...(isProportional && { salary: parseFloat(salary) || 0 }) })} disabled={!trimmed || isDuplicate}
             style={{ width: "100%", padding: 14, borderRadius: 14, background: (!trimmed || isDuplicate) ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: (!trimmed || isDuplicate) ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
             Guardar
           </button>
           {member.id && !member.linkedUid && (
-            <button type="button" onClick={() => onDelete(member.id)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.dangerBg, color: colors.danger, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+            <button onClick={() => onDelete(member.id)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.dangerBg, color: colors.danger, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
               Eliminar miembro
             </button>
           )}
-          <button type="button" onClick={handleClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+          <button onClick={handleClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
         </div>
       </div>
       {showDiscard && (
