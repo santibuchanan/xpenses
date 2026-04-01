@@ -127,10 +127,14 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
 
   // Swipe-to-close
   const sheetRef = useRef(null);
+  const isDraggingFromHandle = useRef(false);
   const { dragY, isDragging, handlers: swipeHandlers } = useSwipeSheet({ onClose: handleClose });
   const onTouchStart = (e) => {
     const handle = sheetRef.current?.querySelector("[data-handle]");
-    if (handle && handle.contains(e.target)) swipeHandlers.onTouchStart(e);
+    if (handle && handle.contains(e.target)) {
+      isDraggingFromHandle.current = true;
+      swipeHandlers.onTouchStart(e);
+    }
   };
 
   // Al cambiar tipo desde la UI (perspectiva), convertir a tipo real
@@ -253,7 +257,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
-      <div ref={sheetRef} onTouchStart={onTouchStart} onTouchMove={swipeHandlers.onTouchMove} onTouchEnd={swipeHandlers.onTouchEnd}
+      <div ref={sheetRef} onTouchStart={onTouchStart} onTouchMove={swipeHandlers.onTouchMove} onTouchEnd={(e) => { if (isDraggingFromHandle.current) swipeHandlers.onTouchEnd(e); isDraggingFromHandle.current = false; }}
         style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px 44px", maxHeight: "90vh", overflowY: "auto", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
         <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
           <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />

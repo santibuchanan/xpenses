@@ -157,11 +157,15 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
   // Swipe-to-close — solo desde el handle
   const sheetRef = useRef(null);
   const amountRef = useRef(null);
+  const isDraggingFromHandle = useRef(false);
   const { dragY, isDragging, handlers: swipeHandlers } = useSwipeSheet({ onClose: handleClose });
 
   const onTouchStart = (e) => {
     const handle = sheetRef.current?.querySelector("[data-handle]");
-    if (handle && handle.contains(e.target)) swipeHandlers.onTouchStart(e);
+    if (handle && handle.contains(e.target)) {
+      isDraggingFromHandle.current = true;
+      swipeHandlers.onTouchStart(e);
+    }
   };
 
   const [touched, setTouched] = useState({ concept: false, amount: false });
@@ -243,7 +247,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
         ref={sheetRef}
         onTouchStart={onTouchStart}
         onTouchMove={swipeHandlers.onTouchMove}
-        onTouchEnd={swipeHandlers.onTouchEnd}
+        onTouchEnd={(e) => { if (isDraggingFromHandle.current) swipeHandlers.onTouchEnd(e); isDraggingFromHandle.current = false; }}
         style={{
           background: colors.card, borderRadius: "24px 24px 0 0", width: "100%",
           // FIX: altura inicial ~82vh para que se vea que se puede deslizar para cerrar
