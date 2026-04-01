@@ -237,16 +237,16 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers
               <input type="number" inputMode="decimal" value={salary} onChange={e => setSalary(e.target.value)} placeholder="0" style={inputStyle} />
             </>
           )}
-          <button onClick={() => onSave({ ...member, name: trimmed, color, ...(isProportional && { salary: parseFloat(salary) || 0 }) })} disabled={!trimmed || isDuplicate}
+          <button type="button" onClick={() => onSave({ ...member, name: trimmed, color, ...(isProportional && { salary: parseFloat(salary) || 0 }) })} disabled={!trimmed || isDuplicate}
             style={{ width: "100%", padding: 14, borderRadius: 14, background: (!trimmed || isDuplicate) ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: (!trimmed || isDuplicate) ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
             Guardar
           </button>
           {member.id && !member.linkedUid && (
-            <button onClick={() => onDelete(member.id)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.dangerBg, color: colors.danger, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
+            <button type="button" onClick={() => onDelete(member.id)} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.dangerBg, color: colors.danger, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
               Eliminar miembro
             </button>
           )}
-          <button onClick={handleClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
+          <button type="button" onClick={handleClose} style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>Cancelar</button>
         </div>
       </div>
       {showDiscard && (
