@@ -619,7 +619,13 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     if (existingByUid && updated.uid === currentUser.uid) {
       await setDoc(doc(db, "users", currentUser.uid), { name: updated.name, ...(updated.salary !== undefined && { salary: updated.salary }) }, { merge: true });
     } else if (existingByUid && updated.salary !== undefined) {
-      await setDoc(doc(db, "users", updated.uid), { salary: updated.salary }, { merge: true });
+      // No se puede escribir en users/{uid} ajeno — guardar en memberLabels del account
+      const labelsWithSalary = (account?.memberLabels || []).map(l =>
+        l.linkedUid === updated.uid
+          ? { ...l, salary: updated.salary }
+          : l
+      );
+      await updateDoc(doc(db, "accounts", account.id), { memberLabels: labelsWithSalary });
     }
     setEditingMember(null);
   };
