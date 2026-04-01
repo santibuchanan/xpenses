@@ -194,16 +194,17 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
   );
 }
 
-function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers = [] }) {
+function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers = [], isProportional = false }) {
   const [name, setName]   = useState(member.name || "");
   const [color, setColor] = useState(member.color || MEMBER_COLORS[0]);
+  const [salary, setSalary] = useState(member.salary?.toString() || "");
   const [showDiscard, setShowDiscard] = useState(false);
 
   const trimmed = name.trim();
   const isDuplicate = trimmed.length > 0 && allMembers.some(
     m => m.name.toLowerCase() === trimmed.toLowerCase() && m.uid !== member.uid
   );
-  const isDirty = name !== (member.name || "") || color !== (member.color || MEMBER_COLORS[0]);
+  const isDirty = name !== (member.name || "") || color !== (member.color || MEMBER_COLORS[0]) || (isProportional && salary !== (member.salary?.toString() || ""));
   const handleClose = () => { if (isDirty) { setShowDiscard(true); return; } onClose(); };
   const { dragY, isDragging, handlers } = useSwipeSheet({ onClose: handleClose });
 
@@ -225,7 +226,13 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers
               <button key={c} onClick={() => setColor(c)} style={{ width: 36, height: 36, borderRadius: 18, background: c, border: color === c ? "3px solid #fff" : "3px solid transparent", cursor: "pointer", boxShadow: color === c ? `0 0 0 2px ${c}` : "none" }} />
             ))}
           </div>
-          <button onClick={() => onSave({ ...member, name: trimmed, color })} disabled={!trimmed || isDuplicate}
+          {isProportional && (
+            <>
+              <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Salario mensual</p>
+              <input type="number" inputMode="decimal" value={salary} onChange={e => setSalary(e.target.value)} placeholder="0" style={inputStyle} />
+            </>
+          )}
+          <button onClick={() => onSave({ ...member, name: trimmed, color, ...(isProportional && { salary: parseFloat(salary) || 0 }) })} disabled={!trimmed || isDuplicate}
             style={{ width: "100%", padding: 14, borderRadius: 14, background: (!trimmed || isDuplicate) ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: (!trimmed || isDuplicate) ? "default" : "pointer", fontFamily: FONT, marginBottom: 8 }}>
             Guardar
           </button>
@@ -594,18 +601,20 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     const existingByLabelId = updated.id && currentLabels.find(l => l.id === updated.id);
     const existingByUid = updated.uid && currentLabels.find(l => l.linkedUid === updated.uid);
     if (existingByLabelId) {
-      newLabels = currentLabels.map(l => l.id === updated.id ? { ...l, name: updated.name, color: updated.color } : l);
+      newLabels = currentLabels.map(l => l.id === updated.id ? { ...l, name: updated.name, color: updated.color, ...(updated.salary !== undefined && { salary: updated.salary }) } : l);
     } else if (existingByUid) {
       newLabels = currentLabels.map(l => l.linkedUid === updated.uid ? { ...l, name: updated.name, color: updated.color } : l);
     } else {
       const newId = `label_${Date.now()}`;
       const color = MEMBER_COLORS[currentLabels.length % MEMBER_COLORS.length];
-      newLabels = [...currentLabels, { id: newId, name: updated.name, color: updated.color || color, linkedUid: null }];
+      newLabels = [...currentLabels, { id: newId, name: updated.name, color: updated.color || color, linkedUid: null, ...(updated.salary !== undefined && { salary: updated.salary }) }];
     }
     await updateDoc(doc(db, "accounts", account.id), { memberLabels: newLabels });
-    // Si es usuario vinculado, también actualizar su nombre en Firestore users
+    // Si es usuario vinculado, también actualizar su perfil en Firestore users
     if (existingByUid && updated.uid === currentUser.uid) {
-      await setDoc(doc(db, "users", currentUser.uid), { name: updated.name }, { merge: true });
+      await setDoc(doc(db, "users", currentUser.uid), { name: updated.name, ...(updated.salary !== undefined && { salary: updated.salary }) }, { merge: true });
+    } else if (existingByUid && updated.salary !== undefined) {
+      await setDoc(doc(db, "users", updated.uid), { salary: updated.salary }, { merge: true });
     }
     setEditingMember(null);
   };
@@ -1017,6 +1026,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           onDelete={handleDeleteMember}
           onClose={() => setEditingMember(null)}
           allMembers={allMembers}
+          isProportional={account?.divisionSystem === 'proportional'}
         />
       )}
 
