@@ -213,9 +213,11 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const sharedExp   = monthExp.filter(e => e.type !== "mio");
 
   // visibleFixed ya viene filtrado desde App.jsx (FIX #9 — no se recalcula aquí)
-  const sharedFixed   = (visibleFixed || []).filter(f => f.shared);
-  const personalFixed = (visibleFixed || []).filter(f => !f.shared);
-  const fixedTotal    = (visibleFixed || []).reduce((s, f) => s + (f.amount || 0), 0);
+  // Filtrar por startDate — solo fijos cuyo mes de inicio <= mes seleccionado
+  const monthVisibleFixed = (visibleFixed || []).filter(f => !f.startDate || f.startDate.slice(0, 7) <= selectedMonth);
+  const sharedFixed   = monthVisibleFixed.filter(f => f.shared);
+  const personalFixed = monthVisibleFixed.filter(f => !f.shared);
+  const fixedTotal    = monthVisibleFixed.reduce((s, f) => s + (f.amount || 0), 0);
 
   // Saldos — incluir labels porque tienen uid estable y participan en gastos
   // Enriquecer con salary de memberLabels para cuentas proporcionales donde
@@ -232,8 +234,8 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   }, [allMembers, account?.memberLabels]);
   const allMonthSettlements = (settlements || []).filter(s => s.month === selectedMonth);
   const saldos = useMemo(
-    () => calcSaldos(sharedExp, isPersonal ? [] : visibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements),
-    [sharedExp, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements]
+    () => calcSaldos(sharedExp, isPersonal ? [] : monthVisibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements),
+    [sharedExp, monthVisibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements]
   );
   const myBalance = saldos[currentUser.uid]?.balance || 0;
 
@@ -388,7 +390,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
         )}
 
         {/* Gastos fijos */}
-        {visibleFixed.length > 0 && (
+        {monthVisibleFixed.length > 0 && (
           <div style={{ marginTop: 8 }}>
             <button onClick={() => setFixedExpanded(v => !v)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 0 8px", fontFamily: FONT }}>
               <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>📋 Gastos fijos</span>
@@ -430,7 +432,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
                   </>
                 )}
 
-                {isPersonal && visibleFixed.map(f => (
+                {isPersonal && monthVisibleFixed.map(f => (
                   <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
                 ))}
               </div>

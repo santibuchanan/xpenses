@@ -290,9 +290,15 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
     [settlements, selectedMonth]
   );
 
+  // Solo incluir fijos cuyo mes de inicio <= mes seleccionado
+  const monthVisibleFixed = useMemo(
+    () => (visibleFixed || []).filter(f => !f.startDate || f.startDate.slice(0, 7) <= selectedMonth),
+    [visibleFixed, selectedMonth]
+  );
+
   const saldos = useMemo(
-    () => calcSaldosAcumulados(expenses.filter(e => !e.deleted), visibleFixed, realMembers, account?.divisionSystem, selectedMonth, settlements),
-    [expenses, settlements, visibleFixed, realMembers, account?.divisionSystem, selectedMonth]
+    () => calcSaldosAcumulados(expenses.filter(e => !e.deleted), monthVisibleFixed, realMembers, account?.divisionSystem, selectedMonth, settlements),
+    [expenses, settlements, monthVisibleFixed, realMembers, account?.divisionSystem, selectedMonth]
   );
 
   const balances = realMembers.map(m => ({ ...m, balance: saldos[m.uid]?.balance || 0 }));
