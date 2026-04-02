@@ -161,6 +161,7 @@ export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, col
         {/* Card deslizable */}
         <div
           {...handlers}
+          onTouchStart={(e) => { e.stopPropagation(); handlers.onTouchStart(e); }}
           onClick={handleClick}
           style={{
             background: colors.card, borderRadius: 20, padding: "14px 16px",
