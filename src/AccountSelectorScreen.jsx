@@ -16,8 +16,8 @@ const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sa
 
 function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
   const [swipeX, setSwipeX] = useState(0);
-  const startX              = { current: null };
-  const isDragging          = { current: false };
+  const startX              = useRef(null);
+  const isDragging          = useRef(false);
   const DELETE_THRESHOLD    = 80;
 
   const onTouchStart = (e) => {
