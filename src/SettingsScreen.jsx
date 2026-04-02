@@ -600,8 +600,6 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const generateInvite = () => { setShowInvite(true); };
 
   const handleSaveMember = async (updated) => {
-    console.log('[DEBUG handleSaveMember]', JSON.stringify(updated));
-    console.log('[DEBUG currentLabels]', JSON.stringify(account?.memberLabels));
     const currentLabels = account?.memberLabels || [];
     let newLabels;
     // Buscar por id (label sin vincular) o por linkedUid (usuario vinculado)
@@ -722,7 +720,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       {members?.map(m => {
         const linkedLabel = memberLabels.find(l => l.linkedUid === m.uid);
         const displayMember = linkedLabel
-          ? { ...m, name: linkedLabel.name, color: linkedLabel.color || m.color }
+          ? { ...m, salary: linkedLabel.salary, name: linkedLabel.name, color: linkedLabel.color || m.color }
           : m;
         return (
           <SwipeableMemberRow
