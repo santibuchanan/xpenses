@@ -608,24 +608,16 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     if (existingByLabelId) {
       newLabels = currentLabels.map(l => l.id === updated.id ? { ...l, name: updated.name, color: updated.color, ...(updated.salary !== undefined && { salary: updated.salary }) } : l);
     } else if (existingByUid) {
-      newLabels = currentLabels.map(l => l.linkedUid === updated.uid ? { ...l, name: updated.name, color: updated.color } : l);
+      newLabels = currentLabels.map(l => l.linkedUid === updated.uid ? { ...l, name: updated.name, color: updated.color, ...(updated.salary !== undefined && { salary: updated.salary }) } : l);
     } else {
       const newId = `label_${Date.now()}`;
       const color = MEMBER_COLORS[currentLabels.length % MEMBER_COLORS.length];
       newLabels = [...currentLabels, { id: newId, name: updated.name, color: updated.color || color, linkedUid: null, ...(updated.salary !== undefined && { salary: updated.salary }) }];
     }
     await updateDoc(doc(db, "accounts", account.id), { memberLabels: newLabels });
-    // Si es usuario vinculado, también actualizar su perfil en Firestore users
+    // Si es el propio usuario vinculado, también actualizar su perfil en Firestore users
     if (existingByUid && updated.uid === currentUser.uid) {
       await setDoc(doc(db, "users", currentUser.uid), { name: updated.name, ...(updated.salary !== undefined && { salary: updated.salary }) }, { merge: true });
-    } else if (existingByUid && updated.salary !== undefined) {
-      // No se puede escribir en users/{uid} ajeno — guardar en memberLabels del account
-      const labelsWithSalary = (account?.memberLabels || []).map(l =>
-        l.linkedUid === updated.uid
-          ? { ...l, salary: updated.salary }
-          : l
-      );
-      await updateDoc(doc(db, "accounts", account.id), { memberLabels: labelsWithSalary });
     }
     setEditingMember(null);
   };
