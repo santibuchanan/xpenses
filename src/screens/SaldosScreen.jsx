@@ -270,14 +270,21 @@ export default function SaldosScreen({ expenses, visibleFixed, members, account,
 
   const monthExp = expenses.filter(e => e.month === selectedMonth && !e.deleted);
   // Memoizado: evita que saldos useMemo recalcule en cada render por referencia nueva de array.
-  const realMembers = useMemo(
-    () => (members || []).filter(m => !!m.uid).sort((a, b) => {
-      if (a.uid === currentUser.uid) return -1;
-      if (b.uid === currentUser.uid) return 1;
-      return 0;
-    }),
-    [members, currentUser.uid]
-  );
+  const realMembers = useMemo(() => {
+    const labelMap = Object.fromEntries(
+      (account?.memberLabels || [])
+        .filter(l => l.linkedUid)
+        .map(l => [l.linkedUid, l])
+    );
+    return (members || [])
+      .filter(m => !!m.uid)
+      .map(m => ({ ...m, salary: m.salary ?? labelMap[m.uid]?.salary }))
+      .sort((a, b) => {
+        if (a.uid === currentUser.uid) return -1;
+        if (b.uid === currentUser.uid) return 1;
+        return 0;
+      });
+  }, [members, account?.memberLabels, currentUser.uid]);
   const monthSettlements = useMemo(
     () => (settlements || []).filter(s => s.month === selectedMonth),
     [settlements, selectedMonth]

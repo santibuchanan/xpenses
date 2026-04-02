@@ -218,7 +218,18 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const fixedTotal    = (visibleFixed || []).reduce((s, f) => s + (f.amount || 0), 0);
 
   // Saldos — incluir labels porque tienen uid estable y participan en gastos
-  const realMembers = allMembers?.filter(m => !!m.uid) || [];
+  // Enriquecer con salary de memberLabels para cuentas proporcionales donde
+  // el salary del linked user vive en account.memberLabels, no en users/{uid}
+  const realMembers = useMemo(() => {
+    const labelMap = Object.fromEntries(
+      (account?.memberLabels || [])
+        .filter(l => l.linkedUid)
+        .map(l => [l.linkedUid, l])
+    );
+    return (allMembers || [])
+      .filter(m => !!m.uid)
+      .map(m => ({ ...m, salary: m.salary ?? labelMap[m.uid]?.salary }));
+  }, [allMembers, account?.memberLabels]);
   const allMonthSettlements = (settlements || []).filter(s => s.month === selectedMonth);
   const saldos = useMemo(
     () => calcSaldos(sharedExp, isPersonal ? [] : visibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements),
