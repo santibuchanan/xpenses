@@ -3,6 +3,7 @@ import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc } from "firebase/
 import { db, deleteUserData, reauthenticateUser } from "./firebase";
 import { useTheme, CURRENCIES as CURRENCIES_MAP } from "./theme.jsx";
 import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
+import { useAmountInput } from "./hooks/useAmountInput.js";
 import DateInput from "./DateInput";
 import InviteScreen from "./InviteScreen.jsx";
 
@@ -100,16 +101,18 @@ function EditCategoryModal({ category, onSave, onClose, onDelete, isDefault, col
   );
 }
 
-function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount }) {
+function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount, currency = "ARS" }) {
   const [form, setForm] = useState(
-    expense || { name: "", amount: "", dueDay: "", shared: true, startDate: new Date().toISOString().slice(0, 10) }
+    expense || { name: "", dueDay: "", shared: true, startDate: new Date().toISOString().slice(0, 10) }
   );
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const [showDiscard, setShowDiscard] = useState(false);
 
+  const { displayValue, numericValue, onChange: onAmountChange } = useAmountInput(expense?.amount ?? 0);
+  const currSymbol = CURRENCY_SYMBOLS[currency] || "$";
+
   const initialName = expense?.name || "";
-  const initialAmount = String(expense?.amount || "");
-  const isDirty = form.name !== initialName || String(form.amount) !== initialAmount;
+  const isDirty = form.name !== initialName || numericValue !== (expense?.amount || 0);
   const handleClose = () => { if (isDirty) { setShowDiscard(true); return; } onClose(); };
   const { dragY, isDragging, handlers } = useSwipeSheet({ onClose: handleClose });
 
@@ -136,8 +139,18 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
           <p style={labelStyle}>Nombre</p>
           <input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Ej: Expensas, Netflix, Gym..." style={inputStyle} />
 
-          <p style={labelStyle}>Monto</p>
-          <input type="number" inputMode="decimal" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0" style={inputStyle} />
+          <p style={labelStyle}>Monto ({currSymbol})</p>
+          <div style={{ position: "relative", marginBottom: 14 }}>
+            <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={displayValue}
+              onChange={onAmountChange}
+              placeholder="0"
+              style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36 }}
+            />
+          </div>
 
           {!isPersonalAccount && (
             <>
@@ -173,7 +186,7 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
             : null}
 
           <button
-            onClick={() => onSave({ ...form, amount: parseFloat(form.amount) || 0, dueDay: parseInt(form.dueDay) || null })}
+            onClick={() => onSave({ ...form, amount: numericValue, dueDay: parseInt(form.dueDay) || null })}
             style={{ width: "100%", padding: 14, borderRadius: 14, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 8 }}>
             Guardar
           </button>
@@ -1002,6 +1015,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
         <FixedExpenseModal
           colors={colors}
           isPersonalAccount={isPersonal}
+          currency={account?.currency || "ARS"}
           expense={editingFixed || undefined}
           onSave={handleSaveFixed}
           onClose={() => { setEditingFixed(null); setShowNewFixed(false); }}
