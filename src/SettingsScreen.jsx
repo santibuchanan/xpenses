@@ -118,9 +118,11 @@ function EditCategoryModal({ category, onSave, onClose, onDelete, isDefault, col
   );
 }
 
-function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount, currency = "ARS" }) {
+function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount, currency = "ARS", categories = [] }) {
   const [form, setForm] = useState(
-    expense || { name: "", dueDay: "", shared: true, startDate: new Date().toISOString().slice(0, 10) }
+    expense
+      ? { ...expense, category: expense.category || null }
+      : { name: "", dueDay: "", shared: true, startDate: new Date().toISOString().slice(0, 10), category: null }
   );
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const [showDiscard, setShowDiscard] = useState(false);
@@ -129,7 +131,7 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
   const currSymbol = CURRENCY_SYMBOLS[currency] || "$";
 
   const initialName = expense?.name || "";
-  const isDirty = form.name !== initialName || numericValue !== (expense?.amount || 0);
+  const isDirty = form.name !== initialName || numericValue !== (expense?.amount || 0) || form.category !== (expense?.category || null);
   const handleClose = () => { if (isDirty) { setShowDiscard(true); return; } onClose(); };
   const { dragY, isDragging, handlers } = useSwipeSheet({ onClose: handleClose });
 
@@ -180,6 +182,24 @@ function FixedExpenseModal({ expense, onSave, onClose, colors, isPersonalAccount
                       background: form.shared === val ? "#4F7FFA11" : colors.input,
                       color: form.shared === val ? "#4F7FFA" : colors.textMuted }}>
                     {lbl}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {categories.length > 0 && (
+            <>
+              <p style={labelStyle}>Categoría (opcional)</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                {categories.map(cat => (
+                  <button key={cat.id} type="button"
+                    onClick={() => set("category", form.category === cat.id ? null : cat.id)}
+                    style={{ padding: "8px 12px", borderRadius: 20, border: "2px solid", fontSize: 13, cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: 6,
+                      borderColor: form.category === cat.id ? "#4F7FFA" : colors.inputBorder,
+                      background: form.category === cat.id ? "#4F7FFA11" : colors.input,
+                      color: form.category === cat.id ? "#4F7FFA" : colors.text }}>
+                    {cat.icon} {cat.label}
                   </button>
                 ))}
               </div>
@@ -1049,6 +1069,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
           expense={editingFixed || undefined}
           onSave={handleSaveFixed}
           onClose={() => { setEditingFixed(null); setShowNewFixed(false); }}
+          categories={allCategories}
         />
       )}
 
