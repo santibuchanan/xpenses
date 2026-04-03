@@ -16,12 +16,20 @@ import { removeMember } from "./hooks/removeMember.js";
 const EMOJI_OPTIONS = ["🛒","🍕","💡","🚗","💊","👗","🏠","📦","🐶","✈️","🏋️","📚","📱","🎮","🍺","☕","🎁","💈","🎵","🏥","🌮","🧴","🎬","🏖️","🎓","💻","🛵","🧹","🪴","🐱","⚽️","🔥","🍔","👩🏼‍❤️‍👨🏼","💃🏾","🏝️","🛫","🍣","🎂","🍾","🏂","⛷️"];
 
 const MONTHS_ES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-function salaryUpdatedMsg(dateStr) {
+function _salaryDate(dateStr) {
   if (!dateStr) return null;
   const currentMonth = new Date().toISOString().slice(0, 7);
   if (dateStr.slice(0, 7) !== currentMonth) return null;
   const [year, month, day] = dateStr.split("-");
-  return `Sueldo actualizado · Aplica desde el ${parseInt(day)} de ${MONTHS_ES[parseInt(month) - 1]} de ${year}`;
+  return { year, month: MONTHS_ES[parseInt(month) - 1], day: parseInt(day) };
+}
+function salaryUpdatedMsg(dateStr) {
+  const d = _salaryDate(dateStr);
+  return d ? `Sueldo actualizado · Aplica desde el ${d.day} de ${d.month} de ${d.year}` : null;
+}
+function salaryRowMsg(dateStr) {
+  const d = _salaryDate(dateStr);
+  return d ? `Sueldo actualizado el ${d.day} de ${d.month} de ${d.year}` : null;
 }
 
 function SectionHeader({ title, colors }) {
@@ -257,9 +265,6 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers
             <>
               <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Salario mensual</p>
               <input type="number" inputMode="decimal" value={salary} onChange={e => setSalary(e.target.value)} placeholder="0" style={inputStyle} />
-              {salaryUpdatedMsg(member.salaryUpdatedAt) && (
-                <p style={{ fontSize: 12, color: "#2ecc71", margin: "-10px 0 14px", fontFamily: FONT }}>{salaryUpdatedMsg(member.salaryUpdatedAt)}</p>
-              )}
             </>
           )}
           <button type="button" onClick={() => onSave({ ...member, name: trimmed, color, ...(isProportional && { salary: parseFloat(salary) || 0 }) })} disabled={!trimmed || isDuplicate}
@@ -407,6 +412,9 @@ function SwipeableMemberRow({ member, isCurrentUser, onEdit, onRemoveRequest, co
             {showSalary ? `$${(member.salary || 0).toLocaleString('es-AR')}/mes · ` : ""}
             {member.uid ? "Vinculado ✓" : (member.linkedUid ? "Vinculado ✓" : "Sin vincular")}
           </p>
+          {showSalary && salaryRowMsg(member.salaryUpdatedAt) && (
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#2ecc71", fontFamily: FONT }}>{salaryRowMsg(member.salaryUpdatedAt)}</p>
+          )}
         </div>
       </div>
     </div>
