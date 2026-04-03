@@ -73,11 +73,14 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
     }).reduce((s, f) => s + (f.amount || 0), 0),
   }];
 
-  const pieData = allCategories.map((c, i) => ({
-    name: c.label,
-    value: activeExpenses.filter(e => e.month === pieMonth && e.category === c.id).reduce((s, e) => s + e.amount, 0),
-    color: CAT_COLORS[i % CAT_COLORS.length],
-  })).filter(c => c.value > 0);
+  const pieData = allCategories.map((c, i) => {
+    const fromExp   = activeExpenses.filter(e => e.month === pieMonth && e.category === c.id).reduce((s, e) => s + e.amount, 0);
+    const fromFixed = (fixedExpenses || []).filter(f => {
+      const start = (f.startDate || "2000-01").slice(0, 7);
+      return f.category === c.id && pieMonth >= start;
+    }).reduce((s, f) => s + (f.amount || 0), 0);
+    return { name: c.label, value: fromExp + fromFixed, color: CAT_COLORS[i % CAT_COLORS.length] };
+  }).filter(c => c.value > 0);
 
   const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     if (percent < 0.07) return null;
