@@ -94,11 +94,12 @@ Origen: `account.memberLabels[]`
 
 ```js
 {
-  id:        string,         // ID local, ej: "label_1234567890"
-  name:      string,
-  color:     string,
-  linkedUid: string | null,  // null si todavía no aceptó la invitación
-  salary:    number,         // Solo en cuentas proporcionales (puede ser undefined)
+  id:             string,         // ID local, ej: "label_1234567890"
+  name:           string,
+  color:          string,
+  linkedUid:      string | null,  // null si todavía no aceptó la invitación
+  salary:         number,         // Solo en cuentas proporcionales (puede ser undefined)
+  salaryUpdatedAt: string,        // "YYYY-MM-DD" — fecha en que se editó el salary; undefined si nunca cambió
 }
 ```
 
@@ -201,7 +202,9 @@ Origen: subcolección `accounts/{id}/fixedExpenses/`
       paid:   boolean,
       paidBy: string,
     }
-  }
+  },
+  category: string | null,    // ID de categoría (DEFAULT_CATEGORIES o custom); null = sin asignar
+  // Retrocompatible: fijos existentes sin category se tratan como null — no suman en ninguna categoría
 }
 ```
 
@@ -405,6 +408,11 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 - `runTransaction` para join atómico
 - Al terminar: `window.location.replace(origin)`
 
+### `components/expenses/SwipeableExpenseRow.jsx`
+
+- Fila de gasto con swipe-to-edit (bottom sheet) y swipe-to-delete
+- `onTouchStart` del card llama `e.stopPropagation()` antes de `handlers.onTouchStart(e)` — evita que el swipe de la fila pise el swipe horizontal de cambio de mes de HomeScreen/SaldosScreen
+
 ### `SettingsScreen.jsx`
 
 > ⚠️ Tiene sus propios listeners de Firestore para categorías y gastos fijos — duplican los de `useFirestoreData`. Pendiente de limpiar (T1).
@@ -466,7 +474,8 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 | Zona | Archivo | Riesgo |
 |------|---------|--------|
 | `accountsLoading` | `useAccountData.js` | Depende de que TODOS los listeners respondan |
-| `visibleFixed` | `HomeScreen` y `SaldosScreen` | Lógica duplicada — cambiar en uno no cambia el otro |
+| `visibleFixed` + filtro `startDate` | `HomeScreen`, `SaldosScreen` | Lógica duplicada. Patrón: `f.startDate?.slice(0,7) <= selectedMonth`; HomeScreen inline, SaldosScreen con `useMemo` |
+| `realMembers` salary enrichment | `HomeScreen`, `SaldosScreen` | `realMembers` enriquece `m.salary` con `memberLabels[linkedUid]?.salary` — NO leer salary solo de `members` en cuentas proporcionales |
 | Listeners duplicados | `SettingsScreen.jsx` | Lecturas innecesarias de Firestore |
 | `forWhom` inicial | `AddExpenseModal.jsx` | Si allMembers llega tarde, forWhom queda vacío |
 
@@ -489,7 +498,8 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 | Cuánto pagó un uid por un gasto | `getAmountPaidBy()` en `utils/expenseFilters.js` | `HomeScreen` (isPozo), `SaldosScreen` (isPozo) |
 | Formateo de montos | `formatAmount()` en `theme.jsx` | Todas las pantallas |
 | Operaciones de escritura de gastos | `hooks/useExpenses.js` | `App.jsx` |
-| Input de montos | `hooks/useAmountInput.js` | `AddExpenseModal`, `EditExpenseModal` |
+| Input de montos | `hooks/useAmountInput.js` | `AddExpenseModal`, `EditExpenseModal`, `FixedExpenseModal` (SettingsScreen) |
+| Category en gastos fijos | `catTotals` (HomeScreen), `pieData` (GraficosScreen) | Fijos con `category` suman en su categoría igual que gastos normales; fijos sin `category` no suman en ninguna |
 | Bottom sheet swipe | `hooks/useSwipeSheet.js` | `AddExpenseModal`, `EditExpenseModal` |
 | Categorías default | `constants/categories.js` | Múltiples componentes |
 | Divisas | `CURRENCIES` en `theme.jsx` | Múltiples componentes |
@@ -505,12 +515,16 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 - Pills de filtro muestran emoji de categoría
 - Gastos fijos con subsecciones Hogar/Personal
 - `MonthNavBar` debajo del hero — dots de paginación + label del mes activo
-- Swipe horizontal (delta > 50px) navega entre meses; respeta límites `minMonth` / `actualMonth`
+- Swipe horizontal (delta > 50px) navega entre meses; respeta límites `minMonth` / `actualMonth`; `SwipeableExpenseRow` usa `e.stopPropagation()` en `onTouchStart` para no pisar este swipe
+- `monthVisibleFixed`: fijos de `visibleFixed` filtrados por `f.startDate?.slice(0,7) <= selectedMonth`
+- `catTotals`: suma gastos regulares + gastos fijos con `category` definida; fijos sin `category` no suman en ninguna
 - Todo el contenido (gastos, gastos fijos, saldos, settlements) se filtra por `selectedMonth`
 
 ### SaldosScreen ✅
 - `MonthNavBar` al tope — dots de paginación + label del mes activo (navegación global con `selectedMonth`)
 - Swipe horizontal navega entre meses; botón "Saldar" oculto en meses históricos (`selectedMonth !== todayMonth`)
+- `monthVisibleFixed`: memoizado con `useMemo`, filtrado por `f.startDate?.slice(0,7) <= selectedMonth`
+- `realMembers`: enriquecido con `salary` de `memberLabels[linkedUid]?.salary` (cuentas proporcionales)
 - **Cuentas shared:** balance neto por miembro, algoritmo greedy, botón Saldar
   - Botón Saldar con guard `useRef` anti-doble-tap; al saldar total usa `debtPairs` frescos (no estado del modal)
   - Settle modal avanza al siguiente acreedor automáticamente o se cierra si no quedan deudas
@@ -529,6 +543,7 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 - Swipe horizontal navega entre meses
 - Toggle "Por mes" / "Por tipo" — torta y barras usan `selectedMonth` (eliminados `pieMonthIdx` / `barMonthIdx`)
 - Excluye gastos `deleted: true`
+- `pieData` (Por categoría): suma gastos regulares + fijos con `category` y `startDate?.slice(0,7) <= selectedMonth`
 - Sección "Presupuesto" (solo si `categoryBudgets` con categorías configuradas): card total del mes con barra de progreso + alertas, cards por categoría con barra de progreso individual
 - Acepta prop `categoryBudgets` desde `account.categoryBudgets`
 
@@ -564,6 +579,9 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 - Salario visible solo en cuentas compartidas proporcionales
 - Fix de edición de miembro: busca por `id` (labels) o `linkedUid` (vinculados)
 - No duplica miembros al editar
+- **Salary de miembro ajeno:** se guarda SOLO en `memberLabels`; si el miembro editado es el propio usuario vinculado (`linkedUid === currentUser.uid`), también actualiza `users/{uid}` — doble escritura intencional
+- **`salaryUpdatedAt`:** guardado en `memberLabels` + `users/{uid}` (Mi Perfil) solo cuando el valor cambia; `salaryRowMsg()` en fila del miembro (verde, solo mes actual); `salaryUpdatedMsg()` bajo campo salario en Mi Perfil
+- **`FixedExpenseModal`:** usa `useAmountInput` para input de monto; acepta prop `categories` (allCategories de la cuenta) para selector de categoría opcional; guarda `category: string | null` — retrocompat
 - Sección "Presupuesto" (solo cuentas pozo): muestra total configurado, botón "Configurar/Editar" abre bottom sheet con input total + inputs por categoría; guarda en `account.categoryBudgets` vía `updateDoc`
 
 ### MenuPanel ✅
@@ -602,6 +620,19 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 | `handleFullSettle` notificaba a todos los miembros en lugar de solo al acreedor | Mar 26 |
 | `handlePartialSettle` no enviaba notificación — ahora notifica solo al acreedor | Mar 26 |
 | `removeMember.js`: detecta y reasigna miembro en `paidBy` array; si queda 1 pagador convierte a string | ✅ Resuelto Mar 28 |
+
+### ✅ Resueltos Apr 3, 2026
+
+| Item | Sesión |
+|------|--------|
+| `SwipeableExpenseRow`: `e.stopPropagation()` en `onTouchStart` del card — evita pisar swipe horizontal de cambio de mes | Apr 3 |
+| `SwipeableAccountRow`: `isDragging` como `useRef` en lugar de estado — swipe no se rompe en re-renders | Apr 3 |
+| `FixedExpenseModal`: usa `useAmountInput` para input de monto (antes era `<input>` sin formato) | Apr 3 |
+| `monthVisibleFixed`: filtro por `startDate <= selectedMonth` — HomeScreen (inline) y SaldosScreen (`useMemo`) | Apr 3 |
+| `realMembers` enriquecido con `salary` de `memberLabels[linkedUid]?.salary` en HomeScreen y SaldosScreen | Apr 3 |
+| Salary de miembro ajeno guardado SOLO en `memberLabels`; si es el propio usuario vinculado: doble escritura en `memberLabels` + `users/{uid}` | Apr 3 |
+| `salaryUpdatedAt` en `users/{uid}` y `memberLabels` al cambiar salary; feedback in-app: `salaryRowMsg` en fila del miembro, `salaryUpdatedMsg` en Mi Perfil | Apr 3 |
+| `FixedExpense.category`: campo `string \| null` opcional; selector en `FixedExpenseModal`; suma en `catTotals` (HomeScreen) y `pieData` (GraficosScreen); retrocompat | Apr 3 |
 
 ### ✅ Resueltos Mar 30, 2026
 

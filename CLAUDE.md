@@ -64,6 +64,21 @@
   createdAt }
 ```
 
+### FixedExpense
+```js
+{ id, name, amount, dueDay, shared, startDate, createdBy, category,
+  payments: { [month: "YYYY-MM"]: { paid: boolean, paidBy: string } } }
+// category: string | null — retrocompat: null = sin categoría, no suma en Top Categorías ni pie chart
+// startDate filtra visibilidad: solo fijos con startDate.slice(0,7) <= selectedMonth son visibles
+```
+
+### Salary — dónde vive y dónde leer
+- **`memberLabels`** es la fuente primaria de salary para miembros vinculados ajenos
+- **`users/{uid}`** es la fuente del propio usuario (también escrito al editar Mi Perfil)
+- Si el miembro editado es el usuario actual (`linkedUid === currentUser.uid`): escribir en AMBOS
+- `realMembers` en HomeScreen/SaldosScreen enriquece `m.salary` con `memberLabels[linkedUid]?.salary ?? m.salary`
+- `salaryUpdatedAt: "YYYY-MM-DD"` se guarda en `memberLabels` y `users/{uid}` solo cuando el valor cambia; visible en SettingsScreen solo si es del mes actual
+
 ---
 
 ## Reglas de notificaciones
@@ -152,6 +167,11 @@ style={{ touchAction: 'pan-y' }}
 - [ ] Modales con scroll lock
 - [ ] Bottom sheets con `useSwipeSheet`
 - [ ] Textos en español rioplatense
+
+### Gastos fijos
+- [ ] `category` en FixedExpense: `string | null` — retrocompat con fijos sin campo
+- [ ] `monthVisibleFixed` filtrado por `f.startDate?.slice(0,7) <= selectedMonth`
+- [ ] `catTotals` (HomeScreen) y `pieData` (GraficosScreen) suman fijos con `category`
 
 ### Firebase
 - [ ] Todos los listeners tienen cleanup (`return unsub`)
