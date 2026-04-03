@@ -244,7 +244,11 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const myPersonalTotal = monthExp.filter(e => e.type === "mio" && e.owner === currentUser.uid).reduce((s, e) => s + e.amount, 0);
 
   const catTotals = allCategories
-    .map(c => ({ ...c, total: monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0) }))
+    .map(c => {
+      const fromExp   = monthExp.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0);
+      const fromFixed = monthVisibleFixed.filter(f => f.category === c.id).reduce((s, f) => s + (f.amount || 0), 0);
+      return { ...c, total: fromExp + fromFixed };
+    })
     .filter(c => c.total > 0)
     .sort((a, b) => b.total - a.total);
 
