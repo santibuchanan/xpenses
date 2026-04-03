@@ -15,6 +15,15 @@ import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 import { removeMember } from "./hooks/removeMember.js";
 const EMOJI_OPTIONS = ["🛒","🍕","💡","🚗","💊","👗","🏠","📦","🐶","✈️","🏋️","📚","📱","🎮","🍺","☕","🎁","💈","🎵","🏥","🌮","🧴","🎬","🏖️","🎓","💻","🛵","🧹","🪴","🐱","⚽️","🔥","🍔","👩🏼‍❤️‍👨🏼","💃🏾","🏝️","🛫","🍣","🎂","🍾","🏂","⛷️"];
 
+const MONTHS_ES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+function salaryUpdatedMsg(dateStr) {
+  if (!dateStr) return null;
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  if (dateStr.slice(0, 7) !== currentMonth) return null;
+  const [year, month, day] = dateStr.split("-");
+  return `Sueldo actualizado · Aplica desde el ${parseInt(day)} de ${MONTHS_ES[parseInt(month) - 1]} de ${year}`;
+}
+
 function SectionHeader({ title, colors }) {
   return <p style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, letterSpacing: 1.2, textTransform: "uppercase", margin: "24px 0 8px", fontFamily: FONT }}>{title}</p>;
 }
@@ -248,6 +257,9 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers
             <>
               <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Salario mensual</p>
               <input type="number" inputMode="decimal" value={salary} onChange={e => setSalary(e.target.value)} placeholder="0" style={inputStyle} />
+              {salaryUpdatedMsg(member.salaryUpdatedAt) && (
+                <p style={{ fontSize: 12, color: "#2ecc71", margin: "-10px 0 14px", fontFamily: FONT }}>{salaryUpdatedMsg(member.salaryUpdatedAt)}</p>
+              )}
             </>
           )}
           <button type="button" onClick={() => onSave({ ...member, name: trimmed, color, ...(isProportional && { salary: parseFloat(salary) || 0 }) })} disabled={!trimmed || isDuplicate}
@@ -552,7 +564,10 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
 
   const saveProfile = async () => {
     setSavingProfile(true);
-    await setDoc(doc(db, "users", currentUser.uid), { name: myName, salary: parseFloat(mySalary) || 0 }, { merge: true });
+    const newSalary = parseFloat(mySalary) || 0;
+    const salaryChanged = !isPersonal && newSalary !== (userProfile?.salary || 0);
+    const update = { name: myName, salary: newSalary, ...(salaryChanged && { salaryUpdatedAt: new Date().toISOString().slice(0, 10) }) };
+    await setDoc(doc(db, "users", currentUser.uid), update, { merge: true });
     setSavingProfile(false);
     setEditingProfile(false);
   };
@@ -618,19 +633,23 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
     // Buscar por id (label sin vincular) o por linkedUid (usuario vinculado)
     const existingByLabelId = updated.id && currentLabels.find(l => l.id === updated.id);
     const existingByUid = updated.uid && currentLabels.find(l => l.linkedUid === updated.uid);
+    const today = new Date().toISOString().slice(0, 10);
     if (existingByLabelId) {
-      newLabels = currentLabels.map(l => l.id === updated.id ? { ...l, name: updated.name, color: updated.color, ...(updated.salary !== undefined && { salary: updated.salary }) } : l);
+      const salaryChanged = updated.salary !== undefined && updated.salary !== existingByLabelId.salary;
+      newLabels = currentLabels.map(l => l.id === updated.id ? { ...l, name: updated.name, color: updated.color, ...(updated.salary !== undefined && { salary: updated.salary }), ...(salaryChanged && { salaryUpdatedAt: today }) } : l);
     } else if (existingByUid) {
-      newLabels = currentLabels.map(l => l.linkedUid === updated.uid ? { ...l, name: updated.name, color: updated.color, ...(updated.salary !== undefined && { salary: updated.salary }) } : l);
+      const salaryChanged = updated.salary !== undefined && updated.salary !== existingByUid.salary;
+      newLabels = currentLabels.map(l => l.linkedUid === updated.uid ? { ...l, name: updated.name, color: updated.color, ...(updated.salary !== undefined && { salary: updated.salary }), ...(salaryChanged && { salaryUpdatedAt: today }) } : l);
     } else {
       const newId = `label_${Date.now()}`;
       const color = MEMBER_COLORS[currentLabels.length % MEMBER_COLORS.length];
-      newLabels = [...currentLabels, { id: newId, name: updated.name, color: updated.color || color, linkedUid: null, ...(updated.salary !== undefined && { salary: updated.salary }) }];
+      newLabels = [...currentLabels, { id: newId, name: updated.name, color: updated.color || color, linkedUid: null, ...(updated.salary !== undefined && { salary: updated.salary }), ...(updated.salary !== undefined && { salaryUpdatedAt: today }) }];
     }
     await updateDoc(doc(db, "accounts", account.id), { memberLabels: newLabels });
     // Si es el propio usuario vinculado, también actualizar su perfil en Firestore users
     if (existingByUid && updated.uid === currentUser.uid) {
-      await setDoc(doc(db, "users", currentUser.uid), { name: updated.name, ...(updated.salary !== undefined && { salary: updated.salary }) }, { merge: true });
+      const salaryChanged = updated.salary !== undefined && updated.salary !== existingByUid.salary;
+      await setDoc(doc(db, "users", currentUser.uid), { name: updated.name, ...(updated.salary !== undefined && { salary: updated.salary }), ...(salaryChanged && { salaryUpdatedAt: today }) }, { merge: true });
     }
     setEditingMember(null);
   };
@@ -701,6 +720,9 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
               <>
                 <p style={{ fontSize: 11, fontWeight: 600, color: colors.textMuted, marginBottom: 6, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Salario mensual</p>
                 <input type="number" value={mySalary} onChange={e => setMySalary(e.target.value)} style={inputStyle} />
+                {salaryUpdatedMsg(userProfile?.salaryUpdatedAt) && (
+                  <p style={{ fontSize: 12, color: "#2ecc71", margin: "-8px 0 12px", fontFamily: FONT }}>{salaryUpdatedMsg(userProfile?.salaryUpdatedAt)}</p>
+                )}
               </>
             )}
             <button onClick={saveProfile} disabled={savingProfile} style={{ width: "100%", padding: 12, borderRadius: 12, background: savingProfile ? "#aaa" : "#4F7FFA", color: "#fff", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>
@@ -733,7 +755,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       {members?.map(m => {
         const linkedLabel = memberLabels.find(l => l.linkedUid === m.uid);
         const displayMember = linkedLabel
-          ? { ...m, salary: linkedLabel.salary, name: linkedLabel.name, color: linkedLabel.color || m.color }
+          ? { ...m, salary: linkedLabel.salary, name: linkedLabel.name, color: linkedLabel.color || m.color, salaryUpdatedAt: linkedLabel.salaryUpdatedAt }
           : m;
         return (
           <SwipeableMemberRow
