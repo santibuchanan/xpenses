@@ -4,7 +4,7 @@
  * La creación de nueva cuenta fue extraída a CreateAccountScreen.jsx
  */
 import { useState, useRef } from "react";
-import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
+import { useSwipeSheet, useSwipeRow } from "./hooks/useSwipeSheet.js";
 import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
@@ -16,46 +16,50 @@ const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sa
 // ── SwipeableAccountRow ───────────────────────────────────────────────────────
 
 function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
-  const [swipeX, setSwipeX] = useState(0);
-  const startX              = useRef(null);
-  const isDragging          = useRef(false);
-  const DELETE_THRESHOLD    = 80;
+  const { offsetX, isSettling, peekProgress, handlers, reset, wasDragging } = useSwipeRow({
+    peekDistance: 80,
+    fullDistance: 180,
+    onFull: () => onDeleteRequest(acc.id),
+  });
 
-  const onTouchStart = (e) => {
-    startX.current     = e.touches[0].clientX;
-    isDragging.current = true;
-  };
-  const onTouchMove = (e) => {
-    if (!isDragging.current || startX.current === null) return;
-    const diff = startX.current - e.touches[0].clientX;
-    if (diff > 0) setSwipeX(Math.min(diff, DELETE_THRESHOLD + 20));
-    else if (diff < -10) setSwipeX(0);
-  };
-  const onTouchEnd = () => {
-    isDragging.current = false;
-    if (swipeX > DELETE_THRESHOLD / 2) {
-      setSwipeX(0);
-      onDeleteRequest(acc.id);
-    } else {
-      setSwipeX(0);
-    }
-    startX.current = null;
+  const handleClick = () => {
+    if (wasDragging()) return;
+    if (offsetX > 0) { reset(); return; }
+    onSelect(acc.id);
   };
 
+  const PEEK = 80;
   const memberLabels   = acc.memberLabels || [];
   const unlinkedCount  = memberLabels.filter(l => !l.linkedUid).length;
   const totalMembers   = (acc.memberIds?.length || 1) + unlinkedCount;
 
   return (
     <div style={{ position: "relative", marginBottom: 12, borderRadius: 20, overflow: "hidden" }}>
+      {/* Fondo rojo animado */}
+      <div style={{
+        position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
+        borderRadius: "0 20px 20px 0", display: "flex", alignItems: "center", justifyContent: "center",
+        background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4h6v2"/>
+          </svg>
+          <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+        </div>
+      </div>
+
+      {/* Card deslizable */}
       <div
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onClick={() => onSelect(acc.id)}
+        {...handlers}
+        onTouchStart={(e) => { e.stopPropagation(); handlers.onTouchStart(e); }}
+        onClick={handleClick}
         style={{
-          transform: `translateX(-${swipeX}px)`,
-          transition: isDragging.current ? "none" : "transform 0.3s ease",
+          transform: `translateX(-${offsetX}px)`,
+          transition: isSettling ? "transform 0.25s ease" : "none",
           background: colors.card, borderRadius: 20, padding: "18px 20px",
           border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow,
           display: "flex", alignItems: "center", gap: 14,
