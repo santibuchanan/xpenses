@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, updateDoc, collection, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { db, deleteUserData, reauthenticateUser } from "./firebase";
 import { useTheme, CURRENCIES as CURRENCIES_MAP } from "./theme.jsx";
 import { useSwipeSheet, useSwipeRow } from "./hooks/useSwipeSheet.js";
@@ -623,7 +623,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
 
   const saveCurrency = async (cur) => {
     setSelectedCurrency(cur);
-    if (account?.id) await updateDoc(doc(db, "accounts", account.id), { currency: cur });
+    if (account?.id) await updateDoc(doc(db, "accounts", account.id), { currency: cur, updatedAt: serverTimestamp() });
   };
 
   const saveBudgets = async () => {
@@ -633,7 +633,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       const n = parseFloat((val || "").replace(/\./g, "")) || 0;
       if (n > 0) budgets[id] = n;
     });
-    await updateDoc(doc(db, "accounts", account.id), { categoryBudgets: budgets });
+    await updateDoc(doc(db, "accounts", account.id), { categoryBudgets: budgets, updatedAt: serverTimestamp() });
     setSavingBudget(false);
     setShowBudgetEditor(false);
   };
@@ -694,7 +694,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
       const color = MEMBER_COLORS[currentLabels.length % MEMBER_COLORS.length];
       newLabels = [...currentLabels, { id: newId, name: updated.name, color: updated.color || color, linkedUid: null, ...(updated.salary !== undefined && { salary: updated.salary }), ...(updated.salary !== undefined && { salaryUpdatedAt: today }) }];
     }
-    await updateDoc(doc(db, "accounts", account.id), { memberLabels: newLabels });
+    await updateDoc(doc(db, "accounts", account.id), { memberLabels: newLabels, updatedAt: serverTimestamp() });
     // Si es el propio usuario vinculado, también actualizar su perfil en Firestore users
     if (existingByUid && updated.uid === currentUser.uid) {
       const salaryChanged = updated.salary !== undefined && updated.salary !== existingByUid.salary;
@@ -706,7 +706,7 @@ export default function SettingsScreen({ currentUser, userProfile, account, memb
   const handleDeleteMember = async (labelId) => {
     const currentLabels = account?.memberLabels || [];
     const newLabels = currentLabels.filter(l => l.id !== labelId);
-    await updateDoc(doc(db, "accounts", account.id), { memberLabels: newLabels });
+    await updateDoc(doc(db, "accounts", account.id), { memberLabels: newLabels, updatedAt: serverTimestamp() });
     setEditingMember(null);
   };
 
