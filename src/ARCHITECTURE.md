@@ -483,7 +483,6 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 
 | Zona | Archivo | Riesgo |
 |------|---------|--------|
-| Scroll lock de sheets | Múltiples archivos | No centralizado — cada sheet lo maneja por separado |
 | `fmtDate()` | Varios | Asume formato `YYYY-MM-DD` |
 
 ---
@@ -500,7 +499,7 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 | Operaciones de escritura de gastos | `hooks/useExpenses.js` | `App.jsx` |
 | Input de montos | `hooks/useAmountInput.js` | `AddExpenseModal`, `EditExpenseModal`, `FixedExpenseModal` (SettingsScreen) |
 | Category en gastos fijos | `catTotals` (HomeScreen), `pieData` (GraficosScreen) | Fijos con `category` suman en su categoría igual que gastos normales; fijos sin `category` no suman en ninguna |
-| Bottom sheet swipe | `hooks/useSwipeSheet.js` | `AddExpenseModal`, `EditExpenseModal` |
+| Swipe gestures (sheets y rows) | `hooks/useSwipeSheet.js` | Todos los modales, sheets y filas swipeables — `useSwipeSheet` (swipe-to-close) y `useSwipeRow` (swipe-to-delete) |
 | Categorías default | `constants/categories.js` | Múltiples componentes |
 | Divisas | `CURRENCIES` en `theme.jsx` | Múltiples componentes |
 
@@ -613,7 +612,6 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 | `calcSaldos()` en mes histórico sin settlements puede mostrar $0 — si los settlements del mes fueron registrados en otro mes, el balance aparece como saldado aunque no lo estaba | Media | Pendiente |
 | Eliminación de cuenta usuario | ✅ Resuelto Mar 28 | DeleteAccountModal 2 pasos + deleteUserData() + reauthenticateUser() |
 | `visibleFixed` duplicado en HomeScreen/SaldosScreen | Baja | Deuda técnica |
-| Scroll lock de sheets no centralizado | Baja | Deuda técnica |
 | MenuPanel: label "Cuenta personal" no contempla pozo | Baja | Cosmético pendiente |
 | `SwipeableExpenseRow`: maneja `paidBy` string o array — muestra nombre único o "Nombre1 y Nombre2" | ✅ Resuelto Mar 28 |
 | Notificaciones con destinatarios incorrectos — `getNotificationRecipients(expense)` reemplaza `otherMembers()` genérico; switch por tipo (hogar/personal/mio/extraordinary/settlement) | Mar 26 |

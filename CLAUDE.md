@@ -138,6 +138,9 @@ isSubmitting.current = false;
 style={{ touchAction: 'pan-y' }}
 ```
 
+### Swipe gestures — estándar obligatorio
+- `useSwipeSheet` / `useSwipeRow` en `hooks/useSwipeSheet.js` son el estándar para todos los gestos de la app. Todos los modales usan `useSwipeSheet` (threshold 120px). Todas las filas swipeables usan `useSwipeRow` (peekDistance: 80, fullDistance: 180). No implementar swipe manualmente en ningún componente nuevo.
+
 ---
 
 ## Checklist pre-push (verificar antes de cada push)
