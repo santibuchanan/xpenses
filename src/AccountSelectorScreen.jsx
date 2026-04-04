@@ -4,6 +4,7 @@
  * La creación de nueva cuenta fue extraída a CreateAccountScreen.jsx
  */
 import { useState, useRef } from "react";
+import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
 import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
@@ -87,13 +88,7 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
 function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
   const { setManualTheme } = useTheme();
   const [editingField,      setEditingField]      = useState(null);
-  const [sheetDragY,  setSheetDragY]  = useState(0);
-  const sheetDragging = useRef(false);
-  const sheetStartY   = useRef(null);
-  const onSheetTouchStart = (e) => { sheetStartY.current = e.touches[0].clientY; sheetDragging.current = true; };
-  const onSheetTouchMove  = (e) => { if (!sheetDragging.current) return; const dy = e.touches[0].clientY - sheetStartY.current; if (dy > 0) setSheetDragY(dy); };
-  const onSheetTouchEnd   = () => { if (sheetDragY > 80) setEditingField(null); else setSheetDragY(0); sheetDragging.current = false; sheetStartY.current = null; };
-  const closeSheet = () => { setSheetDragY(0); setEditingField(null); };
+  const { dragY, isDragging, handlers: sheetHandlers } = useSwipeSheet({ onClose: () => setEditingField(null) });
   const [fieldValue,        setFieldValue]        = useState("");
   const [saving,            setSaving]            = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -106,7 +101,7 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
   const displayName = userProfile?.name  || user.displayName || "Usuario";
   const alias       = userProfile?.alias || "";
 
-  const openEdit = (field, current) => { setSheetDragY(0); setEditingField(field); setFieldValue(current || ""); };
+  const openEdit = (field, current) => { setEditingField(field); setFieldValue(current || ""); };
 
   const saveField = async () => {
     setSaving(true);
@@ -207,15 +202,13 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
 
       {editingField && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
-          onClick={closeSheet}>
+          onClick={() => setEditingField(null)}>
           <div
             onClick={e => e.stopPropagation()}
-            onTouchStart={onSheetTouchStart}
-            onTouchMove={onSheetTouchMove}
-            onTouchEnd={onSheetTouchEnd}
+            {...sheetHandlers}
             style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px calc(40px + env(safe-area-inset-bottom))", fontFamily: FONT,
-              transform: `translateY(${sheetDragY}px)`,
-              transition: sheetDragging.current ? "none" : "transform 0.3s ease" }}>
+              transform: `translateY(${dragY}px)`,
+              transition: isDragging ? "none" : "transform 0.3s ease" }}>
             <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
               <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
             </div>
@@ -243,7 +236,7 @@ function ProfileTab({ user, userProfile, onSignOut, onDeleteAccount, colors }) {
                     setFieldValue(val);
                     if (val === "auto") { setManualTheme(null); localStorage.removeItem("xpenses-theme"); }
                     else { setManualTheme(val); localStorage.setItem("xpenses-theme", val); }
-                    closeSheet(); // cerrar inmediatamente, sin esperar Firestore
+                    setEditingField(null); // cerrar inmediatamente, sin esperar Firestore
                     setDoc(doc(db, "users", user.uid), { theme: val }, { merge: true }); // fire and forget
                   }}
                     style={{ width: "100%", padding: "14px 16px", borderRadius: 14, border: `2px solid ${fieldValue === val ? "#4F7FFA" : colors.inputBorder}`, background: fieldValue === val ? "#4F7FFA11" : colors.input, marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: FONT }}>
