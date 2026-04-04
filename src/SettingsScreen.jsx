@@ -314,39 +314,40 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers
 }
 
 function SwipeableFixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
-  const [swipeX,   setSwipeX]   = useState(0);
-  const [swiped,   setSwiped]   = useState(false);
-  const startX                  = useRef(null);
-  const isDragging              = useRef(false);
-  const DELETE_THRESHOLD        = 80;
-
-  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; isDragging.current = true; };
-  const onTouchMove  = (e) => {
-    if (!isDragging.current || startX.current === null) return;
-    const diff = startX.current - e.touches[0].clientX;
-    if (diff > 0) setSwipeX(Math.min(diff, DELETE_THRESHOLD + 20));
-    else if (diff < -10) { setSwipeX(0); setSwiped(false); }
+  const { offsetX, isSettling, peekProgress, handlers, reset, wasDragging } = useSwipeRow({
+    peekDistance: 80,
+    fullDistance: 180,
+    onFull: () => onDelete(f.id),
+  });
+  const handleClick = () => {
+    if (wasDragging()) return;
+    if (offsetX > 0) { reset(); return; }
+    onEdit(f);
   };
-  const onTouchEnd = () => {
-    isDragging.current = false;
-    if (swipeX > DELETE_THRESHOLD / 2) { setSwipeX(DELETE_THRESHOLD); setSwiped(true); }
-    else { setSwipeX(0); setSwiped(false); }
-    startX.current = null;
-  };
+  const PEEK = 80;
 
   return (
     <div style={{ position: "relative", marginBottom: 8, borderRadius: 16, overflow: "hidden" }}>
-      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: DELETE_THRESHOLD, background: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "0 16px 16px 0" }}>
-        <button onClick={(e) => { e.stopPropagation(); onDelete(f.id); }}
-          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 0 }}>
-          <span style={{ fontSize: 20 }}>🗑️</span>
-          <span style={{ fontSize: 10, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
-        </button>
+      <div style={{
+        position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
+        borderRadius: "0 16px 16px 0", display: "flex", alignItems: "center", justifyContent: "center",
+        background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4h6v2"/>
+          </svg>
+          <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+        </div>
       </div>
       <div
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-        onClick={() => { if (swiped) { setSwipeX(0); setSwiped(false); } else { onEdit(f); } }}
-        style={{ transform: `translateX(-${swipeX}px)`, transition: isDragging.current ? "none" : "transform 0.3s ease", ...cardStyle, display: "flex", alignItems: "center", gap: 12, cursor: "pointer", position: "relative", zIndex: 1, marginBottom: 0 }}>
+        {...handlers}
+        onTouchStart={(e) => { e.stopPropagation(); handlers.onTouchStart(e); }}
+        onClick={handleClick}
+        style={{ transform: `translateX(-${offsetX}px)`, transition: isSettling ? "transform 0.25s ease" : "none", ...cardStyle, display: "flex", alignItems: "center", gap: 12, cursor: "pointer", position: "relative", zIndex: 1, marginBottom: 0 }}>
         <div style={{ width: 40, height: 40, borderRadius: 14, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
           {f.shared ? "🏠" : "👤"}
         </div>
