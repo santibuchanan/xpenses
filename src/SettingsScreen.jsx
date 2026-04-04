@@ -314,10 +314,13 @@ function EditMemberModal({ member, onSave, onClose, onDelete, colors, allMembers
 }
 
 function SwipeableFixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
+  const [fixedToDelete, setFixedToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
   const { offsetX, isSettling, peekProgress, handlers, reset, wasDragging } = useSwipeRow({
     peekDistance: 80,
     fullDistance: 180,
-    onFull: () => onDelete(f.id),
+    onFull: () => setFixedToDelete(f),
   });
   const handleClick = () => {
     if (wasDragging()) return;
@@ -327,39 +330,67 @@ function SwipeableFixedRow({ f, colors, cardStyle, onEdit, onDelete }) {
   const PEEK = 80;
 
   return (
-    <div style={{ position: "relative", marginBottom: 8, borderRadius: 16, overflow: "hidden" }}>
-      <div style={{
-        position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
-        borderRadius: "0 16px 16px 0", display: "flex", alignItems: "center", justifyContent: "center",
-        background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
-      }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14H6L5 6"/>
-            <path d="M10 11v6M14 11v6"/>
-            <path d="M9 6V4h6v2"/>
-          </svg>
-          <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+    <>
+      <div style={{ position: "relative", marginBottom: 8, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{
+          position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
+          borderRadius: "0 16px 16px 0", display: "flex", alignItems: "center", justifyContent: "center",
+          background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4h6v2"/>
+            </svg>
+            <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+          </div>
+        </div>
+        <div
+          {...handlers}
+          onTouchStart={(e) => { e.stopPropagation(); handlers.onTouchStart(e); }}
+          onClick={handleClick}
+          style={{ transform: `translateX(-${offsetX}px)`, transition: isSettling ? "transform 0.25s ease" : "none", ...cardStyle, display: "flex", alignItems: "center", gap: 12, cursor: "pointer", position: "relative", zIndex: 1, marginBottom: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 14, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+            {f.shared ? "🏠" : "👤"}
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>{f.name}</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
+              ${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}
+            </p>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </div>
       </div>
-      <div
-        {...handlers}
-        onTouchStart={(e) => { e.stopPropagation(); handlers.onTouchStart(e); }}
-        onClick={handleClick}
-        style={{ transform: `translateX(-${offsetX}px)`, transition: isSettling ? "transform 0.25s ease" : "none", ...cardStyle, display: "flex", alignItems: "center", gap: 12, cursor: "pointer", position: "relative", zIndex: 1, marginBottom: 0 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 14, background: f.shared ? "#4F7FFA14" : "#FA4F7F14", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
-          {f.shared ? "🏠" : "👤"}
+
+      {fixedToDelete && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: colors.card, borderRadius: 24, padding: 24, width: "100%", maxWidth: 340, fontFamily: FONT, border: `1px solid ${colors.cardBorder}` }}>
+            <p style={{ fontSize: 36, textAlign: "center", margin: "0 0 12px" }}>⚠️</p>
+            <p style={{ fontSize: 18, fontWeight: 700, color: colors.text, margin: "0 0 8px", textAlign: "center", fontFamily: FONT }}>¿Eliminar gasto fijo?</p>
+            <p style={{ fontSize: 13, color: colors.textMuted, margin: "0 0 24px", textAlign: "center", lineHeight: 1.5, fontFamily: FONT }}>
+              "{fixedToDelete.name}" se eliminará. Esta acción no se puede deshacer.
+            </p>
+            <button type="button" disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                await onDelete(fixedToDelete.id);
+                setDeleting(false);
+                setFixedToDelete(null);
+              }}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: "#e74c3c", color: "#fff", border: "none", fontSize: 15, fontWeight: 600, cursor: deleting ? "default" : "pointer", fontFamily: FONT, marginBottom: 8, opacity: deleting ? 0.7 : 1 }}>
+              {deleting ? "Eliminando..." : "Sí, eliminar"}
+            </button>
+            <button type="button" onClick={() => setFixedToDelete(null)}
+              style={{ width: "100%", padding: 14, borderRadius: 14, background: colors.pill, color: colors.textMuted, border: "none", fontSize: 15, cursor: "pointer", fontFamily: FONT }}>
+              Cancelar
+            </button>
+          </div>
         </div>
-        <div style={{ flex: 1 }}>
-          <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: colors.text, fontFamily: FONT }}>{f.name}</p>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textMuted, fontFamily: FONT }}>
-            ${(f.amount || 0).toLocaleString("es-AR")}{f.dueDay ? ` · Vence día ${f.dueDay}` : ""}
-          </p>
-        </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 
