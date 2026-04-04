@@ -366,6 +366,12 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
 
   const visibleAccounts = accounts.filter(a => !deletedIds.includes(a.id));
 
+  const sortedAccounts = [...visibleAccounts].sort((a, b) => {
+    const aTime = a.updatedAt?.toMillis?.() ?? (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    const bTime = b.updatedAt?.toMillis?.() ?? (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    return bTime - aTime;
+  });
+
   // ── Handlers ──
   const handleCreated = (accountId) => {
     setShowCreate(false);
@@ -573,7 +579,7 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
               </div>
             )}
 
-            {visibleAccounts.map(acc => (
+            {sortedAccounts.map(acc => (
               <SwipeableAccountRow
                 key={acc.id}
                 acc={acc}
