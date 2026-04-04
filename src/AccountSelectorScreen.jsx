@@ -15,7 +15,7 @@ const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sa
 
 // ── SwipeableAccountRow ───────────────────────────────────────────────────────
 
-function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
+function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors, onDragStart, onDragMove, onDragEnd }) {
   const { offsetX, isSettling, peekProgress, handlers, reset, wasDragging } = useSwipeRow({
     peekDistance: 80,
     fullDistance: 180,
@@ -66,6 +66,20 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors }) {
           cursor: "pointer", position: "relative", zIndex: 1,
         }}
       >
+        {onDragStart && (
+          <div
+            onTouchStart={(e) => { e.stopPropagation(); onDragStart(e); }}
+            onTouchMove={onDragMove}
+            onTouchEnd={onDragEnd}
+            style={{ padding: '4px 8px 4px 0', touchAction: 'none', cursor: 'grab', color: colors.textMuted, opacity: 0.4, flexShrink: 0, display: 'flex', alignItems: 'center' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="3" y1="7" x2="21" y2="7"/>
+              <line x1="3" y1="12" x2="21" y2="12"/>
+              <line x1="3" y1="17" x2="21" y2="17"/>
+            </svg>
+          </div>
+        )}
         <div style={{
           width: 48, height: 48, borderRadius: 16,
           background: acc.type === "pozo" ? "#f39c1218" : acc.type === "shared" ? "#4F7FFA18" : "#2ecc7118",
@@ -354,7 +368,7 @@ function OnboardingSlides({ onDone }) {
 
 // ── AccountSelectorScreen ─────────────────────────────────────────────────────
 
-export default function AccountSelectorScreen({ user, userProfile, accounts, onSelect, onCreated, onSignOut, onDeleteAccount, isLoading }) {
+export default function AccountSelectorScreen({ user, userProfile, accounts, onSelect, onCreated, onSignOut, onDeleteAccount, isLoading, accountOrder, saveAccountOrder }) {
   const { colors } = useTheme();
   const { notifications, unreadCount, markRead, markAllRead, deleteNotif } = useNotif();
 
@@ -364,13 +378,36 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deletedIds,    setDeletedIds]    = useState([]);
 
+  const [draggingId, setDraggingId] = useState(null);
+  const [overIdx,    setOverIdx]    = useState(null);
+  const dragMeta       = useRef({ draggingId: null, startY: 0, originalIdx: 0, itemHeight: 88 });
+  const displayListRef = useRef([]);
+  const listRef        = useRef(null);
+
   const visibleAccounts = accounts.filter(a => !deletedIds.includes(a.id));
 
-  const sortedAccounts = [...visibleAccounts].sort((a, b) => {
-    const aTime = a.updatedAt?.toMillis?.() ?? (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-    const bTime = b.updatedAt?.toMillis?.() ?? (b.createdAt ? new Date(b.createdAt).getTime() : 0);
-    return bTime - aTime;
-  });
+  const baseSorted = (() => {
+    if (accountOrder?.length) {
+      const mapped = accountOrder.map(id => visibleAccounts.find(a => a.id === id)).filter(Boolean);
+      const rest   = visibleAccounts.filter(a => !accountOrder.includes(a.id));
+      return [...mapped, ...rest];
+    }
+    return [...visibleAccounts].sort((a, b) => {
+      const aTime = a.updatedAt?.toMillis?.() ?? (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+      const bTime = b.updatedAt?.toMillis?.() ?? (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+      return bTime - aTime;
+    });
+  })();
+
+  const displayList = (() => {
+    if (!draggingId || overIdx === null) return baseSorted;
+    const draggingAcc = baseSorted.find(a => a.id === draggingId);
+    if (!draggingAcc) return baseSorted;
+    const without = baseSorted.filter(a => a.id !== draggingId);
+    without.splice(Math.max(0, Math.min(overIdx, without.length)), 0, draggingAcc);
+    return without;
+  })();
+  displayListRef.current = displayList;
 
   // ── Handlers ──
   const handleCreated = (accountId) => {
@@ -427,6 +464,32 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
     } catch (err) {
       console.error("[deleteAccount] ERROR:", err.code, err.message, err);
     }
+  };
+
+  const handleDragStart = (e, accId, idx) => {
+    const el = listRef.current?.children[idx];
+    const itemHeight = el ? el.getBoundingClientRect().height : 88;
+    dragMeta.current = { draggingId: accId, startY: e.touches[0].clientY, originalIdx: idx, itemHeight };
+    setDraggingId(accId);
+    setOverIdx(idx);
+  };
+
+  const handleDragMove = (e) => {
+    if (!dragMeta.current.draggingId) return;
+    const { startY, originalIdx, itemHeight } = dragMeta.current;
+    const raw = Math.round(originalIdx + (e.touches[0].clientY - startY) / itemHeight);
+    const clamped = Math.max(0, Math.min(raw, baseSorted.length - 1));
+    setOverIdx(prev => prev === clamped ? prev : clamped);
+  };
+
+  const handleDragEnd = (e) => {
+    if (!dragMeta.current.draggingId) return;
+    if (Math.abs(e.changedTouches[0].clientY - dragMeta.current.startY) > 10 && saveAccountOrder) {
+      saveAccountOrder(displayListRef.current.map(a => a.id));
+    }
+    dragMeta.current.draggingId = null;
+    setDraggingId(null);
+    setOverIdx(null);
   };
 
   // ── Slides de onboarding (primera vez) ──
@@ -579,15 +642,29 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
               </div>
             )}
 
-            {sortedAccounts.map(acc => (
-              <SwipeableAccountRow
-                key={acc.id}
-                acc={acc}
-                colors={colors}
-                onSelect={onSelect}
-                onDeleteRequest={(id) => setConfirmDelete(id)}
-              />
-            ))}
+            <div ref={listRef}>
+              {displayList.map((acc, idx) => (
+                <div
+                  key={acc.id}
+                  style={{
+                    opacity: acc.id === draggingId ? 0.5 : 1,
+                    position: 'relative',
+                    zIndex: acc.id === draggingId ? 10 : 1,
+                    transition: draggingId ? 'opacity 0.15s' : 'none',
+                  }}
+                >
+                  <SwipeableAccountRow
+                    acc={acc}
+                    colors={colors}
+                    onSelect={onSelect}
+                    onDeleteRequest={(id) => setConfirmDelete(id)}
+                    onDragStart={baseSorted.length > 1 ? (e) => handleDragStart(e, acc.id, idx) : undefined}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                  />
+                </div>
+              ))}
+            </div>
           </>
         )}
       </div>
