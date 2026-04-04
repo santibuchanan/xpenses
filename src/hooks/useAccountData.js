@@ -16,7 +16,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 export function useAccountData(accountIds, selectedAccountId, authUser, userProfile) {
@@ -24,6 +24,7 @@ export function useAccountData(accountIds, selectedAccountId, authUser, userProf
   const [account,      setAccount]      = useState(null);
   const [members,      setMembers]      = useState([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
+  const [accountOrder,    setAccountOrder]    = useState(null);
 
   // Si userProfile ya cargó y accountIds sigue vacío, el usuario no tiene cuentas.
   // Separado del efecto principal para no re-crear listeners cuando cambia userProfile.
@@ -32,6 +33,17 @@ export function useAccountData(accountIds, selectedAccountId, authUser, userProf
       setAccountsLoading(false);
     }
   }, [accountIds, userProfile]);
+
+  // Listener para accountOrder en users/{uid}
+  useEffect(() => {
+    if (!authUser?.uid) return;
+    const unsub = onSnapshot(doc(db, "users", authUser.uid), snap => {
+      if (snap.exists()) {
+        setAccountOrder(snap.data().accountOrder ?? null);
+      }
+    });
+    return () => unsub();
+  }, [authUser?.uid]);
 
   // Listeners de accounts — uno por cada accountId del usuario
   useEffect(() => {
@@ -105,5 +117,10 @@ export function useAccountData(accountIds, selectedAccountId, authUser, userProf
     return () => unsubs.forEach(u => u());
   }, [[...(account?.memberIds || [])].sort().join(",")]);
 
-  return { userAccounts, account, members, accountsLoading };
+  const saveAccountOrder = async (orderedIds) => {
+    if (!authUser?.uid) return;
+    await updateDoc(doc(db, "users", authUser.uid), { accountOrder: orderedIds });
+  };
+
+  return { userAccounts, account, members, accountsLoading, accountOrder, saveAccountOrder };
 }
