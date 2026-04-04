@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import { collection, addDoc, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase.js";
 import { formatAmount } from "../theme.jsx";
 import { NOTIF_TYPES } from "../notifications.jsx";
@@ -63,6 +63,8 @@ export function useExpenses({
       createdAt: new Date().toISOString(),
     });
 
+    await updateDoc(doc(db, "accounts", account.id), { updatedAt: serverTimestamp() });
+
     const others = getNotificationRecipients(expense);
     if (others.length > 0) {
       await sendNotification({
@@ -88,6 +90,7 @@ export function useExpenses({
         accountId: account?.id,
       });
     }
+    await updateDoc(doc(db, "accounts", account.id), { updatedAt: serverTimestamp() });
     setEditingExpense(null);
   }, [authUser, account, allMembers, members, sendNotification, setEditingExpense]);
 
@@ -111,6 +114,8 @@ export function useExpenses({
         console.error("Error soft-delete:", err);
         await deleteDoc(doc(db, "expenses", expense.id));
       }
+
+      await updateDoc(doc(db, "accounts", account.id), { updatedAt: serverTimestamp() });
 
       // 2. Settlement correctivo si hay settlements activos en el mes
       if (addCorrectiveSettlement && account?.id) {
