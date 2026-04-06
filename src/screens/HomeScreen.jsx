@@ -215,9 +215,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   // visibleFixed ya viene filtrado desde App.jsx (FIX #9 — no se recalcula aquí)
   // Filtrar por startDate — solo fijos cuyo mes de inicio <= mes seleccionado
   const monthVisibleFixed = (visibleFixed || []).filter(f => !f.startDate || f.startDate.slice(0, 7) <= selectedMonth);
-  const sharedFixed   = monthVisibleFixed.filter(f => f.shared);
-  const personalFixed = monthVisibleFixed.filter(f => !f.shared);
-  const fixedTotal    = monthVisibleFixed.reduce((s, f) => s + (f.amount || 0), 0);
+  const fixedTotal        = monthVisibleFixed.reduce((s, f) => s + (f.amount || 0), 0);
 
   // Saldos — incluir labels porque tienen uid estable y participan en gastos
   // Enriquecer con salary de memberLabels para cuentas proporcionales donde
@@ -260,6 +258,12 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen,  setSearchOpen]  = useState(false);
   const searchInputRef = useRef(null);
+
+  const displayFixed  = searchQuery
+    ? monthVisibleFixed.filter(f => f.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : monthVisibleFixed;
+  const sharedFixed   = displayFixed.filter(f => f.shared);
+  const personalFixed = displayFixed.filter(f => !f.shared);
 
   const filtered = filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.category === filterType);
   const monthSettlements = (settlements || []).filter(s => s.month === selectedMonth && !s.isCorrection && s.amount > 0);
@@ -430,7 +434,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
         )}
 
         {/* Gastos fijos */}
-        {monthVisibleFixed.length > 0 && (
+        {displayFixed.length > 0 && (
           <div style={{ marginTop: 8 }}>
             <button onClick={() => setFixedExpanded(v => !v)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 0 8px", fontFamily: FONT }}>
               <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>📋 Gastos fijos</span>
@@ -472,7 +476,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
                   </>
                 )}
 
-                {isPersonal && monthVisibleFixed.map(f => (
+                {isPersonal && displayFixed.map(f => (
                   <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
                 ))}
               </div>
