@@ -15,15 +15,22 @@ const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sa
 
 // ── SwipeableAccountRow ───────────────────────────────────────────────────────
 
-function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors, onDragStart, onDragMove, onDragEnd }) {
+function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors, onActivateDrag, onDragMove, onDragEnd }) {
   const { offsetX, isSettling, peekProgress, handlers, reset, wasDragging } = useSwipeRow({
     peekDistance: 80,
     fullDistance: 180,
     onFull: () => onDeleteRequest(acc.id),
   });
 
+  const longPressTimer = useRef(null);
+  const [longPressActive, setLongPressActive] = useState(false);
+  const touchStartY = useRef(null);
+  const touchStartX = useRef(null);
+  const dragEndRef = useRef(false);
+
   const handleClick = () => {
     if (wasDragging()) return;
+    if (dragEndRef.current) { dragEndRef.current = false; return; }
     if (offsetX > 0) { reset(); return; }
     onSelect(acc.id);
   };
@@ -55,7 +62,59 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors, onDragSta
       {/* Card deslizable */}
       <div
         {...handlers}
-        onTouchStart={(e) => { e.stopPropagation(); handlers.onTouchStart(e); }}
+        onTouchStart={(e) => {
+          e.stopPropagation();
+          handlers.onTouchStart(e);
+          if (onActivateDrag) {
+            const touch = e.touches[0];
+            touchStartY.current = touch.clientY;
+            touchStartX.current = touch.clientX;
+            longPressTimer.current = setTimeout(() => {
+              navigator.vibrate?.(50);
+              setLongPressActive(true);
+              onActivateDrag(touch.clientY);
+            }, 450);
+          }
+        }}
+        onTouchMove={(e) => {
+          if (longPressActive) {
+            onDragMove?.(e);
+            return;
+          }
+          if (longPressTimer.current !== null) {
+            const touch = e.touches[0];
+            if (Math.abs(touch.clientX - touchStartX.current) > 8 || Math.abs(touch.clientY - touchStartY.current) > 8) {
+              clearTimeout(longPressTimer.current);
+              longPressTimer.current = null;
+            }
+          }
+          handlers.onTouchMove(e);
+        }}
+        onTouchEnd={(e) => {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+          if (longPressActive) {
+            dragEndRef.current = true;
+            onDragEnd?.(e);
+            setLongPressActive(false);
+            touchStartY.current = null;
+            touchStartX.current = null;
+            return;
+          }
+          handlers.onTouchEnd();
+          touchStartY.current = null;
+          touchStartX.current = null;
+        }}
+        onTouchCancel={() => {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+          if (longPressActive) {
+            onDragEnd?.(null);
+            setLongPressActive(false);
+          }
+          touchStartY.current = null;
+          touchStartX.current = null;
+        }}
         onClick={handleClick}
         style={{
           transform: `translateX(-${offsetX}px)`,
@@ -64,22 +123,9 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors, onDragSta
           border: `1px solid ${colors.cardBorder}`, boxShadow: colors.shadow,
           display: "flex", alignItems: "center", gap: 14,
           cursor: "pointer", position: "relative", zIndex: 1,
+          WebkitUserSelect: 'none',
         }}
       >
-        {onDragStart && (
-          <div
-            onTouchStart={(e) => { e.stopPropagation(); onDragStart(e); }}
-            onTouchMove={onDragMove}
-            onTouchEnd={onDragEnd}
-            style={{ padding: '4px 8px 4px 0', touchAction: 'none', cursor: 'grab', color: colors.textMuted, opacity: 0.4, flexShrink: 0, display: 'flex', alignItems: 'center' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="3" y1="7" x2="21" y2="7"/>
-              <line x1="3" y1="12" x2="21" y2="12"/>
-              <line x1="3" y1="17" x2="21" y2="17"/>
-            </svg>
-          </div>
-        )}
         <div style={{
           width: 48, height: 48, borderRadius: 16,
           background: acc.type === "pozo" ? "#f39c1218" : acc.type === "shared" ? "#4F7FFA18" : "#2ecc7118",
@@ -466,10 +512,10 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
     }
   };
 
-  const handleDragStart = (e, accId, idx) => {
+  const handleDragActivate = (accId, idx, startY) => {
     const el = listRef.current?.children[idx];
     const itemHeight = el ? el.getBoundingClientRect().height : 88;
-    dragMeta.current = { draggingId: accId, startY: e.touches[0].clientY, originalIdx: idx, itemHeight };
+    dragMeta.current = { draggingId: accId, startY, originalIdx: idx, itemHeight };
     setDraggingId(accId);
     setOverIdx(idx);
   };
@@ -484,7 +530,7 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
 
   const handleDragEnd = (e) => {
     if (!dragMeta.current.draggingId) return;
-    if (Math.abs(e.changedTouches[0].clientY - dragMeta.current.startY) > 10 && saveAccountOrder) {
+    if (e && Math.abs(e.changedTouches[0].clientY - dragMeta.current.startY) > 10 && saveAccountOrder) {
       saveAccountOrder(displayListRef.current.map(a => a.id));
     }
     dragMeta.current.draggingId = null;
@@ -642,15 +688,18 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
               </div>
             )}
 
-            <div ref={listRef}>
+            <div ref={listRef} style={{ userSelect: 'none' }}>
               {displayList.map((acc, idx) => (
                 <div
                   key={acc.id}
                   style={{
                     opacity: acc.id === draggingId ? 0.5 : 1,
+                    transform: acc.id === draggingId ? 'scale(1.03)' : 'scale(1)',
+                    boxShadow: acc.id === draggingId ? '0 8px 24px rgba(0,0,0,0.18)' : 'none',
                     position: 'relative',
                     zIndex: acc.id === draggingId ? 10 : 1,
-                    transition: draggingId ? 'opacity 0.15s' : 'none',
+                    transition: draggingId ? 'opacity 0.15s, transform 0.15s' : 'none',
+                    WebkitUserSelect: 'none',
                   }}
                 >
                   <SwipeableAccountRow
@@ -658,7 +707,7 @@ export default function AccountSelectorScreen({ user, userProfile, accounts, onS
                     colors={colors}
                     onSelect={onSelect}
                     onDeleteRequest={(id) => setConfirmDelete(id)}
-                    onDragStart={baseSorted.length > 1 ? (e) => handleDragStart(e, acc.id, idx) : undefined}
+                    onActivateDrag={baseSorted.length > 1 ? (startY) => handleDragActivate(acc.id, idx, startY) : undefined}
                     onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}
                   />
