@@ -39,7 +39,7 @@
   </head>
   <body>
     <div id="splash">
-      <img src="/Logo.png" style="width:110px;border-radius:16px;" />
+      <img src="/logo.png" style="width:110px;border-radius:16px;" />
       <span style="font-size:28px;font-weight:700;color:#FFFFFF;letter-spacing:1px;font-family:system-ui,sans-serif;">X-penses</span>
     </div>
     <div id="root"></div>
@@ -47,18 +47,25 @@
       document.addEventListener('DOMContentLoaded', function() {
         var splash = document.getElementById('splash');
         var root = document.getElementById('root');
+        var hidden = false;
+        var startTime = Date.now();
+        var MIN_DISPLAY = 1800;
+        function hideSplash() {
+          if (hidden) return;
+          hidden = true;
+          splash.classList.add('hide');
+          setTimeout(function() { splash.remove(); }, 400);
+        }
         var observer = new MutationObserver(function() {
           if (root.children.length > 0) {
-            splash.classList.add('hide');
-            setTimeout(function() { splash.remove(); }, 400);
             observer.disconnect();
+            var elapsed = Date.now() - startTime;
+            var remaining = MIN_DISPLAY - elapsed;
+            setTimeout(hideSplash, remaining > 0 ? remaining : 0);
           }
         });
         observer.observe(root, { childList: true });
-        setTimeout(function() {
-          splash.classList.add('hide');
-          setTimeout(function() { splash.remove(); }, 400);
-        }, 4000);
+        setTimeout(hideSplash, 4000);
       });
     </script>
     <script type="module" src="/src/main.jsx"></script>
