@@ -257,6 +257,10 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const monthLabel = new Date(selectedMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
 
   const [filterType, setFilterType] = useState("todos");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen,  setSearchOpen]  = useState(false);
+  const searchInputRef = useRef(null);
+
   const filtered = filterType === "todos" ? monthExpAll : monthExpAll.filter(e => e.category === filterType);
   const monthSettlements = (settlements || []).filter(s => s.month === selectedMonth && !s.isCorrection && s.amount > 0);
 
@@ -266,6 +270,9 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   // Settlements se muestran en SaldosScreen — acá solo gastos
   const sorted = [...filtered.map(e => ({ ...e, _type: "expense" }))]
     .sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+  const sortedFiltered = searchQuery
+    ? sorted.filter(e => e.concept?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : sorted;
 
   const [fixedExpanded,         setFixedExpanded]         = useState(false);
   const [fixedSharedExpanded,   setFixedSharedExpanded]   = useState(false);
@@ -281,10 +288,16 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
           {me?.photo
             ? <img src={me.photo} style={{ width: 44, height: 44, borderRadius: 22, border: "2px solid #ffffff44" }} alt="" />
             : <div style={{ width: 44, height: 44, borderRadius: 22, background: meColor + "44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
-          <div>
+          <div style={{ flex: 1 }}>
             <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>Hola,</p>
             <p style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, fontFamily: FONT }}>{me?.name || currentUser.displayName}</p>
           </div>
+          <button type="button" onClick={() => { setSearchOpen(true); setTimeout(() => searchInputRef.current?.focus(), 50); }}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 8, color: "#ffffff99", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
         </div>
         <div style={{ background: meColor, borderRadius: 22, padding: 20 }}>
           <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Gastos — {monthLabel}</p>
@@ -316,6 +329,29 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
           )}
         </div>
       </div>
+
+      {searchOpen && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", background: colors.card, borderBottom: `1px solid ${colors.cardBorder}` }}>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: colors.input, borderRadius: 12, padding: "9px 12px", border: `1px solid ${colors.inputBorder}` }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Buscar concepto..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ flex: 1, border: "none", background: "transparent", color: colors.text, fontSize: 15, fontFamily: FONT, outline: "none", minWidth: 0 }}
+            />
+          </div>
+          <button type="button"
+            onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#4F7FFA", fontSize: 15, fontWeight: 600, fontFamily: FONT, whiteSpace: "nowrap", padding: "4px 0" }}>
+            Cancelar
+          </button>
+        </div>
+      )}
 
       <div style={{ padding: "0 20px" }}>
         <MonthNavBar selectedMonth={selectedMonth} minMonth={minMonth} todayMonth={actualMonth} setSelectedMonth={setSelectedMonth} />
@@ -461,13 +497,13 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
             <div style={{ width: 60, height: 13, borderRadius: 6, background: colors.divider }} />
           </div>
         ))}
-        {!isLoading && sorted.length === 0 && (
+        {!isLoading && sortedFiltered.length === 0 && (
           <Card style={{ textAlign: "center", color: colors.textMuted, padding: 32 }}>
-            <p style={{ fontSize: 32, margin: "0 0 8px" }}>📭</p>
-            <p style={{ margin: 0, fontFamily: FONT }}>Sin gastos este mes</p>
+            <p style={{ fontSize: 32, margin: "0 0 8px" }}>{searchQuery ? "🔍" : "📭"}</p>
+            <p style={{ margin: 0, fontFamily: FONT }}>{searchQuery ? `Sin resultados para "${searchQuery}"` : "Sin gastos este mes"}</p>
           </Card>
         )}
-        {sorted.map(item => (
+        {sortedFiltered.map(item => (
           <SwipeableExpenseRow key={`${item.id}-${item.deleted ? "del" : "ok"}`} e={item} allCategories={allCategories} allMembers={allMembers} fmt={fmt} fs={fs} colors={colors} onEdit={onEdit} onDelete={onDelete} isPersonal={isPersonal} currentUser={currentUser} />
         ))}
         <div style={{ height: 120 }} />
