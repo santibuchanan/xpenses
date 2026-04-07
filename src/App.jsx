@@ -61,7 +61,7 @@ function NavIcon({ id, active, color }) {
 }
 
 // ── HEADER ──
-function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors, showSearch, searchOpen, searchQuery, setSearchQuery, setSearchOpen }) {
+function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors, showSearch, searchOpen, searchQuery, setSearchQuery, setSearchOpen, searchSuggestions = [] }) {
   const searchInputRef = useRef(null);
 
   useEffect(() => {
@@ -120,6 +120,21 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors, sho
       </div>
       )}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15) 30%, rgba(255,255,255,0.15) 70%, transparent)" }} />
+      {searchOpen && searchSuggestions.length > 0 && (
+        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: colors.card, borderBottom: `1px solid ${colors.cardBorder}`, zIndex: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.3)" }}>
+          {searchSuggestions.map(s => (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", padding: "10px 20px", borderBottom: `1px solid ${colors.divider}`, gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.concept}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>
+                  {s.date}{s.paidBy ? ` · ${s.paidBy}` : ""}
+                </p>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: colors.text, fontFamily: FONT, flexShrink: 0 }}>{s.amount}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -607,6 +622,23 @@ function AppInner() {
   const accountExpenses = expenses;
   const isPersonal = account?.type === "personal";
 
+  const currency = account?.currency || "ARS";
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery || !searchOpen) return [];
+    const q = searchQuery.toLowerCase();
+    return (expenses || [])
+      .filter(e => !e.deleted && e.concept?.toLowerCase().includes(q))
+      .sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""))
+      .slice(0, 6)
+      .map(e => {
+        const paidByUid = Array.isArray(e.paidBy) ? e.paidBy[0]?.uid : e.paidBy;
+        const payer = allMembers?.find(m => m.uid === paidByUid);
+        const [y, mo, d] = (e.date || "").split("-");
+        const dateStr = d && mo ? `${d}/${mo}` : "";
+        return { id: e.id, concept: e.concept, amount: formatAmount(e.amount, currency), date: dateStr, paidBy: payer?.name || "" };
+      });
+  }, [searchQuery, searchOpen, expenses, allMembers, currency]);
+
   const NAV_LEFT  = [{ id: "home", label: "Inicio" }, { id: "saldos", label: "Saldos" }];
   const NAV_RIGHT = [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }];
 
@@ -621,7 +653,7 @@ function AppInner() {
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} showSearch={tab === "home"} searchOpen={searchOpen} searchQuery={searchQuery} setSearchQuery={setSearchQuery} setSearchOpen={setSearchOpen} />
+      <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} showSearch={tab === "home"} searchOpen={searchOpen} searchQuery={searchQuery} setSearchQuery={setSearchQuery} setSearchOpen={setSearchOpen} searchSuggestions={searchSuggestions} />
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
         {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} customCategories={customCategories} visibleFixed={visibleFixed} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} isLoading={expensesLoading} searchQuery={searchQuery} />}
