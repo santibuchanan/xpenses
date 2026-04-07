@@ -246,6 +246,8 @@ function SwipeableSettlementRow({ s, debtor, creditor, isMeDebtor, isMeCreditor,
       </div>
       <div
         {...handlers}
+        onTouchStart={(e) => { e.stopPropagation(); handlers.onTouchStart(e); }}
+        onTouchMove={(e) => { e.stopPropagation(); handlers.onTouchMove(e); }}
         style={{
           padding: "11px 16px", display: "flex", alignItems: "center", gap: 10,
           background: isMe ? colors.pill : colors.card,
