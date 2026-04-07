@@ -568,6 +568,24 @@ function AppInner() {
     [fixedExpenses, authUser?.uid]
   );
 
+  // Sugerencias de búsqueda — ANTES de early returns para respetar reglas de hooks
+  const _currency = account?.currency || "ARS";
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery || !searchOpen) return [];
+    const q = searchQuery.toLowerCase();
+    return (expenses || [])
+      .filter(e => !e.deleted && e.concept?.toLowerCase().includes(q))
+      .sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""))
+      .slice(0, 6)
+      .map(e => {
+        const paidByUid = Array.isArray(e.paidBy) ? e.paidBy[0]?.uid : e.paidBy;
+        const payer = allMembers?.find(m => m.uid === paidByUid);
+        const [, mo, d] = (e.date || "").split("-");
+        const dateStr = d && mo ? `${d}/${mo}` : "";
+        return { id: e.id, concept: e.concept, amount: formatAmount(e.amount, _currency), date: dateStr, paidBy: payer?.name || "" };
+      });
+  }, [searchQuery, searchOpen, expenses, allMembers, _currency]);
+
   const [deleteWarning, setDeleteWarning] = useState(null);
   const { sendNotification } = useNotif();
   const { addExpense, handleEditSave, deleteExpense, doDeleteExpense, markFixedPaid } = useExpenses({
@@ -621,23 +639,6 @@ function AppInner() {
 
   const accountExpenses = expenses;
   const isPersonal = account?.type === "personal";
-
-  const currency = account?.currency || "ARS";
-  const searchSuggestions = useMemo(() => {
-    if (!searchQuery || !searchOpen) return [];
-    const q = searchQuery.toLowerCase();
-    return (expenses || [])
-      .filter(e => !e.deleted && e.concept?.toLowerCase().includes(q))
-      .sort((a, b) => (b.createdAt || b.date || "").localeCompare(a.createdAt || a.date || ""))
-      .slice(0, 6)
-      .map(e => {
-        const paidByUid = Array.isArray(e.paidBy) ? e.paidBy[0]?.uid : e.paidBy;
-        const payer = allMembers?.find(m => m.uid === paidByUid);
-        const [y, mo, d] = (e.date || "").split("-");
-        const dateStr = d && mo ? `${d}/${mo}` : "";
-        return { id: e.id, concept: e.concept, amount: formatAmount(e.amount, currency), date: dateStr, paidBy: payer?.name || "" };
-      });
-  }, [searchQuery, searchOpen, expenses, allMembers, currency]);
 
   const NAV_LEFT  = [{ id: "home", label: "Inicio" }, { id: "saldos", label: "Saldos" }];
   const NAV_RIGHT = [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }];
