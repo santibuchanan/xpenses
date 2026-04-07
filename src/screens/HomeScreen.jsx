@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useTheme, formatAmount } from "../theme.jsx";
 import { useSwipeSheet } from "../hooks/useSwipeSheet.js";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
-import { calcSaldos } from "../hooks/useBalances.js";
+import { calcSaldosAcumulados } from "../hooks/useBalances.js";
 import { getAmountPaidBy } from "../utils/expenseFilters.js";
 import { SwipeableExpenseRow } from "../components/expenses/SwipeableExpenseRow.jsx";
 import { FONT } from "../constants/ui.js";
@@ -230,10 +230,9 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
       .filter(m => !!m.uid)
       .map(m => ({ ...m, salary: m.salary ?? labelMap[m.uid]?.salary }));
   }, [allMembers, account?.memberLabels]);
-  const allMonthSettlements = (settlements || []).filter(s => s.month === selectedMonth);
   const saldos = useMemo(
-    () => calcSaldos(sharedExp, isPersonal ? [] : monthVisibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements),
-    [sharedExp, monthVisibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements]
+    () => calcSaldosAcumulados(expenses.filter(e => !e.deleted), isPersonal ? [] : (visibleFixed || []).filter(f => !f.startDate || f.startDate.slice(0, 7) <= selectedMonth), realMembers, account?.divisionSystem, selectedMonth, settlements),
+    [expenses, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, settlements]
   );
   const myBalance = saldos[currentUser.uid]?.balance || 0;
 
@@ -282,19 +281,19 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const [showHomeTooltip, setShowHomeTooltip] = useState(() => !localStorage.getItem('onboarding_seen_home'));
 
   return (
-    <div style={{ fontFamily: FONT }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div style={{ fontFamily: FONT }}>
       {/* Hero */}
-      <div style={{ background: colors.headerBg, borderRadius: "0 0 32px 32px", padding: "calc(env(safe-area-inset-top) + 76px) 20px 28px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+      <div style={{ background: colors.headerBg, borderRadius: "0 0 32px 32px", padding: "calc(env(safe-area-inset-top) + 76px) 20px 28px" }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginBottom: 18, textAlign: "center" }}>
           {me?.photo
             ? <img src={me.photo} style={{ width: 44, height: 44, borderRadius: 22, border: "2px solid #ffffff44" }} alt="" />
             : <div style={{ width: 44, height: 44, borderRadius: 22, background: meColor + "44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
-          <div style={{ flex: 1 }}>
+          <div>
             <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>Hola,</p>
             <p style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, fontFamily: FONT }}>{me?.name || currentUser.displayName}</p>
           </div>
         </div>
-        <div style={{ background: meColor, borderRadius: 22, padding: 20 }}>
+        <div style={{ background: meColor, borderRadius: 22, padding: 20, textAlign: "center" }}>
           <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Gastos — {monthLabel}</p>
           {isLoading ? (
             <>
@@ -323,10 +322,10 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
             </>
           )}
         </div>
+        <MonthNavBar selectedMonth={selectedMonth} minMonth={minMonth} todayMonth={actualMonth} setSelectedMonth={setSelectedMonth} />
       </div>
 
       <div style={{ padding: "0 20px" }}>
-        <MonthNavBar selectedMonth={selectedMonth} minMonth={minMonth} todayMonth={actualMonth} setSelectedMonth={setSelectedMonth} />
         {showHomeTooltip && (
           <div style={{ background: "#4F7FFA18", border: "1px solid #4F7FFA44", borderRadius: 16, padding: "12px 14px", margin: "12px 0 4px", display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>
