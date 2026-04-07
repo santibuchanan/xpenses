@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useTheme, formatAmount } from "../theme.jsx";
 import { useSwipeSheet } from "../hooks/useSwipeSheet.js";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
-import { calcSaldos } from "../hooks/useBalances.js";
+import { calcSaldosAcumulados } from "../hooks/useBalances.js";
 import { getAmountPaidBy } from "../utils/expenseFilters.js";
 import { SwipeableExpenseRow } from "../components/expenses/SwipeableExpenseRow.jsx";
 import { FONT } from "../constants/ui.js";
@@ -230,10 +230,9 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
       .filter(m => !!m.uid)
       .map(m => ({ ...m, salary: m.salary ?? labelMap[m.uid]?.salary }));
   }, [allMembers, account?.memberLabels]);
-  const allMonthSettlements = (settlements || []).filter(s => s.month === selectedMonth);
   const saldos = useMemo(
-    () => calcSaldos(sharedExp, isPersonal ? [] : monthVisibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements),
-    [sharedExp, monthVisibleFixed, realMembers, account?.divisionSystem, selectedMonth, allMonthSettlements]
+    () => calcSaldosAcumulados(expenses.filter(e => !e.deleted), isPersonal ? [] : (visibleFixed || []).filter(f => !f.startDate || f.startDate.slice(0, 7) <= selectedMonth), realMembers, account?.divisionSystem, selectedMonth, settlements),
+    [expenses, visibleFixed, realMembers, account?.divisionSystem, selectedMonth, settlements]
   );
   const myBalance = saldos[currentUser.uid]?.balance || 0;
 
