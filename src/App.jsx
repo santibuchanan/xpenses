@@ -61,15 +61,54 @@ function NavIcon({ id, active, color }) {
 }
 
 // ── HEADER ──
-function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
+function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors, showSearch, searchOpen, searchQuery, setSearchQuery, setSearchOpen }) {
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (searchOpen) {
+      const t = setTimeout(() => searchInputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [searchOpen]);
+
   return (
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 60, maxWidth: 500, margin: "0 auto", background: colors.headerBg, paddingTop: "calc(env(safe-area-inset-top) + 12px)", paddingBottom: 14, paddingLeft: 20, paddingRight: 20 }}>
+      {searchOpen ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.12)", borderRadius: 12, padding: "9px 12px" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffffaa" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Buscar gasto..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ flex: 1, border: "none", background: "transparent", color: "#fff", fontSize: 15, fontFamily: FONT, outline: "none", minWidth: 0 }}
+            />
+          </div>
+          <button type="button"
+            onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#ffffffcc", fontSize: 15, fontWeight: 600, fontFamily: FONT, whiteSpace: "nowrap", padding: "4px 0", flexShrink: 0 }}>
+            Cancelar
+          </button>
+        </div>
+      ) : (
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <button onClick={onMenuOpen} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}><MenuIcon /></button>
         <div style={{ flex: 1 }}>
           <p style={{ color: "#ffffff55", fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", margin: "0 0 1px", fontFamily: FONT }}>X-penses</p>
           <p style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0, letterSpacing: -0.3, fontFamily: FONT }}>{account?.name || "Mis cuentas"}</p>
         </div>
+        {showSearch && (
+          <button type="button" onClick={() => setSearchOpen(true)}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 8, color: "#ffffffaa", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
+        )}
         <button onClick={onNotifsOpen} style={{ position: "relative", background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 50, width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0 }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffffcc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
           {unreadCount > 0 && (
@@ -79,6 +118,7 @@ function AppHeader({ account, onMenuOpen, onNotifsOpen, unreadCount, colors }) {
           )}
         </button>
       </div>
+      )}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15) 30%, rgba(255,255,255,0.15) 70%, transparent)" }} />
     </div>
   );
@@ -331,6 +371,8 @@ function AppInner() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [showNotifs, setShowNotifs]     = useState(false);
   const [showMenu, setShowMenu]         = useState(false);
+  const [searchOpen,  setSearchOpen]    = useState(false);
+  const [searchQuery, setSearchQuery]   = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [showWelcome, setShowWelcome]   = useState(false);
   const [showEmailAuth, setShowEmailAuth] = useState(false);
@@ -579,10 +621,10 @@ function AppInner() {
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} />
+      <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} showSearch={tab === "home"} searchOpen={searchOpen} searchQuery={searchQuery} setSearchQuery={setSearchQuery} setSearchOpen={setSearchOpen} />
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
-        {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} customCategories={customCategories} visibleFixed={visibleFixed} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} isLoading={expensesLoading} />}
+        {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} customCategories={customCategories} visibleFixed={visibleFixed} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} isLoading={expensesLoading} searchQuery={searchQuery} />}
         <Suspense fallback={<Spinner text="Cargando..." />}>
           {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} visibleFixed={visibleFixed} members={allMembers} account={account} currentMonth={currentMonth} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} customCategories={activeCategories} categoryBudgets={account?.categoryBudgets} />}
           {tab === "graficos" && <GraficosScreen expenses={accountExpenses} account={account} customCategories={customCategories} fixedExpenses={fixedExpenses} categoryBudgets={account?.categoryBudgets} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />}

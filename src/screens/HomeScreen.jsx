@@ -164,7 +164,7 @@ function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, on
 }
 
 // ── HOME SCREEN ──
-export default function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, selectedMonth, setSelectedMonth, customCategories, visibleFixed, onEdit, onDelete, onMarkFixedPaid, settlements, isLoading }) {
+export default function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, selectedMonth, setSelectedMonth, customCategories, visibleFixed, onEdit, onDelete, onMarkFixedPaid, settlements, isLoading, searchQuery = '' }) {
   const { colors } = useTheme();
   const fs = useExpenseFontSize();
   const isPersonal = account?.type === "personal";
@@ -255,9 +255,6 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const monthLabel = new Date(selectedMonth + "-02").toLocaleString("es-AR", { month: "long", year: "numeric" });
 
   const [filterType, setFilterType] = useState("todos");
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchOpen,  setSearchOpen]  = useState(false);
-  const searchInputRef = useRef(null);
 
   const displayFixed  = searchQuery
     ? monthVisibleFixed.filter(f => f.name?.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -296,12 +293,6 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
             <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>Hola,</p>
             <p style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, fontFamily: FONT }}>{me?.name || currentUser.displayName}</p>
           </div>
-          <button type="button" onClick={() => { setSearchOpen(true); setTimeout(() => searchInputRef.current?.focus(), 50); }}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: 8, color: "#ffffff99", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-          </button>
         </div>
         <div style={{ background: meColor, borderRadius: 22, padding: 20 }}>
           <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Gastos — {monthLabel}</p>
@@ -333,29 +324,6 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
           )}
         </div>
       </div>
-
-      {searchOpen && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", background: colors.card, borderBottom: `1px solid ${colors.cardBorder}` }}>
-          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: colors.input, borderRadius: 12, padding: "9px 12px", border: `1px solid ${colors.inputBorder}` }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Buscar concepto..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{ flex: 1, border: "none", background: "transparent", color: colors.text, fontSize: 15, fontFamily: FONT, outline: "none", minWidth: 0 }}
-            />
-          </div>
-          <button type="button"
-            onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#4F7FFA", fontSize: 15, fontWeight: 600, fontFamily: FONT, whiteSpace: "nowrap", padding: "4px 0" }}>
-            Cancelar
-          </button>
-        </div>
-      )}
 
       <div style={{ padding: "0 20px" }}>
         <MonthNavBar selectedMonth={selectedMonth} minMonth={minMonth} todayMonth={actualMonth} setSelectedMonth={setSelectedMonth} />
