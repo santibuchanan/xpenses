@@ -175,7 +175,17 @@ export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, col
             <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
               <span style={{ fontSize: 22, flexShrink: 0 }}>{cat?.icon || "📦"}</span>
               <div>
-                <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{e.concept}</p>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT, display: "flex", alignItems: "center", gap: 4 }}>
+                  {e.concept}
+                  {e.attachments?.length > 0 && (
+                    <button type="button"
+                      onClick={ev => { ev.stopPropagation(); window.open(e.attachments[0], "_blank"); }}
+                      style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, display: "flex", alignItems: "center", color: colors.textMuted }}>
+                      <span style={{ fontSize: 13 }}>📎</span>
+                      {e.attachments.length > 1 && <span style={{ fontSize: 10, fontWeight: 700, fontFamily: FONT }}>{e.attachments.length}</span>}
+                    </button>
+                  )}
+                </p>
                 <p style={{ margin: "2px 0 4px", fontSize: fs.sub, color: colors.textMuted, fontFamily: FONT }}>
                   {fmtDate(e.date)}{who ? ` · ${who.name}` : ""}
                 </p>

@@ -128,6 +128,9 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
   // Swipe-to-close
   const sheetRef = useRef(null);
   const isDraggingFromHandle = useRef(false);
+  const fileInputRef = useRef(null);
+  const [attachmentUrls, setAttachmentUrls] = useState(expense.attachments || []);
+  const [pendingFiles, setPendingFiles] = useState([]);
   const { dragY, isDragging, handlers: swipeHandlers } = useSwipeSheet({ onClose: handleClose });
   const onTouchStart = (e) => {
     const handle = sheetRef.current?.querySelector("[data-handle]");
@@ -210,14 +213,31 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
           .map(([uid, v]) => ({ uid, amount: Math.round(parseFloat(v) * 100) / 100 }))
       : form.paidBy;
     const { id, ...data } = form;
+
+    let attachments = attachmentUrls;
+    if (pendingFiles.length > 0) {
+      const { ref: storageRef, uploadBytes, getDownloadURL } = await import("firebase/storage");
+      const { storage } = await import("./firebase");
+      const newUrls = await Promise.all(
+        pendingFiles.map(async (file) => {
+          const path = `expenses/${id}/${Date.now()}_${file.name}`;
+          const fileRef = storageRef(storage, path);
+          await uploadBytes(fileRef, file);
+          return getDownloadURL(fileRef);
+        })
+      );
+      attachments = [...attachmentUrls, ...newUrls];
+    }
+
     await updateDoc(doc(db, "expenses", id), {
       ...data,
       paidBy: paidByValue,
       amount: parseFloat(data.amount),
       month: data.date?.slice(0, 7) || data.month,
+      attachments,
     });
     setSaving(false);
-    if (onSave) await onSave({ ...data, paidBy: paidByValue, amount: parseFloat(data.amount) });
+    if (onSave) await onSave({ ...data, paidBy: paidByValue, amount: parseFloat(data.amount), attachments });
     else onClose();
   };
 
@@ -421,6 +441,37 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
 
           </div>
         )}
+
+        {/* ADJUNTOS */}
+        <p style={labelStyle}>Adjuntos</p>
+        <div style={{ marginBottom: 14 }}>
+          {attachmentUrls.map((url, i) => (
+            <div key={url} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "8px 12px", borderRadius: 10, background: colors.pill }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>{url.includes(".pdf") || url.includes("application%2Fpdf") ? "📄" : "🖼️"}</span>
+              <a href={url} target="_blank" rel="noreferrer"
+                style={{ fontSize: 13, color: "#4F7FFA", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT }}>
+                Adjunto {i + 1}
+              </a>
+              <button type="button" onClick={() => setAttachmentUrls(prev => prev.filter((_, j) => j !== i))}
+                style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted, fontSize: 18, padding: "0 2px", lineHeight: 1 }}>✕</button>
+            </div>
+          ))}
+          {pendingFiles.map((file, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "8px 12px", borderRadius: 10, background: colors.pill }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>{file.type === "application/pdf" ? "📄" : "🖼️"}</span>
+              <span style={{ fontSize: 13, color: colors.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT }}>{file.name}</span>
+              <button type="button" onClick={() => setPendingFiles(prev => prev.filter((_, j) => j !== i))}
+                style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted, fontSize: 18, padding: "0 2px", lineHeight: 1 }}>✕</button>
+            </div>
+          ))}
+          <button type="button" onClick={() => fileInputRef.current?.click()}
+            style={{ padding: "8px 14px", borderRadius: 10, border: "2px dashed #4F7FFA", background: "transparent", color: "#4F7FFA", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>
+            + Adjuntar foto o PDF
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple
+            onChange={e => { setPendingFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = ""; }}
+            style={{ display: "none" }} />
+        </div>
 
         <button onClick={handleSave} disabled={!isSaveable}
           style={{ width: "100%", padding: 16, borderRadius: 16,

@@ -124,6 +124,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
     owner: currentUser.uid,
   });
   const [loading, setLoading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const currSymbol = CURRENCIES[currency]?.symbol || "$";
@@ -147,8 +148,15 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
   const [showDiscard, setShowDiscard] = useState(false);
   const [showTypeHelp, setShowTypeHelp] = useState(false);
   const handleClose = () => {
-    const dirty = form.concept.trim() !== "" || (amountInput?.numericValue || 0) > 0;
+    const dirty = form.concept.trim() !== "" || (amountInput?.numericValue || 0) > 0 || selectedFiles.length > 0;
     if (dirty) setShowDiscard(true); else onClose();
+  };
+
+  const handlePaste = (e) => {
+    const files = Array.from(e.clipboardData?.files || []).filter(
+      f => f.type.startsWith("image/") || f.type === "application/pdf"
+    );
+    if (files.length > 0) setSelectedFiles(prev => [...prev, ...files]);
   };
 
   // Amount input con hook
@@ -157,6 +165,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
   // Swipe-to-close — solo desde el handle
   const sheetRef = useRef(null);
   const amountRef = useRef(null);
+  const fileInputRef = useRef(null);
   const isDraggingFromHandle = useRef(false);
   const { dragY, isDragging, handlers: swipeHandlers } = useSwipeSheet({ onClose: handleClose });
 
@@ -215,7 +224,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
           .map(([uid, v]) => ({ uid, amount: Math.round(parseFloat(v) * 100) / 100 }))
       : form.paidBy;
     try {
-      await onAdd({ ...form, paidBy: paidByValue, amount, month: form.date.slice(0, 7) });
+      await onAdd({ ...form, paidBy: paidByValue, amount, month: form.date.slice(0, 7) }, selectedFiles);
     } catch(e) {
       console.error("onAdd error", e);
       setLoading(false);
@@ -248,6 +257,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
         onTouchStart={onTouchStart}
         onTouchMove={swipeHandlers.onTouchMove}
         onTouchEnd={(e) => { if (isDraggingFromHandle.current) swipeHandlers.onTouchEnd(e); isDraggingFromHandle.current = false; }}
+        onPaste={handlePaste}
         style={{
           background: colors.card, borderRadius: "24px 24px 0 0", width: "100%",
           // FIX: altura inicial ~82vh para que se vea que se puede deslizar para cerrar
@@ -422,6 +432,28 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
 
           </div>
         )}
+
+        {/* ADJUNTOS */}
+        <p style={labelStyle}>Adjuntos</p>
+        <div style={{ marginBottom: 14 }}>
+          {selectedFiles.map((file, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "8px 12px", borderRadius: 10, background: colors.pill }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>{file.type === "application/pdf" ? "📄" : "🖼️"}</span>
+              <span style={{ fontSize: 13, color: colors.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT }}>
+                {file.name}
+              </span>
+              <button type="button" onClick={() => setSelectedFiles(prev => prev.filter((_, j) => j !== i))}
+                style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted, fontSize: 18, padding: "0 2px", lineHeight: 1 }}>✕</button>
+            </div>
+          ))}
+          <button type="button" onClick={() => fileInputRef.current?.click()}
+            style={{ padding: "8px 14px", borderRadius: 10, border: "2px dashed #4F7FFA", background: "transparent", color: "#4F7FFA", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>
+            + Adjuntar foto o PDF
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple
+            onChange={e => { setSelectedFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = ""; }}
+            style={{ display: "none" }} />
+        </div>
 
         <button
           onClick={handleAdd}

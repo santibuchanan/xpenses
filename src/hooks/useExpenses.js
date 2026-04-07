@@ -1,8 +1,29 @@
 import { useCallback, useRef } from "react";
 import { collection, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase.js";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "../firebase.js";
 import { formatAmount } from "../theme.jsx";
 import { NOTIF_TYPES } from "../notifications.jsx";
+
+/**
+ * Sube archivos a Storage bajo expenses/{expenseId}/{timestamp}_{nombre}
+ * Retorna array de URLs de descarga.
+ */
+async function uploadAttachments(files, expenseId) {
+  const uploads = Array.from(files).map(async (file) => {
+    const path = `expenses/${expenseId}/${Date.now()}_${file.name}`;
+    const fileRef = storageRef(storage, path);
+    await uploadBytes(fileRef, file);
+    return getDownloadURL(fileRef);
+  });
+  return Promise.all(uploads);
+}
+
+// Stub — eliminación de Storage pendiente implementación completa
+// async function deleteAttachments(urls) {
+//   const { deleteObject } = await import("firebase/storage");
+//   await Promise.all(urls.map(url => deleteObject(storageRef(storage, url))));
+// }
 
 /**
  * useExpenses
@@ -55,13 +76,19 @@ export function useExpenses({
   // FIX #6: ref para evitar double-submit en operaciones destructivas
   const isSubmitting = useRef(false);
 
-  const addExpense = useCallback(async (expense) => {
-    await addDoc(collection(db, "expenses"), {
+  const addExpense = useCallback(async (expense, files = []) => {
+    const docRef = await addDoc(collection(db, "expenses"), {
       ...expense,
       createdBy: authUser.uid,
       accountId: account?.id,
       createdAt: new Date().toISOString(),
+      attachments: [],
     });
+
+    if (files.length > 0) {
+      const urls = await uploadAttachments(files, docRef.id);
+      await updateDoc(docRef, { attachments: urls });
+    }
 
     await updateDoc(doc(db, "accounts", account.id), { updatedAt: serverTimestamp() });
 
@@ -234,5 +261,5 @@ export function useExpenses({
     });
   }, [account?.id]);
 
-  return { addExpense, handleEditSave, deleteExpense, doDeleteExpense, markFixedPaid };
+  return { addExpense, handleEditSave, deleteExpense, doDeleteExpense, markFixedPaid, uploadAttachments };
 }
