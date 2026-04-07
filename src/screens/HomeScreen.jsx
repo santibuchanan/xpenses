@@ -285,16 +285,16 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
     <div style={{ fontFamily: FONT }}>
       {/* Hero */}
       <div style={{ background: colors.headerBg, borderRadius: "0 0 32px 32px", padding: "calc(env(safe-area-inset-top) + 76px) 20px 28px" }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginBottom: 18, textAlign: "center" }}>
           {me?.photo
             ? <img src={me.photo} style={{ width: 44, height: 44, borderRadius: 22, border: "2px solid #ffffff44" }} alt="" />
             : <div style={{ width: 44, height: 44, borderRadius: 22, background: meColor + "44", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>👤</div>}
-          <div style={{ flex: 1 }}>
+          <div>
             <p style={{ color: "#ffffff88", fontSize: 12, margin: 0, fontFamily: FONT }}>Hola,</p>
             <p style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, fontFamily: FONT }}>{me?.name || currentUser.displayName}</p>
           </div>
         </div>
-        <div style={{ background: meColor, borderRadius: 22, padding: 20 }}>
+        <div style={{ background: meColor, borderRadius: 22, padding: 20, textAlign: "center" }}>
           <p style={{ color: "#ffffff88", fontSize: 11, margin: "0 0 6px", fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: FONT }}>Gastos — {monthLabel}</p>
           {isLoading ? (
             <>
