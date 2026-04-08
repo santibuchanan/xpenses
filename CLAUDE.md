@@ -11,7 +11,7 @@
 - **Repo local:** `/Users/santi/xpenses`
 - **Deploy:** https://xpenses-seven.vercel.app (automático desde Vercel al pushear a main)
 - **Firebase project:** xpenses-305ee
-- **Stack:** React + Vite + Firebase (Firestore + Auth) + VitePWA
+- **Stack:** React + Vite + Firebase (Firestore + Auth + Storage) + VitePWA
 
 ## Reglas OBLIGATORIAS antes de tocar cualquier archivo
 1. Leer `src/ARCHITECTURE.md` antes de modificar zonas frágiles
@@ -28,9 +28,12 @@
 |---------|------|--------|
 | `utils/normalizeMembers.js` | `buildAllMembers()` | Rompe AddExpenseModal, SaldosScreen, HomeScreen |
 | `hooks/useBalances.js` | `calcSaldos()` | Afecta saldos en HomeScreen y SaldosScreen |
+| `hooks/useBalances.js` | `calcSaldosAcumulados()` | Usada en hero de HomeScreen — no reemplazar por calcSaldos() |
 | `App.jsx` | `inviteIdFromUrl`, listeners, hashchange | Lee hash al montar + escucha `hashchange` para PWA abierta — no re-ejecuta el parse inicial |
 | `App.jsx` | `selectedMonth` state | Estado global de mes — se resetea al cambiar de cuenta; pasado como prop a las 3 pantallas |
+| `App.jsx` | `AppHeader` búsqueda global | `searchQuery` state en AppInner, pasado a HomeScreen — no duplicar lógica de búsqueda en la pantalla |
 | `constants/categories.js` | `DEFAULT_CATEGORIES` | Cambiar afecta toda la app |
+| `constants/features.js` | `ATTACHMENTS_ENABLED` | Feature flag central — cambiar a `true` activa adjuntos (requiere plan Blaze) |
 | `vite.config.js` | workbox config | Puede romper Firebase Auth con PWA |
 
 ---
@@ -48,12 +51,14 @@
 ### Expense
 ```js
 { id, accountId, concept, amount, type, category, date, month,
-  paidBy, forWhom[], owner, deleted, createdBy, createdAt }
+  paidBy, forWhom[], owner, deleted, createdBy, createdAt,
+  attachments: string[] }  // URLs de Firebase Storage — [] o ausente si no tiene
 // Soft delete SIEMPRE: deleted: true — nunca borrado físico
 // Montos con precisión r2: Math.round(n * 100) / 100
 // paidBy: string (uid, pagador único) | Array<{uid, amount}> (multi-pagador)
 //   → NUNCA asumir que es string — usar getPaidEntries() de useBalances.js
 //   → calcSaldos(), getAmountPaidBy(), applyPaidBy() ya son retrocompatibles
+// attachments: UI dormida hasta upgrade a Blaze — ver constants/features.js
 ```
 
 ### Account
@@ -61,6 +66,7 @@
 { id, name, emoji, type, divisionSystem, ownerId, memberIds[],
   memberLabels[], currency, disabledCategories[],
   categoryBudgets: { _total?: number, [catId: string]: number },  // disponible en todos los tipos
+  accountOrder: string[],  // orden manual de cuentas en AccountSelectorScreen (drag & drop)
   createdAt }
 ```
 
@@ -190,7 +196,15 @@ style={{ touchAction: 'pan-y' }}
 
 ---
 
-## Navegación por mes (Mar 30, 2026)
+## Feature flags (constants/features.js)
+
+| Flag | Default | Descripción |
+|------|---------|-------------|
+| `ATTACHMENTS_ENABLED` | `false` | Adjuntar fotos/PDFs a gastos. Requiere Firebase Storage (plan Blaze). Cambiar a `true` activa UI en AddExpenseModal, EditExpenseModal y ícono 📎 en SwipeableExpenseRow. |
+
+---
+
+## Navegación por mes (Apr 7, 2026)
 
 - `selectedMonth` vive en `App.jsx` (AppInner) — estado global `"YYYY-MM"`, se resetea al cambiar de cuenta
 - Pasado como prop `selectedMonth` + `setSelectedMonth` a `HomeScreen`, `SaldosScreen`, `GraficosScreen`
@@ -201,11 +215,11 @@ style={{ touchAction: 'pan-y' }}
 
 ## Pendientes técnicos activos
 
-- HomeScreen skeleton loading no funciona correctamente
 - Listeners duplicados en SettingsScreen (T1)
 - Íconos PWA no se muestran
 - `removeMember.js`: maneja array paidBy pero no redistribuye el monto del miembro eliminado entre los restantes (deuda técnica menor)
 - `calcSaldos()` puede mostrar $0 en mes histórico si los settlements fueron registrados en otro mes
+- **Adjuntos en gastos** — código completo en `useExpenses.js`, `AddExpenseModal`, `EditExpenseModal`, `SwipeableExpenseRow`. Dormido con `ATTACHMENTS_ENABLED=false`. Activar cuando se haga upgrade a Firebase Blaze + configurar Storage Rules (`/expenses/{expenseId}/{fileName}` allow read/write autenticado)
 
 ## Patrones de eliminación de cuenta (firebase.js)
 

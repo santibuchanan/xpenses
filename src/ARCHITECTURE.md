@@ -2,7 +2,7 @@
 
 > **Propósito:** Referencia de arquitectura que debe consultarse antes de cada sprint. Evita regresiones en zonas frágiles.
 
-**Última actualización:** Sesión Mar 30, 2026
+**Última actualización:** Sesión Apr 7, 2026
 **Deploy:** https://xpenses-seven.vercel.app
 **Firebase project:** xpenses-305ee
 
@@ -37,17 +37,18 @@ src/
 ├── EmailAuthScreen.jsx              ← Login con email/contraseña
 ├── WelcomeScreen.jsx                ← Pantalla de bienvenida
 ├── DateInput.jsx                    ← Input de fecha reutilizable
-├── firebase.js                      ← Config Firebase (db, auth)
+├── firebase.js                      ← Config Firebase (db, auth, storage)
 ├── theme.jsx                        ← useTheme + CURRENCIES + formatAmount
 ├── notifications.jsx                ← NotifProvider + useNotif + componentes
 ├── constants/
 │   ├── categories.js                ← DEFAULT_CATEGORIES (fuente única)
+│   ├── features.js                  ← Feature flags (ATTACHMENTS_ENABLED, etc.)
 │   └── ui.js                        ← FONT, constantes de UI
 ├── hooks/
 │   ├── useAccountData.js            ← userAccounts, account, members, accountsLoading
 │   ├── useFirestoreData.js          ← expenses, categories, fixedExpenses, settlements, expensesLoading
 │   ├── useBalances.js               ← calcSaldos() con precisión r2 (2 decimales)
-│   ├── useExpenses.js               ← addExpense, handleEditSave, deleteExpense, markFixedPaid
+│   ├── useExpenses.js               ← addExpense(data, files[]), handleEditSave, deleteExpense, markFixedPaid, uploadAttachments
 │   ├── useSwipeSheet.js             ← Swipe-to-close para bottom sheets
 │   ├── useAmountInput.js            ← Input de montos con formato
 │   └── removeMember.js             ← Función para remover miembros
@@ -150,6 +151,7 @@ Origen: colección `accounts/{id}`
   currency:            string,      // Código ISO, ej: "ARS"
   disabledCategories:  string[],    // IDs de DEFAULT_CATEGORIES desactivadas
   categoryBudgets:     { _total?: number, [catId: string]: number },  // presupuesto por categoría — disponible en todos los tipos de cuenta
+  accountOrder:        string[],    // orden manual de cuentas (drag & drop en AccountSelectorScreen); guardado en users/{uid}
   createdAt:           string,      // ISO date string
 }
 ```
@@ -176,12 +178,15 @@ Origen: colección `expenses/` (filtrada por `accountId`)
   //   ⚠️ calcSaldos() y getAmountPaidBy() son retrocompatibles con ambos formatos
   forWhom:   string[],         // uids de destinatarios (type "personal")
   owner:     string,           // uid del dueño (type "mio")
-  deleted:   boolean,          // soft delete
-  createdBy: string,
-  createdAt: string,           // ISO date string
+  deleted:     boolean,        // soft delete
+  createdBy:   string,
+  createdAt:   string,         // ISO date string
+  attachments: string[],       // URLs de Firebase Storage — [] o ausente si no tiene adjuntos
   // Para type "extraordinary":
   paid_${uid}: number,         // monto pagado por cada miembro
 }
+// attachments: UI dormida con ATTACHMENTS_ENABLED=false en constants/features.js
+// Activar cuando proyecto migre a Firebase Blaze + configurar Storage Rules
 ```
 
 ### 2.6 FixedExpense
@@ -320,10 +325,16 @@ window.location.replace(origin) → recarga app con usuario autenticado
 Orquestador principal. Contiene:
 - **`AppInner`** — componente raíz con estado global, hooks de datos, routing de pantallas
 - **`MenuPanel`** — panel lateral con perfil, tema, tamaño de letra
-- **`AppHeader`** — header fijo con menú y notificaciones
+- **`AppHeader`** — header fijo con menú, notificaciones y búsqueda global de gastos
 - **`ClaimIdentityModal`** — modal para elegir identidad al unirse via invite (legacy, usado cuando no hay InviteJoinScreen)
 
 > ⚠️ Riesgo: Modificar cualquier sección puede afectar las otras. `inviteIdFromUrl` se lee del hash al montar — no re-ejecuta.
+
+**Búsqueda global:**
+- `searchQuery` state en `AppInner`, pasado como prop a `HomeScreen`
+- Input en `AppHeader` — sugerencias en tiempo real mientras se escribe
+- Busca por concepto en gastos regulares + gastos fijos del mes activo
+- La lógica de filtrado vive en `HomeScreen` — no duplicar en `AppHeader`
 
 **Comportamiento de routing al arrancar:**
 - Usuario sin cuentas → muestra `AccountSelectorScreen` vacío (sin auto-redirect a `ConfigScreen`)
@@ -335,10 +346,11 @@ Orquestador principal. Contiene:
 ```js
 // Retorna:
 {
-  userAccounts:    Account[],
-  account:         Account | null,
-  members:         Member[],
-  accountsLoading: boolean,  // false cuando todos los listeners respondieron
+  userAccounts:     Account[],
+  account:          Account | null,
+  members:          Member[],
+  accountsLoading:  boolean,  // false cuando todos los listeners respondieron
+  saveAccountOrder: (orderedIds: string[]) => Promise<void>,  // persiste orden en users/{uid}.accountOrder
 }
 ```
 
@@ -356,7 +368,7 @@ Orquestador principal. Contiene:
 }
 ```
 
-### `hooks/useBalances.js` — `calcSaldos()`
+### `hooks/useBalances.js` — `calcSaldos()` / `calcSaldosAcumulados()`
 
 Función pura de cálculo de saldos:
 - Precisión r2: `Math.round(n * 100) / 100`
@@ -366,6 +378,11 @@ Función pura de cálculo de saldos:
 ```js
 calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMonth, settlements)
 // → { [uid]: { paid, owes, balance } }
+
+calcSaldosAcumulados(expenses, fixedExpenses, members, divisionSystem, upToMonth, settlements)
+// → { [uid]: { paid, owes, balance } }
+// Acumula todos los meses hasta upToMonth inclusive — usada en hero card de HomeScreen
+// ⚠️ No reemplazar por calcSaldos() en HomeScreen — son semánticamente distintas
 ```
 
 ### `hooks/useExpenses.js`
@@ -373,8 +390,9 @@ calcSaldos(expenses, fixedExpenses, members, divisionSystem, currentMonth, settl
 Recibe `allMembers` (además de `members`) para determinar destinatarios de notificaciones.
 
 - `getNotificationRecipients(expense)` — retorna array de members a notificar según `expense.type`
-- `addExpense(data)` — escribe en Firestore + notifica según tipo
-- `handleEditSave(expense)` — actualiza gasto existente + notifica según tipo
+- `addExpense(data, files = [])` — escribe en Firestore + sube archivos a Storage si hay + notifica
+- `uploadAttachments(files, expenseId)` — sube archivos a `expenses/{expenseId}/{ts}_{nombre}`, retorna URLs; exportado del hook para uso en EditExpenseModal
+- `handleEditSave(expense)` — callback post-guardado (notificaciones + cierra modal); la escritura a Firestore la hace EditExpenseModal directamente
 - `deleteExpense(expense)` — soft delete con detección de settlements
 - `doDeleteExpense(expense, adjustSettlements)` — delete real
 - `markFixedPaid(fixedId, paidByUid, month)` — registra pago de fijo
@@ -389,12 +407,15 @@ Pantalla previa a entrar a una cuenta. Tres tabs: Cuentas, Notificaciones, Perfi
 - Skeleton loading mientras `isLoading` es true
 - Estado vacío "No tenés cuentas" solo cuando `!isLoading && accounts.length === 0`
 - Íconos y labels por tipo: Personal 👤 verde, Compartida 👥 azul, Pozo Común 🪣 ámbar
+- **Orden:** primero aplica `accountOrder` (orden manual del usuario); las cuentas sin orden van al final ordenadas por `updatedAt` desc
+- **Drag & drop:** long press activa modo reordenamiento; arrastrar con touch mueve la cuenta; al soltar llama `saveAccountOrder()` para persistir en Firestore
 
 Props:
 ```js
 {
   user, userProfile, accounts, onSelect, onCreated, onSignOut,
-  isLoading: boolean,  // de accountsLoading en useAccountData
+  isLoading: boolean,          // de accountsLoading en useAccountData
+  saveAccountOrder: fn,        // de useAccountData — persiste orden
 }
 ```
 
@@ -412,6 +433,7 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 
 - Fila de gasto con swipe-to-edit (bottom sheet) y swipe-to-delete
 - `onTouchStart` del card llama `e.stopPropagation()` antes de `handlers.onTouchStart(e)` — evita que el swipe de la fila pise el swipe horizontal de cambio de mes de HomeScreen/SaldosScreen
+- Ícono 📎 junto al concepto si `expense.attachments?.length > 0` (con contador si hay más de uno) — **dormido con `ATTACHMENTS_ENABLED`**; al tocar abre el primer adjunto en nueva pestaña
 
 ### `SettingsScreen.jsx`
 
@@ -424,7 +446,8 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 
 ### `firebase.js`
 
-Config Firebase (db, auth) + funciones de operaciones de cuenta:
+Config Firebase (db, auth, storage) + funciones de operaciones de cuenta:
+- `storage = getStorage(app)` — exportado para uso en `uploadAttachments()` (useExpenses)
 - `deleteUserData(uid)` — limpia con `writeBatch`: remueve `uid` de `memberIds[]` y `memberLabels[linkedUid]` en todas las cuentas donde aparece, borra notificaciones del usuario, y borra `users/{uid}` (con `getDoc` previo para evitar error si el doc no existe)
 - `reauthenticateUser(user, providerId, email?, password?)` — re-autentica con email/contraseña o Google según `providerId`; usado por `DeleteAccountModal` cuando Firebase lanza `auth/requires-recent-login`
 
@@ -452,6 +475,16 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 ### `constants/categories.js`
 
 > ⚠️ Cambiar aquí afecta: HomeScreen, AddExpenseModal, SettingsScreen, GraficosScreen, ConfigScreen.
+
+### `constants/features.js`
+
+Feature flags para funcionalidades en desarrollo o condicionadas a infraestructura externa.
+
+```js
+ATTACHMENTS_ENABLED = false  // Adjuntos via Firebase Storage — requiere plan Blaze
+```
+
+> Para activar una feature: cambiar el flag a `true`. No hay que tocar ningún otro archivo — toda la UI ya está implementada y condicionalizada.
 
 ---
 
@@ -502,19 +535,23 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 | Swipe gestures (sheets y rows) | `hooks/useSwipeSheet.js` | Todos los modales, sheets y filas swipeables — `useSwipeSheet` (swipe-to-close) y `useSwipeRow` (swipe-to-delete) |
 | Categorías default | `constants/categories.js` | Múltiples componentes |
 | Divisas | `CURRENCIES` en `theme.jsx` | Múltiples componentes |
+| Feature flags | `constants/features.js` | Controla features dormidas (adjuntos, etc.) |
+| Orden de cuentas | `saveAccountOrder()` en `useAccountData.js` | `AccountSelectorScreen` drag & drop |
+| Búsqueda global de gastos | `searchQuery` en `App.jsx` → `HomeScreen` | `AppHeader` input → filtrado en `HomeScreen` |
 
 ---
 
 ## 7. Estado conocido por pantalla
 
 ### HomeScreen ✅
-- Hero muestra total del mes con skeleton `#ffffff33` mientras `isLoading` (width:140/h:36 total, width:100/h:13 balance)
-- Para cuentas compartidas (`!isPersonal && !isPozo`): muestra balance personal (a favor / a pagar / Saldado ✓)
+- Hero card contiene `MonthNavBar` + swipe horizontal de mes; centrado; usa `calcSaldosAcumulados()` para el balance (no `calcSaldos()`)
+- Para cuentas compartidas (`!isPersonal && !isPozo`): muestra balance personal acumulado (a favor / a pagar / Saldado ✓)
 - Para Pozo Común (`isPozo`): muestra línea con gastos de cada integrante en el hero; stat pills con gasto por integrante en color del miembro
+- Swipe horizontal (delta > 50px) en hero card navega entre meses; respeta límites `minMonth` / `actualMonth`
+- `SwipeableExpenseRow` usa `e.stopPropagation()` en `onTouchStart` para no pisar el swipe de mes
+- **Búsqueda:** recibe `searchQuery` de `AppHeader` vía `App.jsx`; filtra gastos regulares + fijos por concepto; sugerencias en tiempo real
 - Pills de filtro muestran emoji de categoría
 - Gastos fijos con subsecciones Hogar/Personal
-- `MonthNavBar` debajo del hero — dots de paginación + label del mes activo
-- Swipe horizontal (delta > 50px) navega entre meses; respeta límites `minMonth` / `actualMonth`; `SwipeableExpenseRow` usa `e.stopPropagation()` en `onTouchStart` para no pisar este swipe
 - `monthVisibleFixed`: fijos de `visibleFixed` filtrados por `f.startDate?.slice(0,7) <= selectedMonth`
 - `catTotals`: suma gastos regulares + gastos fijos con `category` definida; fijos sin `category` no suman en ninguna
 - Todo el contenido (gastos, gastos fijos, saldos, settlements) se filtra por `selectedMonth`
@@ -549,6 +586,7 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 ### AddExpenseModal ✅
 - Default `paidBy` = usuario que carga (string uid); en modo multi-pagador escribe `Array<{uid,amount}>`
 - Default `forWhom` = todos (tipo "hogar")
+- Sección adjuntos (selector de archivos + paste + preview) **dormida con `ATTACHMENTS_ENABLED`**
 - Sin botón X — swipe o confirmar descarte
 - Se cierra correctamente después de guardar: `onClose()` fuera del try/catch de `onAdd()` (fix Mar 17)
 - Tipos en cuentas shared: Ordinario / Para otro / Extraordinario / Para mí
@@ -561,6 +599,7 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 
 ### EditExpenseModal ✅
 - Mismos tipos con misma lógica `isPozo` que AddExpenseModal
+- Sección adjuntos (carga existentes, agrega nuevos, elimina individuales) **dormida con `ATTACHMENTS_ENABLED`**
 - Sin botón X — swipe o confirmar descarte
 - Campo monto con símbolo de moneda
 - Sección PAGADO POR + PARA: mismo diseño 80/20 que AddExpenseModal (Mar 28)
@@ -573,6 +612,9 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 - Skeleton loading mientras `accountsLoading`
 - Estado vacío solo cuando `!isLoading && accounts.length === 0`
 - Pozo Común: fondo ámbar `#f39c1218`, emoji 🪣, label "Pozo Común"
+- **Orden:** `accountOrder` (users/{uid}) → cuentas sin orden van al final por `updatedAt` desc
+- **Drag & drop:** long press activa modo reordenamiento con feedback visual; arrastrar con touch; suelta → `saveAccountOrder()`
+- Splash screen nativa definida en `index.html`
 
 ### SettingsScreen ✅
 - Salario visible solo en cuentas compartidas proporcionales
@@ -612,6 +654,7 @@ También exporta `monthsBetween(min, max)` como named export, usada internamente
 | `calcSaldos()` en mes histórico sin settlements puede mostrar $0 — si los settlements del mes fueron registrados en otro mes, el balance aparece como saldado aunque no lo estaba | Media | Pendiente |
 | Eliminación de cuenta usuario | ✅ Resuelto Mar 28 | DeleteAccountModal 2 pasos + deleteUserData() + reauthenticateUser() |
 | `visibleFixed` duplicado en HomeScreen/SaldosScreen | Baja | Deuda técnica |
+| **Adjuntos en gastos** — código completo, UI dormida con `ATTACHMENTS_ENABLED=false` | Media | Dormido — activar con upgrade a Firebase Blaze + Storage Rules |
 | MenuPanel: label "Cuenta personal" no contempla pozo | Baja | Cosmético pendiente |
 | `SwipeableExpenseRow`: maneja `paidBy` string o array — muestra nombre único o "Nombre1 y Nombre2" | ✅ Resuelto Mar 28 |
 | Notificaciones con destinatarios incorrectos — `getNotificationRecipients(expense)` reemplaza `otherMembers()` genérico; switch por tipo (hogar/personal/mio/extraordinary/settlement) | Mar 26 |
