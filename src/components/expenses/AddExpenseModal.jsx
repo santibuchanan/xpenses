@@ -6,6 +6,7 @@ import { CURRENCIES } from "../../theme.jsx";
 import { useSwipeSheet } from "../../hooks/useSwipeSheet.js";
 import { useAmountInput } from "../../hooks/useAmountInput.js";
 import DateInput from "../../DateInput.jsx";
+import { ATTACHMENTS_ENABLED } from "../../constants/features.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
@@ -433,9 +434,9 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
           </div>
         )}
 
-        {/* ADJUNTOS */}
-        <p style={labelStyle}>Adjuntos</p>
-        <div style={{ marginBottom: 14 }}>
+        {/* ADJUNTOS — oculto hasta upgrade a Firebase Blaze (ATTACHMENTS_ENABLED) */}
+        {ATTACHMENTS_ENABLED && <p style={labelStyle}>Adjuntos</p>}
+        {ATTACHMENTS_ENABLED && <div style={{ marginBottom: 14 }}>
           {selectedFiles.map((file, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "8px 12px", borderRadius: 10, background: colors.pill }}>
               <span style={{ fontSize: 20, flexShrink: 0 }}>{file.type === "application/pdf" ? "📄" : "🖼️"}</span>
@@ -453,7 +454,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
           <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple
             onChange={e => { setSelectedFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = ""; }}
             style={{ display: "none" }} />
-        </div>
+        </div>}
 
         <button
           onClick={handleAdd}

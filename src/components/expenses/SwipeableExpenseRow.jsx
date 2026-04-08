@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useTheme } from "../../theme.jsx";
 import { Tag } from "../shared/ui.jsx";
 import { useSwipeRow, useSwipeSheet } from "../../hooks/useSwipeSheet.js";
+import { ATTACHMENTS_ENABLED } from "../../constants/features.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
@@ -177,7 +178,7 @@ export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, col
               <div>
                 <p style={{ margin: 0, fontWeight: 600, fontSize: fs.base, color: colors.text, fontFamily: FONT, display: "flex", alignItems: "center", gap: 4 }}>
                   {e.concept}
-                  {e.attachments?.length > 0 && (
+                  {ATTACHMENTS_ENABLED && e.attachments?.length > 0 && (
                     <button type="button"
                       onClick={ev => { ev.stopPropagation(); window.open(e.attachments[0], "_blank"); }}
                       style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, display: "flex", alignItems: "center", color: colors.textMuted }}>

@@ -6,6 +6,7 @@ import { db } from "./firebase";
 import { useTheme, CURRENCIES } from "./theme.jsx";
 import DateInput from "./DateInput";
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
+import { ATTACHMENTS_ENABLED } from "./constants/features.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
@@ -442,9 +443,9 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
           </div>
         )}
 
-        {/* ADJUNTOS */}
-        <p style={labelStyle}>Adjuntos</p>
-        <div style={{ marginBottom: 14 }}>
+        {/* ADJUNTOS — oculto hasta upgrade a Firebase Blaze (ATTACHMENTS_ENABLED) */}
+        {ATTACHMENTS_ENABLED && <p style={labelStyle}>Adjuntos</p>}
+        {ATTACHMENTS_ENABLED && <div style={{ marginBottom: 14 }}>
           {attachmentUrls.map((url, i) => (
             <div key={url} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "8px 12px", borderRadius: 10, background: colors.pill }}>
               <span style={{ fontSize: 20, flexShrink: 0 }}>{url.includes(".pdf") || url.includes("application%2Fpdf") ? "📄" : "🖼️"}</span>
@@ -471,7 +472,7 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
           <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple
             onChange={e => { setPendingFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = ""; }}
             style={{ display: "none" }} />
-        </div>
+        </div>}
 
         <button onClick={handleSave} disabled={!isSaveable}
           style={{ width: "100%", padding: 16, borderRadius: 16,
