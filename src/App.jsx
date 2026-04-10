@@ -652,7 +652,7 @@ function AppInner() {
       {isDesktop && (
         <Sidebar activeTab={tab} onTabChange={setTab} account={account} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(v => !v)} user={authUser} userProfile={userProfile} onSignOut={handleSignOut} onToggleTheme={toggleTheme} isDark={isDark} />
       )}
-      <div style={isDesktop ? { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" } : { width: "100%", maxWidth: 500, margin: "0 auto", background: colors.bg, minHeight: "100dvh", position: "relative", fontFamily: FONT, paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", boxSizing: "border-box", overflowX: "hidden" }}>
+      <div style={isDesktop ? { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", overflowY: "auto" } : { width: "100%", maxWidth: 500, margin: "0 auto", background: colors.bg, minHeight: "100dvh", position: "relative", fontFamily: FONT, paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", boxSizing: "border-box", overflowX: "hidden" }}>
       <style>{`
         ${FONT_IMPORT}
         *, *::before, *::after { box-sizing: border-box; }
@@ -664,7 +664,7 @@ function AppInner() {
 
       {!isDesktop && <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} showSearch={tab === "home"} searchOpen={searchOpen} searchQuery={searchQuery} setSearchQuery={setSearchQuery} setSearchOpen={setSearchOpen} searchSuggestions={searchSuggestions} />}
 
-      <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
+      <div style={{ paddingBottom: isDesktop ? 0 : NAV_HEIGHT + 20, minHeight: isDesktop ? "unset" : "100dvh" }}>
         {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} customCategories={customCategories} visibleFixed={visibleFixed} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} isLoading={expensesLoading} searchQuery={searchQuery} />}
         <Suspense fallback={<Spinner text="Cargando..." />}>
           {tab === "saldos"   && <SaldosScreen expenses={accountExpenses} visibleFixed={visibleFixed} members={allMembers} account={account} currentMonth={currentMonth} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} currentUser={authUser} onAddExpense={addExpense} settlements={settlements} customCategories={activeCategories} categoryBudgets={account?.categoryBudgets} />}
