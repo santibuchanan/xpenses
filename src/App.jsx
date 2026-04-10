@@ -29,6 +29,7 @@ const SettingsScreen = lazy(() => import("./SettingsScreen"));
 import { buildAllMembers } from "./utils/normalizeMembers.js";
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
 import useIsDesktop from "./hooks/useIsDesktop.js";
+import Sidebar from "./components/desktop/Sidebar.jsx";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');`;
@@ -398,6 +399,7 @@ function AppInner() {
   // Onboarding: se muestra una vez por dispositivo a usuarios nuevos (antes de ConfigScreen)
   const [onboardingDone, setOnboardingDone] = useState(() => !!localStorage.getItem("xpenses-onboarding-done"));
   const isDesktop = useIsDesktop();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const currentMonth = getCurrentMonth();
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
@@ -648,7 +650,7 @@ function AppInner() {
   return (
     <div style={{ display: "flex", ...(isDesktop ? { height: "100dvh", background: colors.bg, fontFamily: FONT } : {}) }}>
       {isDesktop && (
-        <div style={{ width: 220, flexShrink: 0, background: colors.card, borderRight: `1px solid ${colors.navBorder}`, height: "100dvh" }} />
+        <Sidebar activeTab={tab} onTabChange={setTab} account={account} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(v => !v)} />
       )}
       <div style={isDesktop ? { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" } : { width: "100%", maxWidth: 500, margin: "0 auto", background: colors.bg, minHeight: "100dvh", position: "relative", fontFamily: FONT, paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", boxSizing: "border-box", overflowX: "hidden" }}>
       <style>{`
@@ -660,7 +662,7 @@ function AppInner() {
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} showSearch={tab === "home"} searchOpen={searchOpen} searchQuery={searchQuery} setSearchQuery={setSearchQuery} setSearchOpen={setSearchOpen} searchSuggestions={searchSuggestions} />
+      {!isDesktop && <AppHeader account={account} onMenuOpen={() => setShowMenu(true)} onNotifsOpen={() => setShowNotifs(true)} unreadCount={unreadCount} colors={colors} showSearch={tab === "home"} searchOpen={searchOpen} searchQuery={searchQuery} setSearchQuery={setSearchQuery} setSearchOpen={setSearchOpen} searchSuggestions={searchSuggestions} />}
 
       <div style={{ paddingBottom: NAV_HEIGHT + 20, minHeight: "100dvh" }}>
         {tab === "home" && <HomeScreen expenses={accountExpenses} currentUser={authUser} allMembers={allMembers} account={account} currentMonth={currentMonth} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} customCategories={customCategories} visibleFixed={visibleFixed} onEdit={setEditingExpense} onDelete={deleteExpense} onMarkFixedPaid={markFixedPaid} settlements={settlements} isLoading={expensesLoading} searchQuery={searchQuery} />}
@@ -672,7 +674,7 @@ function AppInner() {
       </div>
 
       {/* Bottom Nav */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, width: "100%", maxWidth: 500, margin: "0 auto", zIndex: 40 }}>
+      {!isDesktop && <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, width: "100%", maxWidth: 500, margin: "0 auto", zIndex: 40 }}>
         <div style={{ position: "absolute", top: -28, left: "50%", transform: "translateX(-50%)", zIndex: 41 }}>
           <button onClick={() => setShowAdd(true)} style={{ width: 64, height: 64, borderRadius: 32, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", border: "4px solid " + colors.navBg, color: "#fff", fontSize: 30, cursor: "pointer", boxShadow: "0 6px 24px #4F7FFA88", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
         </div>
