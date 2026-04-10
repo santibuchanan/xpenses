@@ -28,6 +28,7 @@ const SettingsScreen = lazy(() => import("./SettingsScreen"));
 // Utilidad centralizada de normalización de miembros
 import { buildAllMembers } from "./utils/normalizeMembers.js";
 import { DEFAULT_CATEGORIES } from "./constants/categories.js";
+import useIsDesktop from "./hooks/useIsDesktop.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');`;
@@ -396,6 +397,7 @@ function AppInner() {
   const [accountIds, setAccountIds]     = useState([]);
   // Onboarding: se muestra una vez por dispositivo a usuarios nuevos (antes de ConfigScreen)
   const [onboardingDone, setOnboardingDone] = useState(() => !!localStorage.getItem("xpenses-onboarding-done"));
+  const isDesktop = useIsDesktop();
   const currentMonth = getCurrentMonth();
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
@@ -644,7 +646,11 @@ function AppInner() {
   const NAV_RIGHT = [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }];
 
   return (
-    <div style={{ width: "100%", maxWidth: 500, margin: "0 auto", background: colors.bg, minHeight: "100dvh", position: "relative", fontFamily: FONT, paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", boxSizing: "border-box", overflowX: "hidden" }}>
+    <div style={{ display: "flex", ...(isDesktop ? { height: "100dvh", background: colors.bg, fontFamily: FONT } : {}) }}>
+      {isDesktop && (
+        <div style={{ width: 220, flexShrink: 0, background: colors.card, borderRight: `1px solid ${colors.navBorder}`, height: "100dvh" }} />
+      )}
+      <div style={isDesktop ? { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" } : { width: "100%", maxWidth: 500, margin: "0 auto", background: colors.bg, minHeight: "100dvh", position: "relative", fontFamily: FONT, paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", boxSizing: "border-box", overflowX: "hidden" }}>
       <style>{`
         ${FONT_IMPORT}
         *, *::before, *::after { box-sizing: border-box; }
@@ -724,6 +730,7 @@ function AppInner() {
           onClaim={(labelId) => finishJoinAccount({ inviteId: claimData.inviteId, accountId: claimData.accountId, accountData: claimData.accountData, claimedLabelId: labelId })}
           onSkip={() => finishJoinAccount({ inviteId: claimData.inviteId, accountId: claimData.accountId, accountData: claimData.accountData, claimedLabelId: null })} />
       )}
+      </div>
     </div>
   );
 }
