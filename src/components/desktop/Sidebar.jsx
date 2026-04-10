@@ -1,5 +1,6 @@
 import { useTheme } from '../../theme';
 import { FONT } from '../../constants/ui';
+import AvatarDropdown from './AvatarDropdown';
 
 const NAV_ITEMS = [
   { key: 'home',     icon: '🏠', label: 'Inicio' },
@@ -8,7 +9,7 @@ const NAV_ITEMS = [
   { key: 'ajustes',  icon: '⚙️', label: 'Ajustes' },
 ];
 
-export default function Sidebar({ activeTab, onTabChange, account, collapsed, onToggleCollapse }) {
+export default function Sidebar({ activeTab, onTabChange, account, collapsed, onToggleCollapse, user, userProfile, onSignOut, onToggleTheme, isDark }) {
   const { colors } = useTheme();
 
   return (
@@ -91,9 +92,17 @@ export default function Sidebar({ activeTab, onTabChange, account, collapsed, on
         {collapsed ? '›' : '‹'}
       </button>
 
-      {/* Avatar placeholder */}
-      <div style={{ padding: collapsed ? '16px 0' : '16px', textAlign: collapsed ? 'center' : 'left', borderTop: `1px solid ${colors.navBorder}`, fontSize: 13, color: colors.textMuted }}>
-        {collapsed ? '👤' : '👤 Mi perfil'}
+      {/* Avatar */}
+      <div style={{ padding: collapsed ? '12px 0' : '8px 12px', borderTop: `1px solid ${colors.navBorder}` }}>
+        {collapsed
+          ? <div style={{ display: 'flex', justifyContent: 'center' }}>
+              {(userProfile?.photo || user?.photoURL)
+                ? <img src={userProfile?.photo || user?.photoURL} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} alt="" />
+                : <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#4F7FFA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 600 }}>{(userProfile?.name || user?.displayName || 'U')[0]}</div>
+              }
+            </div>
+          : <AvatarDropdown user={user} userProfile={userProfile} onSignOut={onSignOut} onToggleTheme={onToggleTheme} isDark={isDark} />
+        }
       </div>
     </div>
   );

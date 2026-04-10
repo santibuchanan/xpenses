@@ -650,7 +650,7 @@ function AppInner() {
   return (
     <div style={{ display: "flex", ...(isDesktop ? { height: "100dvh", background: colors.bg, fontFamily: FONT } : {}) }}>
       {isDesktop && (
-        <Sidebar activeTab={tab} onTabChange={setTab} account={account} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(v => !v)} />
+        <Sidebar activeTab={tab} onTabChange={setTab} account={account} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(v => !v)} user={authUser} userProfile={userProfile} onSignOut={handleSignOut} onToggleTheme={toggleTheme} isDark={isDark} />
       )}
       <div style={isDesktop ? { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" } : { width: "100%", maxWidth: 500, margin: "0 auto", background: colors.bg, minHeight: "100dvh", position: "relative", fontFamily: FONT, paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)", boxSizing: "border-box", overflowX: "hidden" }}>
       <style>{`
