@@ -693,7 +693,7 @@ function AppInner() {
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Modales */}
       {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onSaved={() => setTab("home")} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={activeCategories} isPersonal={isPersonal} isPozo={account?.type === "pozo"} accountId={account?.id} />}
