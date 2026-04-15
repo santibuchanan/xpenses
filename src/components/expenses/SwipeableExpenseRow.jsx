@@ -3,6 +3,7 @@ import { useTheme } from "../../theme.jsx";
 import { Tag } from "../shared/ui.jsx";
 import { useSwipeRow, useSwipeSheet } from "../../hooks/useSwipeSheet.js";
 import { ATTACHMENTS_ENABLED } from "../../constants/features.js";
+import useIsDesktop from "../../hooks/useIsDesktop.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
@@ -78,6 +79,7 @@ export function DeleteConfirmPopup({ expense, fmt, allCategories, colors, onConf
 // Click → abre edición | Swipe parcial → peek rojo | Swipe total → popup eliminar
 export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, colors, onEdit, onDelete, isPersonal, currentUser }) {
   const [showDelete, setShowDelete] = useState(false);
+  const isDesktop = useIsDesktop();
 
   const { offsetX, isSettling, peekProgress, handlers, reset, wasDragging } = useSwipeRow({
     peekDistance: 80,
@@ -142,27 +144,29 @@ export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, col
   return (
     <>
       <div style={{ position: "relative", marginBottom: 10, borderRadius: 20, overflow: "hidden" }}>
-        {/* Fondo rojo animado */}
-        <div style={{
-          position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
-          borderRadius: "0 20px 20px 0", display: "flex", alignItems: "center", justifyContent: "center",
-          background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
-        }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {/* Fondo rojo animado — solo mobile */}
+        {!isDesktop && (
+          <div style={{
+            position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
+            borderRadius: "0 20px 20px 0", display: "flex", alignItems: "center", justifyContent: "center",
+            background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"/>
                 <path d="M19 6l-1 14H6L5 6"/>
                 <path d="M10 11v6M14 11v6"/>
                 <path d="M9 6V4h6v2"/>
               </svg>
-            <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+              <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Card deslizable */}
         <div
           {...handlers}
-          onTouchStart={(e) => { e.stopPropagation(); handlers.onTouchStart(e); }}
+          {...(!isDesktop && { onTouchStart: (ev) => { ev.stopPropagation(); handlers.onTouchStart(ev); } })}
           onClick={handleClick}
           style={{
             background: colors.card, borderRadius: 20, padding: "14px 16px",
@@ -195,9 +199,31 @@ export function SwipeableExpenseRow({ e, allCategories, allMembers, fmt, fs, col
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
               <p style={{ margin: 0, fontWeight: 700, fontSize: fs.base, color: colors.text, fontFamily: FONT }}>{fmt(e.amount)}</p>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 18l6-6-6-6"/>
-              </svg>
+              {isDesktop && (
+                <button
+                  type="button"
+                  onClick={(ev) => { ev.stopPropagation(); setShowDelete(true); }}
+                  style={{
+                    opacity: 0,
+                    transition: 'opacity 0.15s',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    padding: '4px 8px',
+                    color: '#ef4444',
+                  }}
+                  onMouseEnter={ev => ev.currentTarget.style.opacity = 1}
+                  onMouseLeave={ev => ev.currentTarget.style.opacity = 0}
+                >
+                  🗑
+                </button>
+              )}
+              {!isDesktop && (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18l6-6-6-6"/>
+                </svg>
+              )}
             </div>
           </div>
         </div>
