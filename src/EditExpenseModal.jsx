@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useSwipeSheet } from "./hooks/useSwipeSheet.js";
+import useIsDesktop from "./hooks/useIsDesktop.js";
 import { useAmountInput } from "./hooks/useAmountInput.js";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
@@ -75,6 +76,7 @@ function getPerspectiveType(expense, currentUserUid) {
 
 export default function EditExpenseModal({ expense, members, allMembers, customCategories, currentUser, isPozo, isPersonal, onClose, onSave }) {
   const { colors } = useTheme();
+  const isDesktop = useIsDesktop();
   const profiles = (allMembers || members || []);
   const currSymbol = CURRENCIES["ARS"]?.symbol || "$";
 
@@ -277,12 +279,32 @@ export default function EditExpenseModal({ expense, members, allMembers, customC
   const isSaveable = !saving && canSave();
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: isDesktop ? "center" : "flex-end", justifyContent: isDesktop ? "center" : "stretch" }}>
       <div ref={sheetRef} onTouchStart={onTouchStart} onTouchMove={swipeHandlers.onTouchMove} onTouchEnd={(e) => { if (isDraggingFromHandle.current) swipeHandlers.onTouchEnd(e); isDraggingFromHandle.current = false; }}
-        style={{ background: colors.card, borderRadius: "24px 24px 0 0", width: "100%", padding: "0 20px 44px", maxHeight: "90vh", overflowY: "auto", fontFamily: FONT, transform: `translateY(${dragY}px)`, transition: isDragging ? "none" : "transform 0.3s ease" }}>
-        <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
-          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
-        </div>
+        style={{
+          background: colors.card,
+          ...(isDesktop ? {
+            borderRadius: 20,
+            width: "100%",
+            maxWidth: 480,
+            maxHeight: "90vh",
+            overflowY: "auto",
+          } : {
+            borderRadius: "24px 24px 0 0",
+            width: "100%",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            transform: `translateY(${dragY}px)`,
+            transition: isDragging ? "none" : "transform 0.3s ease",
+          }),
+          padding: "0 20px 44px", fontFamily: FONT,
+        }}>
+        {!isDesktop && (
+          <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
+            <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
+          </div>
+        )}
+        {isDesktop && <div style={{ height: 20 }} />}
         <div style={{ marginBottom: 18, paddingTop: 12 }}>
           <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Editar Gasto</span>
         </div>

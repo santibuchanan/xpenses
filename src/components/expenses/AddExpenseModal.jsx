@@ -7,6 +7,7 @@ import { useSwipeSheet } from "../../hooks/useSwipeSheet.js";
 import { useAmountInput } from "../../hooks/useAmountInput.js";
 import DateInput from "../../DateInput.jsx";
 import { ATTACHMENTS_ENABLED } from "../../constants/features.js";
+import useIsDesktop from "../../hooks/useIsDesktop.js";
 
 const FONT = `'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif`;
 
@@ -76,6 +77,7 @@ function PayerAmountInput({ uid, onValueChange, currSymbol, colors, FONT, width 
 
 export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, allMembers, currency, customCategories, isPersonal, isPozo, accountId }) {
   const { colors } = useTheme();
+  const isDesktop = useIsDesktop();
 
   // Scroll lock
   useEffect(() => {
@@ -252,7 +254,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
   const showForWhom = !isPersonal && (form.type === "personal" || form.type === "extraordinary" || form.type === "hogar");
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: isDesktop ? "center" : "flex-end", justifyContent: isDesktop ? "center" : "stretch" }}>
       <div
         ref={sheetRef}
         onTouchStart={onTouchStart}
@@ -260,17 +262,31 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
         onTouchEnd={(e) => { if (isDraggingFromHandle.current) swipeHandlers.onTouchEnd(e); isDraggingFromHandle.current = false; }}
         onPaste={handlePaste}
         style={{
-          background: colors.card, borderRadius: "24px 24px 0 0", width: "100%",
-          // FIX: altura inicial ~82vh para que se vea que se puede deslizar para cerrar
-          padding: "0 20px 44px", maxHeight: "82vh", overflowY: "auto", fontFamily: FONT,
-          transform: `translateY(${dragY}px)`,
-          transition: isDragging ? "none" : "transform 0.3s ease",
+          background: colors.card,
+          ...(isDesktop ? {
+            borderRadius: 20,
+            width: "100%",
+            maxWidth: 480,
+            maxHeight: "90vh",
+            overflowY: "auto",
+          } : {
+            borderRadius: "24px 24px 0 0",
+            width: "100%",
+            maxHeight: "82vh",
+            overflowY: "auto",
+            transform: `translateY(${dragY}px)`,
+            transition: isDragging ? "none" : "transform 0.3s ease",
+          }),
+          padding: "0 20px 44px", fontFamily: FONT,
         }}
       >
-        {/* Handle de swipe */}
-        <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
-          <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
-        </div>
+        {/* Handle de swipe — solo mobile */}
+        {!isDesktop && (
+          <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
+            <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
+          </div>
+        )}
+        {isDesktop && <div style={{ height: 20 }} />}
 
         {/* FIX: sin botón X — solo título */}
         <div style={{ marginBottom: 18, paddingTop: 12 }}>
