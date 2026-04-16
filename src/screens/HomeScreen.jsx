@@ -417,7 +417,11 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
             </button>
 
             {catSectionExpanded && (
-              <div>
+              <div style={{
+                display: isDesktop ? 'grid' : 'block',
+                gridTemplateColumns: isDesktop ? '1fr 1fr' : undefined,
+                gap: isDesktop ? 8 : 0,
+              }}>
                 {(catExpanded ? catTotals : catTotals.slice(0, 4)).map(c => {
                   const budget = account?.categoryBudgets?.[c.id];
                   const pct = budget ? Math.min(100, (c.total / budget) * 100) : Math.min(100, (c.total / catTotals[0].total) * 100);
