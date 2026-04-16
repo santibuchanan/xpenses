@@ -5,7 +5,7 @@ import AvatarDropdown from './AvatarDropdown';
 const NAV_ITEMS = [
   { key: 'home',     icon: '🏠', label: 'Inicio' },
   { key: 'saldos',   icon: '⚖️', label: 'Saldos' },
-  { key: 'graficos', icon: '📊', label: 'Gráficos' },
+  { key: 'graficos', icon: '📊', label: 'Estadísticas' },
   { key: 'ajustes',  icon: '⚙️', label: 'Ajustes' },
 ];
 

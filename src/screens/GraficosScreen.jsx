@@ -107,7 +107,7 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
         alignItems: 'start',
       }}>
         {/* Bar chart */}
-        <div>
+        <div style={{ height: isDesktop ? 420 : undefined }}>
           <SectionTitle>Comparación</SectionTitle>
 
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -168,7 +168,7 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
         </div>
 
         {/* Pie chart */}
-        <div>
+        <div style={{ height: isDesktop ? 420 : undefined }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, marginTop: 4 }}>
             <SectionTitle style={{ margin: 0 }}>Por categoría</SectionTitle>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

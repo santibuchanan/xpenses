@@ -645,7 +645,7 @@ function AppInner() {
   const isPersonal = account?.type === "personal";
 
   const NAV_LEFT  = [{ id: "home", label: "Inicio" }, { id: "saldos", label: "Saldos" }];
-  const NAV_RIGHT = [{ id: "graficos", label: "Gráficos" }, { id: "ajustes", label: "Ajustes" }];
+  const NAV_RIGHT = [{ id: "graficos", label: "Estadísticas" }, { id: "ajustes", label: "Ajustes" }];
 
   return (
     <div style={{ display: "flex", ...(isDesktop ? { height: "100dvh", background: colors.bg, fontFamily: FONT } : {}) }}>
