@@ -695,6 +695,15 @@ function AppInner() {
         </div>
       </div>}
 
+      {/* FAB desktop */}
+      {isDesktop && (
+        <button
+          type="button"
+          onClick={() => setShowAdd(true)}
+          style={{ position: 'fixed', bottom: 32, right: 32, width: 64, height: 64, borderRadius: 32, background: "linear-gradient(135deg,#4F7FFA,#3a6ae8)", border: "none", color: "#fff", fontSize: 30, cursor: "pointer", boxShadow: "0 6px 24px #4F7FFA88", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}
+        >+</button>
+      )}
+
       {/* Modales */}
       {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onSaved={() => setTab("home")} onAdd={addExpense} currentUser={authUser} allMembers={allMembers} currency={account?.currency || "ARS"} customCategories={activeCategories} isPersonal={isPersonal} isPozo={account?.type === "pozo"} accountId={account?.id} />}
       {editingExpense && <EditExpenseModal expense={editingExpense} members={allMembers} customCategories={activeCategories} currentUser={authUser} isPozo={account?.type === "pozo"} isPersonal={isPersonal} onClose={() => setEditingExpense(null)} onSave={handleEditSave} />}
