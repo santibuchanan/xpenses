@@ -5,6 +5,7 @@
  */
 import { useState, useRef } from "react";
 import { useSwipeSheet, useSwipeRow } from "./hooks/useSwipeSheet.js";
+import useIsDesktop from "./hooks/useIsDesktop.js";
 import { collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { useTheme } from "./theme.jsx";
@@ -21,6 +22,7 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors, onActivat
     fullDistance: 180,
     onFull: () => onDeleteRequest(acc.id),
   });
+  const isDesktop = useIsDesktop();
 
   const longPressTimer = useRef(null);
   const [longPressActive, setLongPressActive] = useState(false);
@@ -40,81 +42,82 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors, onActivat
   const unlinkedCount  = memberLabels.filter(l => !l.linkedUid).length;
   const totalMembers   = (acc.memberIds?.length || 1) + unlinkedCount;
 
+  // Touch handlers — solo mobile
+  const touchProps = !isDesktop ? {
+    onTouchStart: (e) => {
+      e.stopPropagation();
+      handlers.onTouchStart(e);
+      if (onActivateDrag) {
+        const touch = e.touches[0];
+        touchStartY.current = touch.clientY;
+        touchStartX.current = touch.clientX;
+        longPressTimer.current = setTimeout(() => {
+          navigator.vibrate?.(50);
+          setLongPressActive(true);
+          onActivateDrag(touch.clientY);
+        }, 450);
+      }
+    },
+    onTouchMove: (e) => {
+      if (longPressActive) { onDragMove?.(e); return; }
+      if (longPressTimer.current !== null) {
+        const touch = e.touches[0];
+        if (Math.abs(touch.clientX - touchStartX.current) > 8 || Math.abs(touch.clientY - touchStartY.current) > 8) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
+      }
+      handlers.onTouchMove(e);
+    },
+    onTouchEnd: (e) => {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+      if (longPressActive) {
+        dragEndRef.current = true;
+        onDragEnd?.(e);
+        setLongPressActive(false);
+        touchStartY.current = null;
+        touchStartX.current = null;
+        return;
+      }
+      handlers.onTouchEnd();
+      touchStartY.current = null;
+      touchStartX.current = null;
+    },
+    onTouchCancel: () => {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+      if (longPressActive) { onDragEnd?.(null); setLongPressActive(false); }
+      touchStartY.current = null;
+      touchStartX.current = null;
+    },
+  } : {};
+
   return (
     <div style={{ position: "relative", marginBottom: 12, borderRadius: 20, overflow: "hidden" }}>
-      {/* Fondo rojo animado */}
-      <div style={{
-        position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
-        borderRadius: "0 20px 20px 0", display: "flex", alignItems: "center", justifyContent: "center",
-        background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
-      }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14H6L5 6"/>
-            <path d="M10 11v6M14 11v6"/>
-            <path d="M9 6V4h6v2"/>
-          </svg>
-          <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+      {/* Fondo rojo animado — solo mobile */}
+      {!isDesktop && (
+        <div style={{
+          position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
+          borderRadius: "0 20px 20px 0", display: "flex", alignItems: "center", justifyContent: "center",
+          background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4h6v2"/>
+            </svg>
+            <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Card deslizable */}
+      {/* Card */}
       <div
         {...handlers}
-        onTouchStart={(e) => {
-          e.stopPropagation();
-          handlers.onTouchStart(e);
-          if (onActivateDrag) {
-            const touch = e.touches[0];
-            touchStartY.current = touch.clientY;
-            touchStartX.current = touch.clientX;
-            longPressTimer.current = setTimeout(() => {
-              navigator.vibrate?.(50);
-              setLongPressActive(true);
-              onActivateDrag(touch.clientY);
-            }, 450);
-          }
-        }}
-        onTouchMove={(e) => {
-          if (longPressActive) {
-            onDragMove?.(e);
-            return;
-          }
-          if (longPressTimer.current !== null) {
-            const touch = e.touches[0];
-            if (Math.abs(touch.clientX - touchStartX.current) > 8 || Math.abs(touch.clientY - touchStartY.current) > 8) {
-              clearTimeout(longPressTimer.current);
-              longPressTimer.current = null;
-            }
-          }
-          handlers.onTouchMove(e);
-        }}
-        onTouchEnd={(e) => {
-          clearTimeout(longPressTimer.current);
-          longPressTimer.current = null;
-          if (longPressActive) {
-            dragEndRef.current = true;
-            onDragEnd?.(e);
-            setLongPressActive(false);
-            touchStartY.current = null;
-            touchStartX.current = null;
-            return;
-          }
-          handlers.onTouchEnd();
-          touchStartY.current = null;
-          touchStartX.current = null;
-        }}
-        onTouchCancel={() => {
-          clearTimeout(longPressTimer.current);
-          longPressTimer.current = null;
-          if (longPressActive) {
-            onDragEnd?.(null);
-            setLongPressActive(false);
-          }
-          touchStartY.current = null;
-          touchStartX.current = null;
-        }}
+        {...touchProps}
         onClick={handleClick}
         style={{
           transform: `translateX(-${offsetX}px)`,
@@ -126,6 +129,12 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors, onActivat
           WebkitUserSelect: 'none',
         }}
       >
+        {/* Handle drag — solo desktop, visual por ahora (TODO: conectar mouse drag) */}
+        {isDesktop && (
+          <div style={{ cursor: 'grab', color: colors.textMuted, fontSize: 18, userSelect: 'none', flexShrink: 0, lineHeight: 1 }}>
+            ⠿
+          </div>
+        )}
         <div style={{
           width: 48, height: 48, borderRadius: 16,
           background: acc.type === "pozo" ? "#f39c1218" : acc.type === "shared" ? "#4F7FFA18" : "#2ecc7118",
@@ -139,9 +148,25 @@ function SwipeableAccountRow({ acc, onSelect, onDeleteRequest, colors, onActivat
             {acc.type === "pozo" ? "Pozo Común" : acc.type === "shared" ? "Compartida" : "Personal"} · {totalMembers} miembro{totalMembers !== 1 ? "s" : ""}
           </p>
         </div>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 18l6-6-6-6"/>
-        </svg>
+        {isDesktop ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDeleteRequest(acc.id); }}
+            style={{
+              opacity: 0, transition: 'opacity 0.15s',
+              background: 'transparent', border: 'none',
+              cursor: 'pointer', fontSize: 16, padding: '4px 8px', color: '#ef4444',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = 1}
+            onMouseLeave={e => e.currentTarget.style.opacity = 0}
+          >
+            🗑
+          </button>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        )}
       </div>
     </div>
   );
