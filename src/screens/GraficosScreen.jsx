@@ -100,98 +100,111 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
   return (
     <div style={{ padding: "0 20px", paddingTop: "calc(env(safe-area-inset-top) + 76px)", fontFamily: FONT }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <MonthNavBar selectedMonth={selectedMonth} minMonth={minMonth} todayMonth={todayMonth} setSelectedMonth={setSelectedMonth} />
-      <SectionTitle>Comparación</SectionTitle>
+      <div style={{
+        display: isDesktop ? 'grid' : 'block',
+        gridTemplateColumns: isDesktop ? '1fr 1fr' : undefined,
+        gap: isDesktop ? 24 : 0,
+        alignItems: 'start',
+      }}>
+        {/* Bar chart */}
+        <div>
+          <SectionTitle>Comparación</SectionTitle>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        {[["total","Por mes"],["por_tipo","Por tipo"]].map(([val, lbl]) => (
-          <button key={val} onClick={() => setBarView(val)}
-            style={{ padding: "7px 16px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600,
-              borderColor: barView === val ? "#4F7FFA" : colors.inputBorder,
-              background: barView === val ? "#4F7FFA" : colors.card,
-              color: barView === val ? "#fff" : colors.textMuted }}>
-            {lbl}
-          </button>
-        ))}
-      </div>
-
-      {barView === "por_tipo" && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 8, gap: 8 }}>
-          <button onClick={() => canGoPrev && setSelectedMonth(shiftMonth(selectedMonth, -1))} disabled={!canGoPrev}
-            style={{ background: "none", border: "none", cursor: !canGoPrev ? "default" : "pointer", color: !canGoPrev ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>←</button>
-          <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, minWidth: 70, textAlign: "center" }}>
-            {barMonth ? new Date(barMonth + "-02").toLocaleString("es-AR", { month: "short", year: "2-digit" }) : "-"}
-          </span>
-          <button onClick={() => canGoNext && setSelectedMonth(shiftMonth(selectedMonth, 1))} disabled={!canGoNext}
-            style={{ background: "none", border: "none", cursor: !canGoNext ? "default" : "pointer", color: !canGoNext ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>→</button>
-        </div>
-      )}
-
-      <Card>
-        {last6.length === 0
-          ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p>
-          : <ResponsiveContainer width="100%" height={210}>
-              <BarChart data={barView === "total" ? barDataTotal : barDataTipoMonth} barCategoryGap="30%">
-                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: colors.textMuted, fontFamily: FONT }} />
-                <YAxis tick={{ fontSize: 10, fill: colors.textMuted, fontFamily: FONT }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
-                {barView === "total"
-                  ? <Bar dataKey="Total" fill="#4F7FFA" radius={[6,6,0,0]} />
-                  : <>
-                      <Bar dataKey="Ordinario"      fill="#4F7FFA" radius={[6,6,0,0]} />
-                      <Bar dataKey="Para mí"        fill="#2ecc71" radius={[6,6,0,0]} />
-                      <Bar dataKey="Extraordinario" fill="#f39c12" radius={[6,6,0,0]} />
-                      <Bar dataKey="Fijos"    fill="#9b59b6" radius={[6,6,0,0]} />
-                    </>
-                }
-              </BarChart>
-            </ResponsiveContainer>
-        }
-        {barView === "por_tipo" && (
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>
-            {[["#4F7FFA","Ordinario"],["#2ecc71","Para mí"],["#f39c12","Extraordinario"],["#9b59b6","Fijos"]].map(([col, lbl]) => (
-              <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <div style={{ width: 10, height: 10, borderRadius: 3, background: col }} />
-                <span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span>
-              </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {[["total","Por mes"],["por_tipo","Por tipo"]].map(([val, lbl]) => (
+              <button key={val} onClick={() => setBarView(val)}
+                style={{ padding: "7px 16px", borderRadius: 20, border: "2px solid", cursor: "pointer", fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                  borderColor: barView === val ? "#4F7FFA" : colors.inputBorder,
+                  background: barView === val ? "#4F7FFA" : colors.card,
+                  color: barView === val ? "#fff" : colors.textMuted }}>
+                {lbl}
+              </button>
             ))}
           </div>
-        )}
-      </Card>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, marginTop: 4 }}>
-        <SectionTitle style={{ margin: 0 }}>Por categoría</SectionTitle>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => canGoPrev && setSelectedMonth(shiftMonth(selectedMonth, -1))} disabled={!canGoPrev}
-            style={{ background: "none", border: "none", cursor: !canGoPrev ? "default" : "pointer", color: !canGoPrev ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>←</button>
-          <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, minWidth: 60, textAlign: "center" }}>
-            {pieMonth ? new Date(pieMonth + "-02").toLocaleString("es-AR", { month: "short", year: "2-digit" }) : "-"}
-          </span>
-          <button onClick={() => canGoNext && setSelectedMonth(shiftMonth(selectedMonth, 1))} disabled={!canGoNext}
-            style={{ background: "none", border: "none", cursor: !canGoNext ? "default" : "pointer", color: !canGoNext ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>→</button>
+          {barView === "por_tipo" && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 8, gap: 8 }}>
+              <button onClick={() => canGoPrev && setSelectedMonth(shiftMonth(selectedMonth, -1))} disabled={!canGoPrev}
+                style={{ background: "none", border: "none", cursor: !canGoPrev ? "default" : "pointer", color: !canGoPrev ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>←</button>
+              <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, minWidth: 70, textAlign: "center" }}>
+                {barMonth ? new Date(barMonth + "-02").toLocaleString("es-AR", { month: "short", year: "2-digit" }) : "-"}
+              </span>
+              <button onClick={() => canGoNext && setSelectedMonth(shiftMonth(selectedMonth, 1))} disabled={!canGoNext}
+                style={{ background: "none", border: "none", cursor: !canGoNext ? "default" : "pointer", color: !canGoNext ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>→</button>
+            </div>
+          )}
+
+          <Card>
+            {last6.length === 0
+              ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos aún</p>
+              : <ResponsiveContainer width="100%" height={210}>
+                  <BarChart data={barView === "total" ? barDataTotal : barDataTipoMonth} barCategoryGap="30%">
+                    <XAxis dataKey="mes" tick={{ fontSize: 12, fill: colors.textMuted, fontFamily: FONT }} />
+                    <YAxis tick={{ fontSize: 10, fill: colors.textMuted, fontFamily: FONT }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
+                    {barView === "total"
+                      ? <Bar dataKey="Total" fill="#4F7FFA" radius={[6,6,0,0]} />
+                      : <>
+                          <Bar dataKey="Ordinario"      fill="#4F7FFA" radius={[6,6,0,0]} />
+                          <Bar dataKey="Para mí"        fill="#2ecc71" radius={[6,6,0,0]} />
+                          <Bar dataKey="Extraordinario" fill="#f39c12" radius={[6,6,0,0]} />
+                          <Bar dataKey="Fijos"    fill="#9b59b6" radius={[6,6,0,0]} />
+                        </>
+                    }
+                  </BarChart>
+                </ResponsiveContainer>
+            }
+            {barView === "por_tipo" && (
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 6 }}>
+                {[["#4F7FFA","Ordinario"],["#2ecc71","Para mí"],["#f39c12","Extraordinario"],["#9b59b6","Fijos"]].map(([col, lbl]) => (
+                  <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 3, background: col }} />
+                    <span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{lbl}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Pie chart */}
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, marginTop: 4 }}>
+            <SectionTitle style={{ margin: 0 }}>Por categoría</SectionTitle>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button onClick={() => canGoPrev && setSelectedMonth(shiftMonth(selectedMonth, -1))} disabled={!canGoPrev}
+                style={{ background: "none", border: "none", cursor: !canGoPrev ? "default" : "pointer", color: !canGoPrev ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>←</button>
+              <span style={{ fontSize: 13, fontWeight: 600, color: colors.text, fontFamily: FONT, minWidth: 60, textAlign: "center" }}>
+                {pieMonth ? new Date(pieMonth + "-02").toLocaleString("es-AR", { month: "short", year: "2-digit" }) : "-"}
+              </span>
+              <button onClick={() => canGoNext && setSelectedMonth(shiftMonth(selectedMonth, 1))} disabled={!canGoNext}
+                style={{ background: "none", border: "none", cursor: !canGoNext ? "default" : "pointer", color: !canGoNext ? colors.textSubtle : "#4F7FFA", fontSize: 18, padding: "0 4px" }}>→</button>
+            </div>
+          </div>
+
+          <Card>
+            {pieData.length === 0
+              ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos para este mes</p>
+              : <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" labelLine={false} label={renderCustomLabel}>
+                      {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                    </Pie>
+                    <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
+                  </PieChart>
+                </ResponsiveContainer>
+            }
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6, justifyContent: "center" }}>
+              {pieData.map(p => (
+                <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} />
+                  <span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{p.name}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
         </div>
       </div>
-
-      <Card>
-        {pieData.length === 0
-          ? <p style={{ color: colors.textMuted, textAlign: "center", padding: 20, fontFamily: FONT }}>Sin datos para este mes</p>
-          : <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" labelLine={false} label={renderCustomLabel}>
-                  {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <Tooltip formatter={v => fmt(v)} contentStyle={{ background: colors.card, border: "none", borderRadius: 12, fontFamily: FONT }} />
-              </PieChart>
-            </ResponsiveContainer>
-        }
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6, justifyContent: "center" }}>
-          {pieData.map(p => (
-            <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} />
-              <span style={{ fontSize: 11, color: colors.textMuted, fontFamily: FONT }}>{p.name}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
       {/* ── PRESUPUESTO POR CATEGORÍA ── */}
       {categoryBudgets && Object.keys(categoryBudgets).filter(k => k !== "_total" && categoryBudgets[k] > 0).length > 0 && (() => {
         const budgetCats = Object.keys(categoryBudgets)
