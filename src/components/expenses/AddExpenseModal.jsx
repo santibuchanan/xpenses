@@ -430,9 +430,14 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
         style={{
           background: colors.card,
           ...(isDesktop ? {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 'calc(100vw - 220px - 48px)',
+            maxWidth: 900,
+            minWidth: 560,
             borderRadius: 20,
-            width: "100%",
-            maxWidth: 640,
             maxHeight: "90vh",
             overflowY: "auto",
           } : {
