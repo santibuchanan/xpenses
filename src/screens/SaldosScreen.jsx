@@ -233,6 +233,7 @@ function SwipeableSettlementRow({ s, debtor, creditor, isMeDebtor, isMeCreditor,
     fullDistance: 180,
     onFull: () => onDelete(s),
   });
+  const isDesktop = useIsDesktop();
   const PEEK = 80;
 
   const content = (
@@ -262,25 +263,30 @@ function SwipeableSettlementRow({ s, debtor, creditor, isMeDebtor, isMeCreditor,
 
   return (
     <div style={{ position: "relative", overflow: "hidden", borderTop: `1px solid ${colors.divider}` }}>
-      <div style={{
-        position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
-      }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14H6L5 6"/>
-            <path d="M10 11v6M14 11v6"/>
-            <path d="M9 6V4h6v2"/>
-          </svg>
-          <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+      {/* Fondo rojo — solo mobile */}
+      {!isDesktop && (
+        <div style={{
+          position: "absolute", right: 0, top: 0, bottom: 0, width: PEEK,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: `rgba(229,62,62,${0.15 + peekProgress * 0.85})`, transition: "background 0.1s",
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: Math.min(1, offsetX / (PEEK / 2)) }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4h6v2"/>
+            </svg>
+            <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: FONT }}>Eliminar</span>
+          </div>
         </div>
-      </div>
+      )}
       <div
         {...handlers}
-        onTouchStart={(e) => { e.stopPropagation(); handlers.onTouchStart(e); }}
-        onTouchMove={(e) => { e.stopPropagation(); handlers.onTouchMove(e); }}
+        {...(!isDesktop && {
+          onTouchStart: (e) => { e.stopPropagation(); handlers.onTouchStart(e); },
+          onTouchMove:  (e) => { e.stopPropagation(); handlers.onTouchMove(e); },
+        })}
         style={{
           padding: "11px 16px", display: "flex", alignItems: "center", gap: 10,
           background: isMe ? colors.pill : colors.card,
@@ -290,6 +296,21 @@ function SwipeableSettlementRow({ s, debtor, creditor, isMeDebtor, isMeCreditor,
         }}
       >
         {content}
+        {isDesktop && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(s); }}
+            style={{
+              opacity: 0, transition: 'opacity 0.15s',
+              background: 'transparent', border: 'none',
+              cursor: 'pointer', fontSize: 16, padding: '4px 8px', color: '#ef4444',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = 1}
+            onMouseLeave={e => e.currentTarget.style.opacity = 0}
+          >
+            🗑
+          </button>
+        )}
       </div>
     </div>
   );
