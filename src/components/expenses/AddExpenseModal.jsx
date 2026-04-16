@@ -253,6 +253,172 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
   const showPaidBy  = !isPersonal && form.type !== "mio";
   const showForWhom = !isPersonal && (form.type === "personal" || form.type === "extraordinary" || form.type === "hogar");
 
+  // ── Bloques reutilizados en ambas ramas ──
+  const tipoBlock = !isPersonal && (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        <p style={{ ...labelStyle, margin: 0 }}>Tipo</p>
+        <button type="button" onClick={() => setShowTypeHelp(true)}
+          style={{ width: 18, height: 18, borderRadius: 9, background: colors.pill, border: `1px solid ${colors.inputBorder}`, cursor: "pointer", fontSize: 10, fontWeight: 700, color: colors.textMuted, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontFamily: FONT }}>?</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+        {visibleTypes.map(([val, lbl]) => (
+          <button key={val} onClick={() => setType(val)}
+            style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+              borderColor: form.type === val ? "#4F7FFA" : colors.inputBorder,
+              background: form.type === val ? "#4F7FFA11" : colors.input,
+              color: form.type === val ? "#4F7FFA" : colors.textMuted }}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+
+  const categoriaBlock = (
+    <>
+      <p style={labelStyle}>Categoría</p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
+        {allCategories.map(c => (
+          <button key={c.id} onClick={() => set("category", c.id)}
+            style={{ padding: "7px 12px", borderRadius: 12, border: "2px solid", fontSize: 12, cursor: "pointer", fontFamily: FONT,
+              borderColor: form.category === c.id ? "#4F7FFA" : colors.inputBorder,
+              background: form.category === c.id ? "#4F7FFA11" : colors.input,
+              color: form.category === c.id ? "#4F7FFA" : colors.text }}>
+            {c.icon} {c.label}
+          </button>
+        ))}
+        <button onClick={() => setShowNewCat(true)}
+          style={{ padding: "7px 12px", borderRadius: 12, border: "2px dashed", fontSize: 12, cursor: "pointer", fontFamily: FONT,
+            borderColor: "#4F7FFA", background: "transparent", color: "#4F7FFA", fontWeight: 600 }}>
+          + Nueva
+        </button>
+      </div>
+    </>
+  );
+
+  const conceptoBlock = (
+    <>
+      <p style={labelStyle}>Concepto</p>
+      <input value={form.concept} onChange={e => set("concept", e.target.value)} onFocus={() => touchField("concept")} onKeyDown={e => e.key === "Enter" && amountRef.current?.focus()} placeholder="Ej: Supermercado" style={{ ...inputStyle, borderColor: touched.concept && !form.concept ? "#ff6b6b" : colors.inputBorder }} />
+    </>
+  );
+
+  const montoBlock = (
+    <>
+      <p style={labelStyle}>Monto ({currSymbol})</p>
+      <div style={{ position: "relative", marginBottom: 14 }}>
+        <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
+        <input
+          ref={amountRef}
+          type="text"
+          inputMode="decimal"
+          value={amountInput.displayValue}
+          onChange={amountInput.onChange}
+          onFocus={() => { touchField("amount"); amountInput.onFocus?.(); }}
+          onBlur={amountInput.onBlur}
+          placeholder="0"
+          style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36,
+            borderColor: touched.amount && amountInput.numericValue <= 0 ? "#ff6b6b" : colors.inputBorder
+          }}
+        />
+      </div>
+    </>
+  );
+
+  const fechaBlock = (
+    <>
+      <p style={labelStyle}>Fecha</p>
+      <DateInput value={form.date} onChange={v => set("date", v)} />
+    </>
+  );
+
+  const pagadoPorBlock = showPaidBy && (
+    <div>
+      <p style={labelStyle}>Pagado por</p>
+      {memberList.map(m => {
+        const isPayer = multiPayer ? (m.uid in paidAmounts) : form.paidBy === m.uid;
+        const mc = "#4F7FFA";
+        return (
+          <div key={m.uid} style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 6,
+            height: 42, padding: "0 10px", borderRadius: 12,
+            border: `2px solid ${isPayer ? mc : colors.inputBorder}`,
+            background: isPayer ? mc + "18" : colors.input,
+          }}>
+            <button type="button" onClick={() => togglePayerSelection(m.uid)}
+              style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0,
+                background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT,
+                textAlign: "left" }}>
+              <span style={{
+                width: 18, height: 18, borderRadius: 9, flexShrink: 0,
+                border: `2px solid ${isPayer ? mc : colors.textMuted}`,
+                background: isPayer ? mc : "transparent",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, color: "#fff", fontWeight: 700,
+              }}>
+                {isPayer && "✓"}
+              </span>
+              <span style={{ fontWeight: 600, fontSize: 13, color: isPayer ? mc : colors.text,
+                fontFamily: FONT, flex: 1, minWidth: 0,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                textAlign: "left" }}>
+                {m.name}
+              </span>
+            </button>
+            {multiPayer && isPayer && (
+              <PayerAmountInput
+                uid={m.uid}
+                onValueChange={(u, amt) => setPaidAmounts(prev => ({ ...prev, [u]: amt }))}
+                currSymbol={currSymbol}
+                colors={colors}
+                FONT={FONT}
+              />
+            )}
+          </div>
+        );
+      })}
+      {multiPayer && (
+        <p style={{
+          fontSize: 11, textAlign: "right", fontFamily: FONT, fontWeight: 600, margin: "2px 0 0",
+          color: Math.abs(multiPayerTotal - (amountInput.numericValue || 0)) < 0.01 ? "#27ae60" : "#e74c3c",
+        }}>
+          {currSymbol}{multiPayerTotal.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {currSymbol}{(amountInput.numericValue || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </p>
+      )}
+    </div>
+  );
+
+  const paraBlock = showForWhom && (
+    <div>
+      <p style={{ ...labelStyle, textAlign: "center" }}>Para</p>
+      {memberList.map(m => {
+        const sel = form.forWhom?.includes(m.uid);
+        const mc = "#4F7FFA";
+        return (
+          <button key={m.uid} type="button" onClick={() => toggleForWhom(m.uid)}
+            style={{
+              width: "100%", height: 42, marginBottom: 6,
+              borderRadius: 12, border: `2px solid ${sel ? mc : colors.inputBorder}`,
+              background: sel ? mc + "18" : colors.input,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", padding: 0,
+            }}>
+            <span style={{
+              width: 18, height: 18, borderRadius: 9,
+              border: `2px solid ${sel ? mc : colors.textMuted}`,
+              background: sel ? mc : "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 10, color: "#fff", fontWeight: 700,
+            }}>
+              {sel && "✓"}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: isDesktop ? "center" : "flex-end", justifyContent: isDesktop ? "center" : "stretch" }}>
       <div
@@ -266,7 +432,7 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
           ...(isDesktop ? {
             borderRadius: 20,
             width: "100%",
-            maxWidth: 480,
+            maxWidth: 640,
             maxHeight: "90vh",
             overflowY: "auto",
           } : {
@@ -277,207 +443,249 @@ export default function AddExpenseModal({ onClose, onAdd, onSaved, currentUser, 
             transform: `translateY(${dragY}px)`,
             transition: isDragging ? "none" : "transform 0.3s ease",
           }),
-          padding: "0 20px 44px", fontFamily: FONT,
+          padding: isDesktop ? 0 : "0 20px 44px", fontFamily: FONT,
         }}
       >
-        {/* Handle de swipe — solo mobile */}
-        {!isDesktop && (
-          <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
-            <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
-          </div>
-        )}
-        {isDesktop && <div style={{ height: 20 }} />}
-
-        {/* FIX: sin botón X — solo título */}
-        <div style={{ marginBottom: 18, paddingTop: 12 }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Nuevo Gasto</span>
-        </div>
-
-        {!isPersonal && (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-              <p style={{ ...labelStyle, margin: 0 }}>Tipo</p>
-              <button type="button" onClick={() => setShowTypeHelp(true)}
-                style={{ width: 18, height: 18, borderRadius: 9, background: colors.pill, border: `1px solid ${colors.inputBorder}`, cursor: "pointer", fontSize: 10, fontWeight: 700, color: colors.textMuted, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontFamily: FONT }}>?</button>
+        {isDesktop ? (
+          <div style={{ padding: 28, position: 'relative', fontFamily: FONT }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Nuevo Gasto</h2>
+              <button type="button" onClick={handleClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 20, color: colors.textMuted, padding: 4 }}>✕</button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-              {visibleTypes.map(([val, lbl]) => (
-                <button key={val} onClick={() => setType(val)}
-                  style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
-                    borderColor: form.type === val ? "#4F7FFA" : colors.inputBorder,
-                    background: form.type === val ? "#4F7FFA11" : colors.input,
-                    color: form.type === val ? "#4F7FFA" : colors.textMuted }}>
-                  {lbl}
+
+            {/* Fila 1: dos columnas */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
+              {/* Columna izquierda: Tipo + Categoría */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {tipoBlock}
+                {categoriaBlock}
+              </div>
+              {/* Columna derecha: Concepto + Monto + Fecha */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {conceptoBlock}
+                {montoBlock}
+                {fechaBlock}
+              </div>
+            </div>
+
+            {/* Fila 2: Pagado por + Para en horizontal */}
+            {(showPaidBy || showForWhom) && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
+                {pagadoPorBlock}
+                {paraBlock}
+              </div>
+            )}
+
+            {/* Botones */}
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button type="button" onClick={handleClose} style={{ flex: 1, padding: '14px 0', borderRadius: 12, border: `1px solid ${colors.cardBorder}`, background: 'transparent', color: colors.textMuted, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: FONT }}>
+                Cancelar
+              </button>
+              <button type="button" onClick={handleAdd} disabled={loading} style={{ flex: 2, padding: '14px 0', borderRadius: 12, border: 'none', background: loading ? '#aaa' : '#4F7FFA', color: '#fff', fontSize: 15, fontWeight: 600, cursor: loading ? 'default' : 'pointer', fontFamily: FONT }}>
+                {loading ? "Guardando..." : "Agregar"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Handle de swipe — solo mobile */}
+            <div data-handle style={{ padding: "20px 0 4px", cursor: "grab", touchAction: "none" }}>
+              <div style={{ width: 36, height: 4, background: colors.divider, borderRadius: 2, margin: "0 auto" }} />
+            </div>
+
+            {/* FIX: sin botón X — solo título */}
+            <div style={{ marginBottom: 18, paddingTop: 12 }}>
+              <span style={{ fontSize: 20, fontWeight: 700, color: colors.text, fontFamily: FONT }}>Nuevo Gasto</span>
+            </div>
+
+            {!isPersonal && (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <p style={{ ...labelStyle, margin: 0 }}>Tipo</p>
+                  <button type="button" onClick={() => setShowTypeHelp(true)}
+                    style={{ width: 18, height: 18, borderRadius: 9, background: colors.pill, border: `1px solid ${colors.inputBorder}`, cursor: "pointer", fontSize: 10, fontWeight: 700, color: colors.textMuted, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontFamily: FONT }}>?</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                  {visibleTypes.map(([val, lbl]) => (
+                    <button key={val} onClick={() => setType(val)}
+                      style={{ padding: "10px 8px", borderRadius: 12, border: "2px solid", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+                        borderColor: form.type === val ? "#4F7FFA" : colors.inputBorder,
+                        background: form.type === val ? "#4F7FFA11" : colors.input,
+                        color: form.type === val ? "#4F7FFA" : colors.textMuted }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <p style={labelStyle}>Concepto</p>
+            <input value={form.concept} onChange={e => set("concept", e.target.value)} onFocus={() => touchField("concept")} onKeyDown={e => e.key === "Enter" && amountRef.current?.focus()} placeholder="Ej: Supermercado" style={{ ...inputStyle, borderColor: touched.concept && !form.concept ? "#ff6b6b" : colors.inputBorder }} />
+
+            <p style={labelStyle}>Monto ({currSymbol})</p>
+            <div style={{ position: "relative", marginBottom: 14 }}>
+              <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
+              <input
+                ref={amountRef}
+                type="text"
+                inputMode="decimal"
+                value={amountInput.displayValue}
+                onChange={amountInput.onChange}
+                onFocus={() => { touchField("amount"); amountInput.onFocus?.(); }}
+                onBlur={amountInput.onBlur}
+                placeholder="0"
+                style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36,
+                  borderColor: touched.amount && amountInput.numericValue <= 0 ? "#ff6b6b" : colors.inputBorder
+                }}
+              />
+            </div>
+
+            <p style={labelStyle}>Categoría</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
+              {allCategories.map(c => (
+                <button key={c.id} onClick={() => set("category", c.id)}
+                  style={{ padding: "7px 12px", borderRadius: 12, border: "2px solid", fontSize: 12, cursor: "pointer", fontFamily: FONT,
+                    borderColor: form.category === c.id ? "#4F7FFA" : colors.inputBorder,
+                    background: form.category === c.id ? "#4F7FFA11" : colors.input,
+                    color: form.category === c.id ? "#4F7FFA" : colors.text }}>
+                  {c.icon} {c.label}
                 </button>
               ))}
+              <button onClick={() => setShowNewCat(true)}
+                style={{ padding: "7px 12px", borderRadius: 12, border: "2px dashed", fontSize: 12, cursor: "pointer", fontFamily: FONT,
+                  borderColor: "#4F7FFA", background: "transparent", color: "#4F7FFA", fontWeight: 600 }}>
+                + Nueva
+              </button>
             </div>
+
+            <p style={labelStyle}>Fecha</p>
+            <DateInput value={form.date} onChange={v => set("date", v)} />
+
+            {(showPaidBy || showForWhom) && (
+              <div style={{ display: "grid", gridTemplateColumns: "4fr 1fr", gap: 10, marginBottom: 14, alignItems: "start" }}>
+
+                {/* ── Pagado por (80%) ── */}
+                {showPaidBy && (
+                  <div>
+                    <p style={labelStyle}>Pagado por</p>
+                    {memberList.map(m => {
+                      const isPayer = multiPayer ? (m.uid in paidAmounts) : form.paidBy === m.uid;
+                      const mc = "#4F7FFA";
+                      return (
+                        <div key={m.uid} style={{
+                          display: "flex", alignItems: "center", gap: 8, marginBottom: 6,
+                          height: 42, padding: "0 10px", borderRadius: 12,
+                          border: `2px solid ${isPayer ? mc : colors.inputBorder}`,
+                          background: isPayer ? mc + "18" : colors.input,
+                        }}>
+                          <button type="button" onClick={() => togglePayerSelection(m.uid)}
+                            style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0,
+                              background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT,
+                              textAlign: "left" }}>
+                            <span style={{
+                              width: 18, height: 18, borderRadius: 9, flexShrink: 0,
+                              border: `2px solid ${isPayer ? mc : colors.textMuted}`,
+                              background: isPayer ? mc : "transparent",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 10, color: "#fff", fontWeight: 700,
+                            }}>
+                              {isPayer && "✓"}
+                            </span>
+                            <span style={{ fontWeight: 600, fontSize: 13, color: isPayer ? mc : colors.text,
+                              fontFamily: FONT, flex: 1, minWidth: 0,
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              textAlign: "left" }}>
+                              {m.name}
+                            </span>
+                          </button>
+                          {multiPayer && isPayer && (
+                            <PayerAmountInput
+                              uid={m.uid}
+                              onValueChange={(u, amt) => setPaidAmounts(prev => ({ ...prev, [u]: amt }))}
+                              currSymbol={currSymbol}
+                              colors={colors}
+                              FONT={FONT}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                    {multiPayer && (
+                      <p style={{
+                        fontSize: 11, textAlign: "right", fontFamily: FONT, fontWeight: 600, margin: "2px 0 0",
+                        color: Math.abs(multiPayerTotal - (amountInput.numericValue || 0)) < 0.01 ? "#27ae60" : "#e74c3c",
+                      }}>
+                        {currSymbol}{multiPayerTotal.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {currSymbol}{(amountInput.numericValue || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Para (20%) — cajas alineadas con Pagado por ── */}
+                {showForWhom && (
+                  <div>
+                    <p style={{ ...labelStyle, textAlign: "center" }}>Para</p>
+                    {memberList.map(m => {
+                      const sel = form.forWhom?.includes(m.uid);
+                      const mc = "#4F7FFA";
+                      return (
+                        <button key={m.uid} type="button" onClick={() => toggleForWhom(m.uid)}
+                          style={{
+                            width: "100%", height: 42, marginBottom: 6,
+                            borderRadius: 12, border: `2px solid ${sel ? mc : colors.inputBorder}`,
+                            background: sel ? mc + "18" : colors.input,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            cursor: "pointer", padding: 0,
+                          }}>
+                          <span style={{
+                            width: 18, height: 18, borderRadius: 9,
+                            border: `2px solid ${sel ? mc : colors.textMuted}`,
+                            background: sel ? mc : "transparent",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 10, color: "#fff", fontWeight: 700,
+                          }}>
+                            {sel && "✓"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* ADJUNTOS — oculto hasta upgrade a Firebase Blaze (ATTACHMENTS_ENABLED) */}
+            {ATTACHMENTS_ENABLED && <p style={labelStyle}>Adjuntos</p>}
+            {ATTACHMENTS_ENABLED && <div style={{ marginBottom: 14 }}>
+              {selectedFiles.map((file, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "8px 12px", borderRadius: 10, background: colors.pill }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{file.type === "application/pdf" ? "📄" : "🖼️"}</span>
+                  <span style={{ fontSize: 13, color: colors.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT }}>
+                    {file.name}
+                  </span>
+                  <button type="button" onClick={() => setSelectedFiles(prev => prev.filter((_, j) => j !== i))}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted, fontSize: 18, padding: "0 2px", lineHeight: 1 }}>✕</button>
+                </div>
+              ))}
+              <button type="button" onClick={() => fileInputRef.current?.click()}
+                style={{ padding: "8px 14px", borderRadius: 10, border: "2px dashed #4F7FFA", background: "transparent", color: "#4F7FFA", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>
+                + Adjuntar foto o PDF
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple
+                onChange={e => { setSelectedFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = ""; }}
+                style={{ display: "none" }} />
+            </div>}
+
+            <button
+              onClick={handleAdd}
+              disabled={loading}
+              style={{ width: "100%", padding: 16, borderRadius: 16, background: loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 600, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginTop: 4 }}>
+              {loading ? "Guardando..." : "Agregar"}
+            </button>
           </>
         )}
-
-        <p style={labelStyle}>Concepto</p>
-        <input value={form.concept} onChange={e => set("concept", e.target.value)} onFocus={() => touchField("concept")} onKeyDown={e => e.key === "Enter" && amountRef.current?.focus()} placeholder="Ej: Supermercado" style={{ ...inputStyle, borderColor: touched.concept && !form.concept ? "#ff6b6b" : colors.inputBorder }} />
-
-        <p style={labelStyle}>Monto ({currSymbol})</p>
-        <div style={{ position: "relative", marginBottom: 14 }}>
-          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: colors.textMuted, fontWeight: 600, fontSize: 15, fontFamily: FONT }}>{currSymbol}</span>
-          <input
-            ref={amountRef}
-            type="text"
-            inputMode="decimal"
-            value={amountInput.displayValue}
-            onChange={amountInput.onChange}
-            onFocus={() => { touchField("amount"); amountInput.onFocus?.(); }}
-            onBlur={amountInput.onBlur}
-            placeholder="0"
-            style={{ ...inputStyle, marginBottom: 0, paddingLeft: 36,
-              borderColor: touched.amount && amountInput.numericValue <= 0 ? "#ff6b6b" : colors.inputBorder
-            }}
-          />
-        </div>
-
-        <p style={labelStyle}>Categoría</p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
-          {allCategories.map(c => (
-            <button key={c.id} onClick={() => set("category", c.id)}
-              style={{ padding: "7px 12px", borderRadius: 12, border: "2px solid", fontSize: 12, cursor: "pointer", fontFamily: FONT,
-                borderColor: form.category === c.id ? "#4F7FFA" : colors.inputBorder,
-                background: form.category === c.id ? "#4F7FFA11" : colors.input,
-                color: form.category === c.id ? "#4F7FFA" : colors.text }}>
-              {c.icon} {c.label}
-            </button>
-          ))}
-          <button onClick={() => setShowNewCat(true)}
-            style={{ padding: "7px 12px", borderRadius: 12, border: "2px dashed", fontSize: 12, cursor: "pointer", fontFamily: FONT,
-              borderColor: "#4F7FFA", background: "transparent", color: "#4F7FFA", fontWeight: 600 }}>
-            + Nueva
-          </button>
-        </div>
-
-        <p style={labelStyle}>Fecha</p>
-        <DateInput value={form.date} onChange={v => set("date", v)} />
-
-        {(showPaidBy || showForWhom) && (
-          <div style={{ display: "grid", gridTemplateColumns: "4fr 1fr", gap: 10, marginBottom: 14, alignItems: "start" }}>
-
-            {/* ── Pagado por (80%) ── */}
-            {showPaidBy && (
-              <div>
-                <p style={labelStyle}>Pagado por</p>
-                {memberList.map(m => {
-                  const isPayer = multiPayer ? (m.uid in paidAmounts) : form.paidBy === m.uid;
-                  const mc = "#4F7FFA";
-                  return (
-                    <div key={m.uid} style={{
-                      display: "flex", alignItems: "center", gap: 8, marginBottom: 6,
-                      height: 42, padding: "0 10px", borderRadius: 12,
-                      border: `2px solid ${isPayer ? mc : colors.inputBorder}`,
-                      background: isPayer ? mc + "18" : colors.input,
-                    }}>
-                      <button type="button" onClick={() => togglePayerSelection(m.uid)}
-                        style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0,
-                          background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT,
-                          textAlign: "left" }}>
-                        <span style={{
-                          width: 18, height: 18, borderRadius: 9, flexShrink: 0,
-                          border: `2px solid ${isPayer ? mc : colors.textMuted}`,
-                          background: isPayer ? mc : "transparent",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 10, color: "#fff", fontWeight: 700,
-                        }}>
-                          {isPayer && "✓"}
-                        </span>
-                        <span style={{ fontWeight: 600, fontSize: 13, color: isPayer ? mc : colors.text,
-                          fontFamily: FONT, flex: 1, minWidth: 0,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          textAlign: "left" }}>
-                          {m.name}
-                        </span>
-                      </button>
-                      {multiPayer && isPayer && (
-                        <PayerAmountInput
-                          uid={m.uid}
-                          onValueChange={(u, amt) => setPaidAmounts(prev => ({ ...prev, [u]: amt }))}
-                          currSymbol={currSymbol}
-                          colors={colors}
-                          FONT={FONT}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-                {multiPayer && (
-                  <p style={{
-                    fontSize: 11, textAlign: "right", fontFamily: FONT, fontWeight: 600, margin: "2px 0 0",
-                    color: Math.abs(multiPayerTotal - (amountInput.numericValue || 0)) < 0.01 ? "#27ae60" : "#e74c3c",
-                  }}>
-                    {currSymbol}{multiPayerTotal.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {currSymbol}{(amountInput.numericValue || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* ── Para (20%) — cajas alineadas con Pagado por ── */}
-            {showForWhom && (
-              <div>
-                <p style={{ ...labelStyle, textAlign: "center" }}>Para</p>
-                {memberList.map(m => {
-                  const sel = form.forWhom?.includes(m.uid);
-                  const mc = "#4F7FFA";
-                  return (
-                    <button key={m.uid} type="button" onClick={() => toggleForWhom(m.uid)}
-                      style={{
-                        width: "100%", height: 42, marginBottom: 6,
-                        borderRadius: 12, border: `2px solid ${sel ? mc : colors.inputBorder}`,
-                        background: sel ? mc + "18" : colors.input,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        cursor: "pointer", padding: 0,
-                      }}>
-                      <span style={{
-                        width: 18, height: 18, borderRadius: 9,
-                        border: `2px solid ${sel ? mc : colors.textMuted}`,
-                        background: sel ? mc : "transparent",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 10, color: "#fff", fontWeight: 700,
-                      }}>
-                        {sel && "✓"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-          </div>
-        )}
-
-        {/* ADJUNTOS — oculto hasta upgrade a Firebase Blaze (ATTACHMENTS_ENABLED) */}
-        {ATTACHMENTS_ENABLED && <p style={labelStyle}>Adjuntos</p>}
-        {ATTACHMENTS_ENABLED && <div style={{ marginBottom: 14 }}>
-          {selectedFiles.map((file, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "8px 12px", borderRadius: 10, background: colors.pill }}>
-              <span style={{ fontSize: 20, flexShrink: 0 }}>{file.type === "application/pdf" ? "📄" : "🖼️"}</span>
-              <span style={{ fontSize: 13, color: colors.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT }}>
-                {file.name}
-              </span>
-              <button type="button" onClick={() => setSelectedFiles(prev => prev.filter((_, j) => j !== i))}
-                style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted, fontSize: 18, padding: "0 2px", lineHeight: 1 }}>✕</button>
-            </div>
-          ))}
-          <button type="button" onClick={() => fileInputRef.current?.click()}
-            style={{ padding: "8px 14px", borderRadius: 10, border: "2px dashed #4F7FFA", background: "transparent", color: "#4F7FFA", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>
-            + Adjuntar foto o PDF
-          </button>
-          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple
-            onChange={e => { setSelectedFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = ""; }}
-            style={{ display: "none" }} />
-        </div>}
-
-        <button
-          onClick={handleAdd}
-          disabled={loading}
-          style={{ width: "100%", padding: 16, borderRadius: 16, background: loading ? "#aaa" : "linear-gradient(135deg,#4F7FFA,#3a6ae8)", color: "#fff", border: "none", fontSize: 16, fontWeight: 600, cursor: loading ? "default" : "pointer", fontFamily: FONT, marginTop: 4 }}>
-          {loading ? "Guardando..." : "Agregar"}
-        </button>
       </div>
 
       {/* Modal nueva categoría */}
