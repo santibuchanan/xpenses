@@ -2,7 +2,7 @@
 
 > **Propósito:** Referencia de arquitectura que debe consultarse antes de cada sprint. Evita regresiones en zonas frágiles.
 
-**Última actualización:** Sesión Apr 7, 2026
+**Última actualización:** Sesión Apr 16, 2026
 **Deploy:** https://xpenses-seven.vercel.app
 **Firebase project:** xpenses-305ee
 
@@ -51,18 +51,22 @@ src/
 │   ├── useExpenses.js               ← addExpense(data, files[]), handleEditSave, deleteExpense, markFixedPaid, uploadAttachments
 │   ├── useSwipeSheet.js             ← Swipe-to-close para bottom sheets
 │   ├── useAmountInput.js            ← Input de montos con formato
+│   ├── useIsDesktop.js              ← Media query hook — true si ≥768px
 │   └── removeMember.js             ← Función para remover miembros
 ├── utils/
 │   └── normalizeMembers.js          ← buildAllMembers()
 └── screens/
     ├── HomeScreen.jsx               ← Pantalla principal con movimientos y skeleton
     ├── SaldosScreen.jsx             ← Saldos, settlements, historial
-    └── GraficosScreen.jsx           ← Gráficos por categoría y mes
+    └── GraficosScreen.jsx           ← Estadísticas por categoría y mes
 └── components/
     ├── MonthNavBar.jsx              ← Navegación global de meses (label + dots paginación)
+    ├── desktop/
+    │   ├── Sidebar.jsx              ← Sidebar colapsable desktop (220px / 64px), nav vertical, avatar dropdown
+    │   └── AvatarDropdown.jsx       ← Dropdown de usuario — toggle tema + cerrar sesión
     └── expenses/
         ├── AddExpenseModal.jsx      ← Modal agregar gasto
-        └── SwipeableExpenseRow.jsx  ← Fila de gasto con swipe
+        └── SwipeableExpenseRow.jsx  ← Fila de gasto con swipe (mobile) / hover 🗑 (desktop)
 ```
 
 ---
@@ -325,8 +329,20 @@ window.location.replace(origin) → recarga app con usuario autenticado
 Orquestador principal. Contiene:
 - **`AppInner`** — componente raíz con estado global, hooks de datos, routing de pantallas
 - **`MenuPanel`** — panel lateral con perfil, tema, tamaño de letra
-- **`AppHeader`** — header fijo con menú, notificaciones y búsqueda global de gastos
+- **`AppHeader`** — header fijo con menú, notificaciones y búsqueda global de gastos (**oculto en desktop** — reemplazado por `Sidebar`)
+- **`BottomNav`** — navegación inferior mobile (**oculto en desktop**)
 - **`ClaimIdentityModal`** — modal para elegir identidad al unirse via invite (legacy, usado cuando no hay InviteJoinScreen)
+- **FAB `+`** — en mobile está embebido en BottomNav; en desktop es un botón independiente `position: fixed, bottom: 32, right: 32`
+
+**Layout desktop (≥768px):**
+```
+<div style={{ display: 'flex', height: '100dvh' }}>
+  <Sidebar />                          ← 220px expandido / 64px colapsado
+  <div style={{ flex: 1, overflowY: 'auto' }}>
+    {/* contenido de pantalla activa */}
+  </div>
+</div>
+```
 
 > ⚠️ Riesgo: Modificar cualquier sección puede afectar las otras. `inviteIdFromUrl` se lee del hash al montar — no re-ejecuta.
 
@@ -429,10 +445,37 @@ Componente completamente autónomo — maneja todo el flujo de invite sin depend
 - `runTransaction` para join atómico
 - Al terminar: `window.location.replace(origin)`
 
+### `hooks/useIsDesktop.js`
+
+```js
+// Retorna true si window.matchMedia('(min-width: 768px)').matches
+// Se actualiza reactivamente con addEventListener('change')
+// Breakpoint único para toda la app — NO crear breakpoints alternativos
+```
+
+### `components/desktop/Sidebar.jsx`
+
+Sidebar colapsable para desktop. Props:
+```js
+{ activeTab, onTabChange, account, collapsed, onToggleCollapse,
+  user, userProfile, onSignOut, onToggleTheme, isDark }
+```
+- Ancho: 220px expandido / 64px colapsado
+- Toggle collapse: botón absoluto en `right: -12` del sidebar
+- Nav items: Inicio / Saldos / Estadísticas / Ajustes — key `"graficos"` para routing (no cambiar)
+- Avatar section: muestra `AvatarDropdown` cuando expandido; solo foto/inicial cuando colapsado
+
+### `components/desktop/AvatarDropdown.jsx`
+
+Dropdown de usuario que aparece sobre el avatar.
+- Se abre hacia arriba (`bottom: '100%'`)
+- Cierra con click fuera via `mousedown` listener
+- Items: toggle tema (muestra label según `isDark`) + cerrar sesión (color rojo)
+
 ### `components/expenses/SwipeableExpenseRow.jsx`
 
-- Fila de gasto con swipe-to-edit (bottom sheet) y swipe-to-delete
-- `onTouchStart` del card llama `e.stopPropagation()` antes de `handlers.onTouchStart(e)` — evita que el swipe de la fila pise el swipe horizontal de cambio de mes de HomeScreen/SaldosScreen
+- **Mobile:** swipe-to-delete con fondo rojo animado; `onTouchStart` llama `e.stopPropagation()` para no pisar swipe horizontal de mes
+- **Desktop:** botón 🗑 con `opacity: 0` + `onMouseEnter/Leave`; fondo rojo y touch handlers desactivados
 - Ícono 📎 junto al concepto si `expense.attachments?.length > 0` (con contador si hay más de uno) — **dormido con `ATTACHMENTS_ENABLED`**; al tocar abre el primer adjunto en nueva pestaña
 
 ### `SettingsScreen.jsx`

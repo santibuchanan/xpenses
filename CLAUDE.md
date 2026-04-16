@@ -149,6 +149,44 @@ style={{ touchAction: 'pan-y' }}
 
 ---
 
+## Desktop layout — sprint MP1-12.5 (Apr 16, 2026)
+
+### Patrón establecido como estándar
+
+- **Breakpoint único:** `≥768px` via `useIsDesktop()` (`src/hooks/useIsDesktop.js`)
+- **Tablet (`768px`)** mantiene versión mobile — desktop solo en pantallas anchas
+- **Swipeables → botón 🗑 al hover:** `opacity: 0` + `onMouseEnter/Leave` en desktop; swipe touch desactivado
+- **Bottom sheets → modal centrado:** `alignItems: center, justifyContent: center` en backdrop; `borderRadius: 20, maxWidth` en sheet
+- **Swipe horizontal de mes → desactivado en desktop:** guard `if (isDesktop) return` en `handleTouchStart`/`handleTouchEnd` de `HomeScreen` y `GraficosScreen`; `MonthNavBar` cubre la navegación en desktop
+
+### Nuevos archivos creados
+
+| Archivo | Descripción |
+|---------|-------------|
+| `src/hooks/useIsDesktop.js` | Media query hook — retorna `true` si `window.matchMedia('(min-width: 768px)')` |
+| `src/components/desktop/Sidebar.jsx` | Sidebar colapsable (220px expandido, 64px colapsado) con nav vertical, toggle, avatar dropdown |
+| `src/components/desktop/AvatarDropdown.jsx` | Dropdown de usuario — toggle tema + cerrar sesión; se abre hacia arriba, cierra con click fuera |
+
+### Tokens de tema usados en desktop (nunca inventar nuevos)
+
+```js
+colors.textMuted       // ← usar en lugar de colors.textSecondary (no existe)
+colors.cardBorder      // ← usar en lugar de colors.border (no existe)
+#4F7FFA                // ← hardcoded para accent (colors.primary no existe)
+colors.navBorder       // ← borde del sidebar
+```
+
+### Zonas frágiles desktop
+
+| Archivo | Zona | Riesgo |
+|---------|------|--------|
+| `App.jsx` | Wrapper flex desktop — sidebar + main | Cambiar `flexDirection` o `width` del sidebar rompe el layout |
+| `App.jsx` | FAB desktop (`position: fixed, bottom: 32, right: 32`) | No debe solapar con sidebar colapsado |
+| `AddExpenseModal` / `EditExpenseModal` | Modal `position: fixed, width: calc(100vw - 220px - 48px)` | Depende del ancho del sidebar expandido (220px) |
+| `Sidebar.jsx` | NAV_ITEMS key `"graficos"` | La key es el valor de `tab` state en App.jsx — no cambiar; solo cambiar `label` |
+
+---
+
 ## Checklist pre-push (verificar antes de cada push)
 
 ### Auth
@@ -209,7 +247,7 @@ style={{ touchAction: 'pan-y' }}
 - `selectedMonth` vive en `App.jsx` (AppInner) — estado global `"YYYY-MM"`, se resetea al cambiar de cuenta
 - Pasado como prop `selectedMonth` + `setSelectedMonth` a `HomeScreen`, `SaldosScreen`, `GraficosScreen`
 - `MonthNavBar` (`src/components/MonthNavBar.jsx`) — label capitalizado + dots deslizantes (máx. 7), tap navega
-- Swipe horizontal (delta > 50px) en las 3 pantallas para cambiar de mes
+- Swipe horizontal (delta > 50px) en mobile para cambiar de mes — **desactivado en desktop** (`if (isDesktop) return` en `handleTouchStart`/`handleTouchEnd`)
 - `historyMonth` (SaldosScreen) y `pieMonthIdx`/`barMonthIdx` (GraficosScreen) eliminados
 - SaldosScreen: botón Saldar oculto en meses históricos; badge "Saldado en {mes}" en deudas pasadas
 
