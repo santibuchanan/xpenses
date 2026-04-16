@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useTheme, formatAmount } from "../theme.jsx";
+import useIsDesktop from "../hooks/useIsDesktop.js";
 import { useSwipeSheet } from "../hooks/useSwipeSheet.js";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
 import { calcSaldosAcumulados } from "../hooks/useBalances.js";
@@ -166,6 +167,7 @@ function MarkPaidModal({ fixedExpense, allMembers, currentUser, currentMonth, on
 // ── HOME SCREEN ──
 export default function HomeScreen({ expenses, currentUser, allMembers, account, currentMonth, selectedMonth, setSelectedMonth, customCategories, visibleFixed, onEdit, onDelete, onMarkFixedPaid, settlements, isLoading, searchQuery = '' }) {
   const { colors } = useTheme();
+  const isDesktop = useIsDesktop();
   const fs = useExpenseFontSize();
   const isPersonal = account?.type === "personal";
   const isPozo = account?.type === "pozo";
@@ -193,8 +195,12 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
   const minMonth = expenses.length > 0
     ? expenses.reduce((min, e) => (e.month && e.month < min ? e.month : min), expenses[0]?.month || actualMonth)
     : actualMonth;
-  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchStart = (e) => {
+    if (isDesktop) return;
+    touchStartX.current = e.touches[0].clientX;
+  };
   const handleTouchEnd = (e) => {
+    if (isDesktop) return;
     if (touchStartX.current === null) return;
     const delta = e.changedTouches[0].clientX - touchStartX.current;
     touchStartX.current = null;

@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import MonthNavBar from "../components/MonthNavBar.jsx";
+import useIsDesktop from "../hooks/useIsDesktop.js";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useTheme, formatAmount } from "../theme.jsx";
 import { DEFAULT_CATEGORIES } from "../constants/categories.js";
@@ -19,6 +20,7 @@ function SectionTitle({ children, style = {} }) {
 
 export default function GraficosScreen({ expenses, account, customCategories, fixedExpenses, categoryBudgets, selectedMonth, setSelectedMonth }) {
   const { colors } = useTheme();
+  const isDesktop = useIsDesktop();
   const fmt = (n) => formatAmount(n, account?.currency || "ARS");
   const allCategories = [...DEFAULT_CATEGORIES, ...(customCategories || [])];
 
@@ -44,8 +46,12 @@ export default function GraficosScreen({ expenses, account, customCategories, fi
   const canGoNext = selectedMonth < todayMonth;
 
   const touchStartX = useRef(null);
-  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchStart = (e) => {
+    if (isDesktop) return;
+    touchStartX.current = e.touches[0].clientX;
+  };
   const handleTouchEnd = (e) => {
+    if (isDesktop) return;
     if (touchStartX.current === null) return;
     const delta = e.changedTouches[0].clientX - touchStartX.current;
     touchStartX.current = null;
