@@ -66,7 +66,7 @@ function StatPill({ label, value, color }) {
 
 // ── FIXED EXPENSE ROW ──
 // FIX #11: colors eliminado como prop — se consume directo de useTheme()
-function FixedExpenseHomeRow({ f, fmt, fs, currentMonth, allMembers, onMarkPaid }) {
+function FixedExpenseHomeRow({ f, fmt, fs, currentMonth, allMembers, onMarkPaid, isDesktop }) {
   const { colors } = useTheme();
   const payment = f.payments?.[currentMonth];
   const isPaid = payment?.paid === true;
@@ -75,6 +75,51 @@ function FixedExpenseHomeRow({ f, fmt, fs, currentMonth, allMembers, onMarkPaid 
   const daysLeft = f.dueDay ? f.dueDay - today : null;
   const isUrgent = !isPaid && daysLeft !== null && daysLeft >= 0 && daysLeft <= 5;
   const isOverdue = !isPaid && daysLeft !== null && daysLeft < 0;
+
+  if (isDesktop) {
+    return (
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr auto auto auto',
+        alignItems: 'center',
+        gap: 16,
+        padding: '12px 16px',
+        borderRadius: 10,
+        background: colors.card,
+        marginBottom: 6,
+        border: `1px solid ${colors.cardBorder}`,
+        opacity: isPaid ? 0.75 : 1,
+      }}>
+        <div style={{ fontSize: 14, color: colors.text, fontWeight: 500, fontFamily: FONT }}>{f.name}</div>
+        <div style={{ fontSize: 13, color: colors.textMuted, minWidth: 80, textAlign: 'center', fontFamily: FONT }}>
+          {f.dueDay ? `Vence día ${f.dueDay}` : '—'}
+        </div>
+        <div style={{ fontSize: 13, color: colors.textMuted, minWidth: 80, textAlign: 'center', fontFamily: FONT }}>
+          {isPaid
+            ? `Pagó ${paidByMember?.name || '—'}`
+            : '—'}
+        </div>
+        <button
+          type="button"
+          onClick={() => !isPaid && onMarkPaid(f)}
+          style={{
+            padding: '4px 12px',
+            borderRadius: 20,
+            border: 'none',
+            cursor: isPaid ? 'default' : 'pointer',
+            background: isPaid ? '#22c55e22' : colors.pill,
+            color: isPaid ? '#22c55e' : colors.textMuted,
+            fontSize: 12,
+            fontWeight: 600,
+            minWidth: 80,
+            fontFamily: FONT,
+          }}
+        >
+          {isPaid ? '✓ Pagado' : 'Marcar pagado'}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <Card style={{ padding: "12px 16px", marginBottom: 8, opacity: isPaid ? 0.75 : 1 }}>
@@ -429,7 +474,7 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
                       </div>
                     </button>
                     {fixedSharedExpanded && sharedFixed.map(f => (
-                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
+                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} isDesktop={isDesktop} />
                     ))}
                   </>
                 )}
@@ -444,13 +489,13 @@ export default function HomeScreen({ expenses, currentUser, allMembers, account,
                       </div>
                     </button>
                     {fixedPersonalExpanded && personalFixed.map(f => (
-                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
+                      <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} isDesktop={isDesktop} />
                     ))}
                   </>
                 )}
 
                 {isPersonal && displayFixed.map(f => (
-                  <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} />
+                  <FixedExpenseHomeRow key={f.id} f={f} fmt={fmt} fs={fs} currentMonth={selectedMonth} allMembers={allMembers} onMarkPaid={setPayingFixed} isDesktop={isDesktop} />
                 ))}
               </div>
             )}
